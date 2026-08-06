@@ -1,0 +1,23 @@
+.DS_Store
+.idea/
+.vscode/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+dist/
+build/
+coverage/
+.coverage
+tmp/
+work/
+
+# Never commit local case evidence or production extracts.
+data/private/
+evidence/private/
+exports/

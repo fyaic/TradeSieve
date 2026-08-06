@@ -1,0 +1,339 @@
+schema_version: 1
+accessed_at: "2026-08-06"
+policy:
+  primary_sources_control: true
+  production_use_requires_licence_review: true
+  current_claims_require_revalidation: true
+sources:
+  - id: eu-sanctions-overview
+    title: EU sanctions overview and related resources
+    category: official-regulatory
+    authority: European Commission
+    jurisdiction: EU
+    url: https://finance.ec.europa.eu/eu-and-world/sanctions-restrictive-measures/overview-sanctions-and-related-resources_en
+    use: Regime orientation and official data entry points
+    access: Public web page
+
+  - id: eu-dual-use-regulation-2021-821
+    title: Regulation (EU) 2021/821
+    category: official-law
+    authority: EUR-Lex
+    jurisdiction: EU
+    url: https://eur-lex.europa.eu/eli/reg/2021/821
+    use: Dual-use legal framework and versioned Annex I controls
+    access: Public legal publication
+
+  - id: eu-taric
+    title: EU customs tariff (TARIC)
+    category: official-data
+    authority: European Commission
+    jurisdiction: EU
+    url: https://taxation-customs.ec.europa.eu/customs/common-customs-tariff-cct/tariff-classification-goods/eu-customs-tariff-taric_en
+    use: Customs measures and CN/TARIC candidate checks
+    access: Public database and member-state data distribution
+
+  - id: eu-russia-regulation-833-2014
+    title: Regulation (EU) No 833/2014
+    category: official-law
+    authority: EUR-Lex
+    jurisdiction: EU
+    url: https://eur-lex.europa.eu/eli/reg/2014/833
+    use: Russia-related sectoral, goods, technology, and services restrictions
+    access: Public legal publication
+
+  - id: eu-russia-circumvention-guidance
+    title: Guidance for EU operators on Russia sanctions circumvention
+    category: official-guidance
+    authority: European Commission
+    jurisdiction: EU
+    url: https://finance.ec.europa.eu/document/download/3c86c9a8-f09e-4092-ab8c-a9e678df1494_en?filename=guidance-eu-operators-russia-sanctions-circumvention_en.pdf
+    use: Red flags and enhanced due-diligence evidence patterns
+    access: Public PDF
+
+  - id: eu-russia-package-21
+    title: EU 21st package of sanctions against Russia
+    category: official-announcement
+    authority: Council of the European Union
+    jurisdiction: EU
+    url: https://www.consilium.europa.eu/en/press/press-releases/2026/07/23/21st-package-of-sanctions-eu-hits-russian-energy-financial-services-and-crypto-hard/
+    use: Freshness case study and amendment discovery
+    access: Public web page
+
+  - id: ofac-sanctions-list-service
+    title: OFAC Sanctions List Service
+    category: official-data
+    authority: U.S. Department of the Treasury, OFAC
+    jurisdiction: US
+    url: https://ofac.treasury.gov/sanctions-list-service
+    use: Sanctions list downloads, customized datasets, and deltas
+    access: Public service; production connector terms must be reviewed
+
+  - id: ofac-faq-401
+    title: OFAC FAQ 401 — 50 Percent Rule
+    category: official-guidance
+    authority: U.S. Department of the Treasury, OFAC
+    jurisdiction: US
+    url: https://ofac.treasury.gov/faqs/401
+    use: Ownership aggregation rule modelling and test design
+    access: Public web page
+
+  - id: us-consolidated-screening-list
+    title: Consolidated Screening List
+    category: official-data
+    authority: U.S. Department of Commerce, International Trade Administration
+    jurisdiction: US
+    url: https://www.trade.gov/consolidated-screening-list
+    use: Consolidated export-screening data and API discovery
+    access: Public data and API; underlying source publications remain authoritative
+
+  - id: uk-sanctions-list
+    title: UK Sanctions List
+    category: official-data
+    authority: UK Government
+    jurisdiction: UK
+    url: https://www.gov.uk/government/publications/the-uk-sanctions-list
+    use: UK designations, ships, regimes, and measures
+    access: Public downloads; recheck format and terms during connector design
+
+  - id: un-consolidated-list
+    title: UN Security Council Consolidated List
+    category: official-data
+    authority: United Nations Security Council
+    jurisdiction: UN
+    url: https://main.un.org/securitycouncil/en/content/un-sc-consolidated-list
+    use: UN references, aliases, identifiers, and committee regimes
+    access: Public XML, HTML, and PDF
+
+  - id: gleif-lei-data
+    title: GLEIF LEI data
+    category: official-reference-data
+    authority: Global Legal Entity Identifier Foundation
+    jurisdiction: Global
+    url: https://www.gleif.org/en/lei-data/access-and-use-lei-data
+    use: Legal-entity identifiers and available relationship data
+    access: Public API and files; terms must be recorded for production
+
+  - id: bods
+    title: Beneficial Ownership Data Standard
+    category: open-standard
+    authority: Open Ownership
+    jurisdiction: Global
+    url: https://standard.openownership.org/
+    use: Ownership/control data interchange and provenance patterns
+    access: Public standard; Apache-2.0 repository components
+
+  - id: opensanctions-yente
+    title: yente entity matching API
+    category: open-source
+    authority: OpenSanctions
+    jurisdiction: Global
+    url: https://github.com/opensanctions/yente
+    use: Party-screening architecture and benchmark candidate
+    access: MIT code; underlying OpenSanctions data has separate commercial terms
+
+  - id: opensanctions-yente-client
+    title: yente client, CLI, and MCP server
+    category: open-source
+    authority: OpenSanctions
+    jurisdiction: Global
+    url: https://github.com/opensanctions/yente-client
+    use: Reference implementation for API/CLI/MCP parity
+    access: MIT code; service and dataset terms are separate
+
+  - id: followthemoney
+    title: FollowTheMoney entity data model
+    category: open-standard
+    authority: OpenSanctions
+    jurisdiction: Global
+    url: https://www.opensanctions.org/docs/entities/
+    use: Entity, identifier, relationship, and provenance modelling reference
+    access: Public documentation; verify component licences separately
+
+  - id: moov-watchman
+    title: Watchman sanctions screening service
+    category: open-source
+    authority: Moov Financial
+    jurisdiction: Global
+    url: https://github.com/moov-io/watchman
+    use: Self-hosted matcher and operations benchmark candidate
+    access: Apache-2.0 code; list-source configurations require independent audit
+
+  - id: splink
+    title: Splink probabilistic record linkage
+    category: open-source
+    authority: UK Ministry of Justice Analytical Services
+    jurisdiction: Global
+    url: https://github.com/moj-analytical-services/splink
+    use: Scalable probabilistic entity-resolution baseline
+    access: MIT code
+
+  - id: ditto
+    title: Ditto deep entity matching
+    category: open-source
+    authority: Megagon Labs
+    jurisdiction: Global
+    url: https://github.com/megagonlabs/ditto
+    use: Learned entity-matching research baseline
+    access: Apache-2.0 code
+
+  - id: opa
+    title: Open Policy Agent
+    category: open-source
+    authority: Open Policy Agent project
+    jurisdiction: Global
+    url: https://www.openpolicyagent.org/docs
+    use: Policy bundle, decision logging, and policy-engine reference
+    access: Public documentation; Apache-2.0 code
+
+  - id: mcp-specification
+    title: Model Context Protocol specification
+    category: open-standard
+    authority: Model Context Protocol project
+    jurisdiction: Global
+    url: https://github.com/modelcontextprotocol/modelcontextprotocol
+    use: Agent-tool interoperability and versioning
+    access: Public specification repository
+
+  - id: mcp-security-practices
+    title: MCP security best practices
+    category: open-standard-guidance
+    authority: Model Context Protocol project
+    jurisdiction: Global
+    url: https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices
+    use: Authorization, confused-deputy, token, and tool-safety design
+    access: Public documentation
+
+  - id: openapi
+    title: OpenAPI Specification
+    category: open-standard
+    authority: OpenAPI Initiative
+    jurisdiction: Global
+    url: https://spec.openapis.org/oas/
+    use: Canonical synchronous API contract
+    access: Public specification
+
+  - id: json-schema
+    title: JSON Schema specification
+    category: open-standard
+    authority: JSON Schema
+    jurisdiction: Global
+    url: https://json-schema.org/specification
+    use: Shared request, result, evidence, and event schemas
+    access: Public specification
+
+  - id: asyncapi
+    title: AsyncAPI documentation
+    category: open-standard
+    authority: AsyncAPI Initiative
+    jurisdiction: Global
+    url: https://www.asyncapi.com/docs
+    use: Event and webhook contract design
+    access: Public documentation
+
+  - id: cli-guidelines
+    title: Command Line Interface Guidelines
+    category: community-guidance
+    authority: clig.dev contributors
+    jurisdiction: Global
+    url: https://clig.dev/
+    use: Composable, scriptable, human-usable CLI design
+    access: Public documentation
+
+  - id: opensanctions-pairs-2026
+    title: OpenSanctions Pairs — A Large-Scale Entity Resolution Benchmark
+    category: academic-paper
+    authority: Paper authors
+    jurisdiction: Global
+    url: https://arxiv.org/abs/2603.11051
+    use: Multisource matching benchmark and error-analysis design
+    access: Public preprint; dataset terms must be checked separately
+
+  - id: federal-reserve-llm-sanctions-screening
+    title: Can Large Language Models Improve Sanctions Screening?
+    category: academic-working-paper
+    authority: Federal Reserve Board authors
+    jurisdiction: US
+    url: https://papers.ssrn.com/sol3/Delivery.cfm/fedgfe2025-92.pdf?abstractid=5956312&mirid=1
+    use: LLM-versus-fuzzy matching evidence and benchmark questions
+    access: Public working paper
+
+  - id: ditto-paper
+    title: Deep Entity Matching with Pre-Trained Language Models
+    category: academic-paper
+    authority: Paper authors
+    jurisdiction: Global
+    url: https://arxiv.org/abs/2004.00584
+    use: Learned matcher design and evaluation reference
+    access: Public preprint
+
+  - id: splink-paper
+    title: Splink — freely available software for probabilistic record linkage at scale
+    category: academic-paper
+    authority: International Journal of Population Data Science
+    jurisdiction: Global
+    url: https://doi.org/10.23889/ijpds.v7i3.1794
+    use: Probabilistic linkage method and implementation evidence
+    access: Public journal article
+
+  - id: blocking-survey
+    title: A Survey of Blocking and Filtering Techniques for Entity Resolution
+    category: academic-paper
+    authority: Paper authors
+    jurisdiction: Global
+    url: https://arxiv.org/abs/1603.07816
+    use: Candidate-generation and scalability design
+    access: Public preprint
+
+  - id: frontiers-nlp-sanctions-screening
+    title: Natural language processing for sanctions screening
+    category: academic-paper
+    authority: Frontiers in Artificial Intelligence
+    jurisdiction: Global
+    url: https://www.frontiersin.org/journals/artificial-intelligence/articles/10.3389/frai.2024.1374323/full
+    use: Applied NLP workflow and evaluation reference
+    access: Open-access article
+
+  - id: lseg-world-check-one-api
+    title: World-Check One API
+    category: commercial-industry
+    authority: LSEG
+    jurisdiction: Global
+    url: https://developers.lseg.com/en/api-catalog/customer-and-third-party-screening/world-check-one-api
+    use: Commercial screening workflow, case, webhook, and audit comparison
+    access: Commercial product; no production use without contract and data-rights review
+
+  - id: sap-gts
+    title: SAP Global Trade Services
+    category: commercial-industry
+    authority: SAP
+    jurisdiction: Global
+    url: https://www.sap.com/products/financial-management/global-trade-management.html
+    use: Enterprise logistics, screening, and trade-control integration patterns
+    access: Commercial product documentation
+
+  - id: sayari-graph
+    title: Sayari Graph
+    category: commercial-industry
+    authority: Sayari
+    jurisdiction: Global
+    url: https://sayari.com/platform/graph/
+    use: Corporate, ownership, and trade relationship intelligence comparison
+    access: Commercial product
+
+  - id: kharon
+    title: Kharon risk intelligence
+    category: commercial-industry
+    authority: Kharon
+    jurisdiction: Global
+    url: https://www.kharon.com/
+    use: Network and sanctions-risk intelligence comparison
+    access: Commercial product
+
+  - id: e2open-global-trade
+    title: e2open Global Trade
+    category: commercial-industry
+    authority: e2open
+    jurisdiction: Global
+    url: https://www.e2open.com/global-trade/
+    use: Enterprise export-management and global-trade workflow comparison
+    access: Commercial product

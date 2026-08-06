@@ -1,0 +1,41 @@
+name: Research task
+description: Investigate a source, regulation, method, product, or benchmark.
+title: "research: "
+labels: ["area/research"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Research question
+      description: State a bounded question and why it matters.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and exclusions
+      description: Include jurisdiction, as-of date, workflow, and explicit exclusions.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Preferred primary evidence
+      description: List official sources, original papers, specifications, or repositories to inspect.
+  - type: checkboxes
+    id: safeguards
+    attributes:
+      label: Safeguards
+      options:
+        - label: I will separate source facts from project inference.
+          required: true
+        - label: I will record durable sources in `research/sources.yaml`.
+          required: true
+        - label: I will not include production customer or transaction data.
+          required: true
+  - type: textarea
+    id: deliverable
+    attributes:
+      label: Deliverable and decision gate
+    validations:
+      required: true

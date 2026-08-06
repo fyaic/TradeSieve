@@ -1,0 +1,41 @@
+name: Data-source connector
+description: Assess or add an official, community, or commercial source.
+title: "source: "
+labels: ["area/data"]
+body:
+  - type: input
+    id: owner
+    attributes:
+      label: Source owner and jurisdiction
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Primary URL
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Legal/data scope and intended use
+    validations:
+      required: true
+  - type: textarea
+    id: access
+    attributes:
+      label: Access, licence, retention, and redistribution constraints
+    validations:
+      required: true
+  - type: textarea
+    id: lifecycle
+    attributes:
+      label: Version, delta, history, and failure behavior
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance tests and rollback
+    validations:
+      required: true

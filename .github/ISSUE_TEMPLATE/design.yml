@@ -1,0 +1,43 @@
+name: Design proposal
+description: Propose an architecture, interface, schema, control, or operating-model change.
+title: "design: "
+labels: ["area/architecture"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and users
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Requirements and safety constraints
+      description: Include audit, authorization, source/rule versions, replay, and human-review implications.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed design
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and trade-offs
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification and rollback
+    validations:
+      required: true
+  - type: checkboxes
+    id: decisions
+    attributes:
+      label: Decision records
+      options:
+        - label: I will add an ADR if this materially changes a project boundary or invariant.
+          required: true
