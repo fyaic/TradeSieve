@@ -1,15 +1,16 @@
 # Contributing
 
-TradeSieve is in discovery. Contributions should improve the evidence base, clarify requirements, or make an explicit design decision.
+TradeSieve is in Phase 1 planning and delivery. Contributions should deliver a linked user/operational outcome, improve the evidence base, clarify requirements, or make an explicit design decision.
 
 ## Workflow
 
-1. Create a focused branch named `agent/<description>` or `docs/<description>`.
-2. Link the change to an issue or explain the decision in the pull request.
-3. Separate factual research from project recommendations.
-4. Add primary-source links, access dates, and licence notes.
-5. Run `./scripts/check_docs.sh` before opening a pull request.
-6. Use a pull request; do not push directly to protected branches.
+1. Refine the issue against the [Definition of Ready](docs/delivery/agile-operating-model.md).
+2. Create a focused branch named `feature/<issue>-<description>`, `fix/<issue>-<description>`, `docs/<issue>-<description>`, or `agent/<description>`.
+3. Link the change to an issue/requirement and state observable acceptance criteria in the pull request.
+4. Separate factual research from project recommendations; add primary-source links, access dates, and licence notes.
+5. Update OpenAPI/examples/CLI/MCP parity and migrations when the contract/data changes.
+6. Run `./scripts/check_docs.sh` and all implementation checks before marking the PR ready.
+7. Meet the [Definition of Done](docs/delivery/agile-operating-model.md); use a pull request rather than direct main pushes.
 
 ## Content safety
 

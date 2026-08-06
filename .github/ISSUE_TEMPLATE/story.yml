@@ -1,0 +1,53 @@
+name: User story
+description: Deliver a testable user or operational outcome inside one sprint.
+title: "story: "
+labels: ["type/story", "phase/1-mvp"]
+body:
+  - type: input
+    id: parent
+    attributes:
+      label: Parent epic and requirement IDs
+      placeholder: "#123; FR-INT-001, NFR-007"
+    validations:
+      required: true
+  - type: textarea
+    id: story
+    attributes:
+      label: Story
+      description: As a … I want … so that …
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Include observable success, failure, authorization, idempotency, audit, and safety behavior where applicable.
+      placeholder: |
+        - Given … when … then …
+        - Given a forbidden/failed condition … then the action remains held …
+    validations:
+      required: true
+  - type: textarea
+    id: data
+    attributes:
+      label: Synthetic fixtures and test evidence
+      description: Identify fixtures and how acceptance will be demonstrated without production data.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies and open decisions
+    validations:
+      required: true
+  - type: checkboxes
+    id: ready
+    attributes:
+      label: Definition of Ready
+      options:
+        - label: Outcome, acceptance, requirements, dependencies, safety, and test approach are understood.
+          required: true
+        - label: The story is small enough to complete and demonstrate in one sprint.
+          required: true
+        - label: No production data or unapproved source/licence assumption is required.
+          required: true

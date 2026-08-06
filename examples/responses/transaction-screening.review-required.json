@@ -1,0 +1,85 @@
+{
+  "schema_version": "1.0.0",
+  "screening_id": "scr_demo001",
+  "case_id": "case_demo001",
+  "state": "REVIEW_REQUIRED",
+  "signal": "YELLOW",
+  "highest_priority": "P1",
+  "business_action": "HOLD",
+  "summary": "Synthetic transaction has unresolved party identity, goods specification, end-user, and legal-nexus evidence.",
+  "findings": [
+    {
+      "finding_id": "fnd_demo_party_001",
+      "kind": "PARTY_IDENTITY_INCOMPLETE",
+      "priority": "P1",
+      "status": "OPEN",
+      "fact_class": "UNKNOWN",
+      "summary": "Buyer registration identifier is missing; candidate resolution is incomplete.",
+      "evidence_refs": [],
+      "source_refs": [
+        "demo-sanctions:2026-08-06:synthetic-record-17"
+      ],
+      "uncertainty": [
+        "No authoritative registration identifier was supplied"
+      ],
+      "required_action": "OBTAIN_REGISTRATION_IDENTIFIER_AND_REVIEW",
+      "owner_role": "COMPLIANCE_REVIEWER",
+      "due_before": "QUOTE_RELEASE"
+    },
+    {
+      "finding_id": "fnd_demo_goods_001",
+      "kind": "GOODS_SPECIFICATION_INCOMPLETE",
+      "priority": "P1",
+      "status": "OPEN",
+      "fact_class": "UNKNOWN",
+      "summary": "Model, part number, and technical specification are missing; the HS code is not a definitive control classification.",
+      "evidence_refs": [],
+      "source_refs": [
+        "demo-eu-russia:1:goods-completeness"
+      ],
+      "uncertainty": [
+        "Technical parameters cannot be compared with the configured control assertions"
+      ],
+      "required_action": "OBTAIN_MANUFACTURER_MODEL_AND_DATA_SHEET",
+      "owner_role": "SALES_AND_EXPORT_CONTROL_REVIEWER",
+      "due_before": "QUOTE_RELEASE"
+    },
+    {
+      "finding_id": "fnd_demo_nexus_001",
+      "kind": "LEGAL_NEXUS_UNRESOLVED",
+      "priority": "P1",
+      "status": "OPEN",
+      "fact_class": "UNKNOWN",
+      "summary": "Applicable EU Member State and bank policy scope have not been confirmed.",
+      "evidence_refs": [],
+      "source_refs": [
+        "demo-policy-scope:1"
+      ],
+      "uncertainty": [
+        "Legal and contractual scope is incomplete"
+      ],
+      "required_action": "CONFIRM_LEGAL_NEXUS_AND_BANK_POLICY",
+      "owner_role": "LEGAL_COMPLIANCE_OWNER",
+      "due_before": "QUOTE_RELEASE"
+    }
+  ],
+  "required_evidence": [
+    "Buyer authoritative registration identifier",
+    "Manufacturer model or part number and technical data sheet",
+    "Final end-user and installation/use details",
+    "Applicable EU Member State and bank/customer policy scope"
+  ],
+  "version_set": {
+    "schema": "1.0.0",
+    "sources": [
+      "demo-sanctions:2026-08-06"
+    ],
+    "rules": [
+      "demo-eu-russia:1",
+      "demo-policy-scope:1"
+    ],
+    "matcher": "demo-deterministic:1",
+    "models": []
+  },
+  "created_at": "2026-08-06T08:00:00Z"
+}

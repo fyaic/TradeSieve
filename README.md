@@ -1,52 +1,75 @@
 # TradeSieve
 
-> Independent, agent-ready trade compliance control plane for sanctions, export-control, and transaction-risk triage.
+> Independent, agent-ready trade-compliance decision-support service for sanctions, export-control, and transaction-risk triage.
 
-[![Status: Discovery](https://img.shields.io/badge/status-discovery-6f42c1)](#project-status)
+[![Status: Phase 1 planned](https://img.shields.io/badge/status-Phase%201%20planned-6f42c1)](#project-status)
 [![Interfaces: API CLI MCP](https://img.shields.io/badge/interfaces-API%20%7C%20CLI%20%7C%20MCP-0969da)](docs/architecture/agent-interface-principles.md)
 [![Decision model: Human cleared](https://img.shields.io/badge/decision-human--cleared-b7791f)](docs/decisions/0002-human-clearance-only.md)
 
-TradeSieve is a research and design repository for an independent screening service that can sit beside CRM, order, booking, shipment, and payment systems. It is intended to normalize official sanctions and export-control sources, screen parties/goods/routes/payments, preserve evidence, and route uncertain cases to authorized reviewers.
+TradeSieve is designed as an independently deployable service beside CRM, order, booking, shipment, and payment systems. It normalizes approved sanctions/export-control evidence, screens proposed business actions, preserves source/rule provenance, and routes uncertainty to authorized human review.
 
 ## Project status
 
-**Discovery only. No production screening engine exists yet.** Nothing in this repository is legal advice or an automatic clearance mechanism.
+**Phase 1 is planned; no runnable MVP exists yet.** The current repository is a reviewed product, research, architecture, contract, and delivery baseline. The [target MVP user experience](docs/getting-started/mvp-user-experience.md) is an acceptance contract, not a working quickstart until implementation and release gates pass.
 
-The current work records the original logistics-industry problem, surveys official sources and existing systems, and establishes design constraints for a future implementation.
+Nothing in this repository is legal advice or an automatic legal-clearance mechanism.
+
+## Phase 1 outcome
+
+Version `0.1.0` should let an evaluator:
+
+1. start a private demo with Docker Compose;
+2. submit the same synthetic transaction through REST, CLI, and MCP;
+3. receive structured findings, missing evidence, versions, and a `HOLD`/review action;
+4. complete the authorized human review path;
+5. connect a sample CRM/OMS synchronous gate and signed webhook;
+6. demonstrate source-change rescreening, replay, and a redacted evidence/audit pack.
+
+See [Phase 1 service MVP](docs/product/mvp-scope.md), [delivery plan](docs/delivery/phase-1-plan.md), and [backlog decomposition](docs/delivery/phase-1-backlog.md).
 
 ## Product principles
 
-- **Independent control plane:** business systems call TradeSieve; they do not embed legal data or matching rules.
+- **Focused service boundary:** business systems remain systems of record; TradeSieve owns screening evidence, cases, decisions, and provenance.
 - **One contract, multiple interfaces:** REST/OpenAPI is canonical; CLI and MCP are typed adapters over the same application service.
-- **Evidence before score:** every result identifies the source version, rule version, facts, uncertainty, and required action.
-- **Human clearance only:** automation may hold or escalate; only an authorized reviewer can issue a time-bounded release.
-- **As-of-time reproducibility:** raw sources, deltas, hashes, and decisions are immutable and replayable.
+- **Evidence before score:** results identify source/rule/input/model versions, facts, uncertainty, and required action.
+- **Human clearance only:** automation may hold or escalate; only an authorized reviewer can issue a scoped, expiring release.
+- **As-of-time readiness:** raw sources, deltas, hashes, and decisions are immutable and replayable; complete historic reconstruction is a later coverage question.
 - **AI as an assistant:** models may extract, normalize, compare, and draft; deterministic controls and human review own disposition.
+- **Private by default:** production customer/transaction data does not leave the approved deployment boundary by default.
 
 ## Intended interfaces
 
 | Interface | Primary users | Intended use |
 | --- | --- | --- |
-| REST/OpenAPI | CRM, OMS, booking, payment systems | Synchronous screening and case operations |
-| Events/webhooks | Integration services | Rescreening, holds, releases, source-change notifications |
-| `tradesieve` CLI | Operators, CI jobs, analysts | Batch screening, replay, source inspection, diagnostics |
-| TradeSieve MCP | AI agents | Structured evidence retrieval and review-safe workflows |
+| REST/OpenAPI | CRM, OMS, booking, payment systems | Idempotent pre-action screening and case operations |
+| Events/webhooks | Integration services | Rescreening, holds, human decisions, source-change notifications |
+| `tradesieve` CLI | Operators, CI jobs, analysts | Validation, screening, replay, source inspection, diagnostics |
+| TradeSieve MCP | Authorized AI agents | Structured evidence retrieval and review-safe workflows |
+| Reviewer console | Compliance reviewers | Findings, evidence, human decision, expiry, audit |
 
-## Documentation map
+## Repository map
 
-- [Original request](docs/requirements/original-request.md)
-- [Problem, scope, and success criteria](docs/requirements/problem-and-scope.md)
-- [Initial system shape](docs/architecture/initial-system-shape.md)
-- [Agent interface principles](docs/architecture/agent-interface-principles.md)
-- [Research landscape](docs/research/landscape.md)
-- [Official data and regulatory sources](docs/research/regulatory-and-data-sources.md)
-- [Open-source and standards review](docs/research/open-source-and-standards.md)
-- [Academic research review](docs/research/academic-research.md)
-- [Industry patterns](docs/research/industry-patterns.md)
-- [Machine-readable source registry](research/sources.yaml)
-- [Discovery roadmap](docs/roadmap/discovery-plan.md)
+| Path | Purpose |
+| --- | --- |
+| `docs/requirements/` | Original request, problem, scope, success criteria |
+| `docs/product/` | Service definition, personas/journeys, detailed requirements, MVP |
+| `docs/architecture/` | Service/domain/integration/security/implementation design |
+| `docs/decisions/` | Architecture decision records |
+| `docs/delivery/` | Agile operating model, Phase 1 plan and backlog |
+| `docs/getting-started/` | Target/released user and integration journeys |
+| `docs/research/` | Regulatory, community, academic, and industry research |
+| `api/openapi/` | Versioned canonical HTTP contract |
+| `examples/` | Synthetic requests and safe expected responses |
+| `research/sources.yaml` | Machine-readable source registry |
+| `scripts/` | Repository and contract checks |
 
-See the [documentation index](docs/README.md) for all records and decisions.
+Start with the [documentation index](docs/README.md).
+
+## Current contract artifacts
+
+- [Draft OpenAPI 3.1 contract](api/openapi/tradesieve.v1.json)
+- [Synthetic transaction request](examples/requests/transaction-screening.json)
+- [Expected review-required response](examples/responses/transaction-screening.review-required.json)
 
 ## Explicit non-goals
 
@@ -56,6 +79,6 @@ See the [documentation index](docs/README.md) for all records and decisions.
 - Sending production customer or shipment data to third-party AI services by default.
 - Scraping and silently overwriting legal sources without provenance and version control.
 
-## Repository governance
+## Governance
 
-This repository is currently private and proprietary. See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), and [GOVERNANCE.md](GOVERNANCE.md).
+This is a private `fyaic` organization repository. Delivery follows the [agile operating model](docs/delivery/agile-operating-model.md), [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), and [GOVERNANCE.md](GOVERNANCE.md).

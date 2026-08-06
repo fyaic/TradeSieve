@@ -185,6 +185,42 @@ sources:
     use: Policy bundle, decision logging, and policy-engine reference
     access: Public documentation; Apache-2.0 code
 
+  - id: fastapi
+    title: FastAPI official documentation
+    category: open-source-documentation
+    authority: FastAPI project
+    jurisdiction: Global
+    url: https://fastapi.tiangolo.com/features/
+    use: Phase 1 typed HTTP, OpenAPI, JSON Schema, authentication, and container implementation candidate
+    access: Public documentation; verify locked package and transitive licences at implementation
+
+  - id: postgresql-row-security
+    title: PostgreSQL row security policies
+    category: official-technical-documentation
+    authority: PostgreSQL Global Development Group
+    jurisdiction: Global
+    url: https://www.postgresql.org/docs/current/ddl-rowsecurity.html
+    use: Tenant and database-role defense-in-depth design
+    access: Public PostgreSQL documentation
+
+  - id: postgresql-pg-trgm
+    title: PostgreSQL pg_trgm extension
+    category: official-technical-documentation
+    authority: PostgreSQL Global Development Group
+    jurisdiction: Global
+    url: https://www.postgresql.org/docs/current/pgtrgm.html
+    use: Explainable Phase 1 candidate-retrieval benchmark baseline
+    access: Public PostgreSQL documentation
+
+  - id: opentelemetry-python
+    title: OpenTelemetry Python instrumentation
+    category: open-standard-documentation
+    authority: OpenTelemetry project
+    jurisdiction: Global
+    url: https://opentelemetry.io/docs/languages/python/instrumentation/
+    use: Vendor-neutral redacted traces, metrics, and logs design
+    access: Public documentation; Apache-2.0 project components
+
   - id: mcp-specification
     title: Model Context Protocol specification
     category: open-standard
@@ -193,6 +229,15 @@ sources:
     url: https://github.com/modelcontextprotocol/modelcontextprotocol
     use: Agent-tool interoperability and versioning
     access: Public specification repository
+
+  - id: mcp-python-sdk
+    title: Official MCP Python SDK
+    category: open-source
+    authority: Model Context Protocol project
+    jurisdiction: Global
+    url: https://github.com/modelcontextprotocol/python-sdk
+    use: Phase 1 Streamable HTTP and optional stdio MCP implementation candidate
+    access: Public official SDK repository; pin and review the stable version during implementation
 
   - id: mcp-security-practices
     title: MCP security best practices
@@ -211,6 +256,15 @@ sources:
     url: https://spec.openapis.org/oas/
     use: Canonical synchronous API contract
     access: Public specification
+
+  - id: redocly-cli
+    title: Redocly CLI
+    category: open-source
+    authority: Redocly
+    jurisdiction: Global
+    url: https://github.com/Redocly/redocly-cli
+    use: Pinned Phase 1 OpenAPI linting in repository CI
+    access: MIT code; CI pins npm package version 2.44.2
 
   - id: json-schema
     title: JSON Schema specification
