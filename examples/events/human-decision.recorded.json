@@ -1,0 +1,22 @@
+{
+  "event_id": "evt-decision-001",
+  "event_type": "human_decision.recorded",
+  "event_version": "1.0",
+  "occurred_at": "2026-08-06T08:00:01Z",
+  "tenant_id": "tenant-demo",
+  "correlation_id": "crm-quote-001",
+  "subject": {
+    "screening_id": "scr-demo-001",
+    "case_id": "case-demo-001",
+    "external_object_type": "QUOTE",
+    "external_object_id": "demo-quote-001"
+  },
+  "data": {
+    "kind": "human_decision.recorded",
+    "case_id": "case-demo-001",
+    "decision_id": "decision-demo-001",
+    "decision": "HUMAN_BLOCKED",
+    "decision_effective_from": "2026-08-06T08:00:01Z",
+    "decision_expires_at": null
+  }
+}

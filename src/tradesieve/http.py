@@ -5,15 +5,10 @@ from __future__ import annotations
 import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 
+from tradesieve.application.contracts import Health, HealthStatus
 from tradesieve.config import Settings, get_settings
 from tradesieve.runtime import check_readiness
-
-
-class HealthResponse(BaseModel):
-    status: str
-    checks: dict[str, str]
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -24,24 +19,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         debug=runtime_settings.debug,
     )
 
-    @application.get("/health/live", response_model=HealthResponse)
-    def liveness() -> HealthResponse:
-        return HealthResponse(status="OK", checks={"process": "UP"})
+    @application.get("/health/live", response_model=Health)
+    def liveness() -> Health:
+        return Health(status=HealthStatus.OK, checks={"process": "UP"})
 
     @application.get(
         "/health/ready",
-        response_model=HealthResponse,
-        responses={503: {"model": HealthResponse}},
+        response_model=Health,
+        responses={503: {"model": Health}},
     )
-    def readiness() -> HealthResponse | JSONResponse:
+    def readiness() -> Health | JSONResponse:
         status = check_readiness(runtime_settings)
-        payload = HealthResponse(
-            status="OK" if status.ready else "UNAVAILABLE",
+        payload = Health(
+            status=HealthStatus.OK if status.ready else HealthStatus.UNAVAILABLE,
             checks=status.public_checks(),
         )
         if status.ready:
             return payload
-        return JSONResponse(status_code=503, content=payload.model_dump())
+        return JSONResponse(status_code=503, content=payload.model_dump(mode="json"))
 
     return application
 

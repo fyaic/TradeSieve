@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0.0",
+  "tenant_id": "tenant-demo",
+  "correlation_id": "crm-customer-incomplete-001",
+  "data_classification": "SYNTHETIC",
+  "external_object": {
+    "system": "demo-crm",
+    "object_type": "CUSTOMER",
+    "object_id": "demo-customer-incomplete-001",
+    "object_version": "1"
+  },
+  "proposed_action": "CUSTOMER_ONBOARDING",
+  "activities": [],
+  "action_due_at": "2026-08-07T08:00:00",
+  "legal_nexus": [],
+  "parties": [
+    {
+      "party_ref": "customer-1",
+      "roles": [
+        "CUSTOMER"
+      ],
+      "entity_type": "ORGANIZATION",
+      "legal_name": null,
+      "aliases": [],
+      "country": null,
+      "identifiers": [],
+      "address": null
+    }
+  ],
+  "ownership_and_control": [],
+  "goods": [],
+  "route": null,
+  "documents": [],
+  "payment": null,
+  "unexpected_business_override": "ALLOW"
+}

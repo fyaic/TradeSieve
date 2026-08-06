@@ -83,8 +83,14 @@ Each finding includes:
   "summary": "Candidate record requires human resolution",
   "evidence_refs": ["ev_..."],
   "source_refs": ["snapshot:record:field"],
-  "rule_evaluations": ["rule_version:evaluation"],
-  "uncertainty": ["registration identifier missing"],
+  "rule_evaluation_refs": ["rule_version:evaluation"],
+  "uncertainty": [
+    {
+      "fact_path": "parties.party-1.identifiers",
+      "description": "Registration identifier missing"
+    }
+  ],
+  "required_evidence_refs": ["req_registration_id"],
   "required_action": "OBTAIN_REGISTRATION_ID_AND_REVIEW",
   "owner_role": "COMPLIANCE_REVIEWER",
   "due_before": "QUOTE_RELEASE"

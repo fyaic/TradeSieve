@@ -1,0 +1,167 @@
+"""Generated contract fixtures, schema parity, and drift-failure tests."""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+from pydantic import ValidationError
+
+from tradesieve.application.contract_examples import (
+    event_examples,
+    incomplete_customer_onboarding_request,
+    structurally_invalid_request,
+    transaction_review_required_result,
+    transaction_screening_request,
+)
+from tradesieve.application.contracts import EventEnvelope, ScreeningRequest
+
+ROOT = Path(__file__).parents[2]
+GENERATOR = ROOT / "scripts/generate_contract.py"
+
+
+def load_json(path: Path) -> object:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_generated_golden_incomplete_result_and_event_examples_round_trip() -> None:
+    request = transaction_screening_request()
+    incomplete = incomplete_customer_onboarding_request()
+    result = transaction_review_required_result(request)
+    events = event_examples(result)
+
+    assert load_json(ROOT / "examples/requests/transaction-screening.json") == (
+        request.model_dump(mode="json")
+    )
+    assert load_json(
+        ROOT / "examples/requests/customer-onboarding.incomplete.json"
+    ) == incomplete.model_dump(mode="json")
+    assert load_json(
+        ROOT / "examples/responses/transaction-screening.review-required.json"
+    ) == result.model_dump(mode="json")
+    assert result.result_hash == result.canonical_result_hash()
+
+    event_paths = {
+        "screening.completed": "screening.completed.json",
+        "case.state_changed": "case.state-changed.json",
+        "human_decision.recorded": "human-decision.recorded.json",
+    }
+    for event_type, filename in event_paths.items():
+        committed = load_json(ROOT / "examples/events" / filename)
+        parsed = EventEnvelope.model_validate(committed)
+        assert committed == events[event_type].model_dump(mode="json")
+        assert parsed.event_type.value == event_type
+
+
+def test_committed_negative_fixture_is_rejected_and_not_published_as_valid() -> None:
+    incomplete = incomplete_customer_onboarding_request()
+    invalid = structurally_invalid_request(incomplete)
+    path = (
+        ROOT / "examples/requests/invalid/transaction-screening.structural-error.json"
+    )
+    assert load_json(path) == invalid
+
+    with pytest.raises(ValidationError) as exc_info:
+        ScreeningRequest.model_validate(invalid)
+    message = str(exc_info.value)
+    assert "unexpected_business_override" in message
+    assert "timezone" in message
+
+    openapi = load_json(ROOT / "api/openapi/tradesieve.v1.json")
+    assert isinstance(openapi, dict)
+    published = openapi["paths"]["/v1/screenings"]["post"]["requestBody"]["content"][
+        "application/json"
+    ]["examples"]
+    assert "invalid" not in published
+
+
+def test_openapi_and_shared_registry_have_generated_schema_parity() -> None:
+    openapi = load_json(ROOT / "api/openapi/tradesieve.v1.json")
+    registry = load_json(ROOT / "api/schemas/tradesieve.contracts.v1.json")
+    assert isinstance(openapi, dict)
+    assert isinstance(registry, dict)
+    openapi_schemas = openapi["components"]["schemas"]
+    shared_schemas = registry["$defs"]
+
+    assert set(openapi_schemas) == set(shared_schemas)
+    assert openapi["x-tradesieve-canonical-source"]["model"] == (
+        "tradesieve.application.contracts"
+    )
+    for schema in openapi_schemas.values():
+        if schema.get("type") == "object":
+            assert schema.get("additionalProperties") is False
+
+    request_properties = openapi_schemas["ScreeningRequest"]["properties"]
+    assert {
+        "activities",
+        "legal_nexus",
+        "parties",
+        "ownership_and_control",
+        "goods",
+        "route",
+        "documents",
+        "payment",
+    } <= set(request_properties)
+    assert (
+        openapi_schemas["EventEnvelope"]["properties"]["data"]["discriminator"][
+            "propertyName"
+        ]
+        == "kind"
+    )
+    assert "never legal clearance" in openapi_schemas["Signal"]["description"]
+    amount_schema = openapi_schemas["PaymentPath"]["properties"]["amount"]
+    assert {item["type"] for item in amount_schema["anyOf"]} == {"string", "null"}
+    decimal_fields = (
+        ("GoodsLine", "quantity"),
+        ("OwnershipControlRelationship", "ownership_percentage"),
+        ("ClassificationCandidate", "confidence"),
+    )
+    for schema_name, field_name in decimal_fields:
+        schema = openapi_schemas[schema_name]["properties"][field_name]
+        assert {item["type"] for item in schema["anyOf"]} == {"string", "null"}
+
+
+def test_generator_is_byte_deterministic_and_check_mode_detects_temp_drift(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "contract-root"
+    shutil.copytree(ROOT / "api", root / "api")
+    shutil.copytree(ROOT / "examples", root / "examples")
+    env = {**os.environ, "TRADESIEVE_CONTRACT_ROOT": str(root)}
+    command = [sys.executable, str(GENERATOR)]
+
+    first = subprocess.run(
+        command, env=env, capture_output=True, text=True, check=False
+    )
+    assert first.returncode == 0, first.stdout + first.stderr
+    first_bytes = {
+        path.relative_to(root): path.read_bytes()
+        for path in sorted(root.rglob("*.json"))
+    }
+
+    second = subprocess.run(
+        command, env=env, capture_output=True, text=True, check=False
+    )
+    assert second.returncode == 0, second.stdout + second.stderr
+    second_bytes = {
+        path.relative_to(root): path.read_bytes()
+        for path in sorted(root.rglob("*.json"))
+    }
+    assert second_bytes == first_bytes
+
+    stale_path = root / "examples/requests/customer-onboarding.incomplete.json"
+    stale_path.write_text("{}\n", encoding="utf-8")
+    check = subprocess.run(
+        [*command, "--check"],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert check.returncode == 1
+    assert "customer-onboarding.incomplete.json" in check.stdout

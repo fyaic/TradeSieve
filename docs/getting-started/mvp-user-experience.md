@@ -46,33 +46,15 @@ curl --fail-with-body \
   -H "Authorization: Bearer $TRADESIEVE_TOKEN" \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: demo-quote-001-v1" \
-  -H "X-Correlation-ID: crm-demo-quote-001" \
+  -H "X-Correlation-ID: crm-quote-001" \
   --data @examples/requests/transaction-screening.json \
   http://localhost:8080/v1/screenings
 ```
 
-Expected decision-first response shape:
-
-```json
-{
-  "screening_id": "scr_...",
-  "case_id": "case_...",
-  "state": "REVIEW_REQUIRED",
-  "signal": "YELLOW",
-  "highest_priority": "P1",
-  "business_action": "HOLD",
-  "summary": "Material goods and party evidence requires human review.",
-  "required_evidence": [
-    "Manufacturer data sheet and model/part number",
-    "Counterparty registration identifier"
-  ],
-  "version_set": {
-    "schema": "1.0.0",
-    "rules": ["demo-eu-russia:1"],
-    "sources": ["demo-sanctions:2026-08-06"]
-  }
-}
-```
+The [generated review-required response](../../examples/responses/transaction-screening.review-required.json)
+is the executable decision-first shape. It includes stable screening/case IDs, typed
+findings and evidence requirements, active holds, the canonical input and result hashes,
+and explicit input/source/rule/matcher/model versions.
 
 HTTP `201` means the result was created. It does not mean the transaction is cleared; the caller enforces `business_action`.
 

@@ -41,6 +41,8 @@ jobs:
         run: uv run --locked ruff check .
       - name: Type check
         run: uv run --locked mypy
+      - name: Check generated contracts
+        run: uv run --locked python scripts/generate_contract.py --check
       - name: Run unit and architecture tests
         run: uv run --locked pytest
       - name: Build package

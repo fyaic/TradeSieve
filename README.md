@@ -30,7 +30,7 @@ See [Phase 1 service MVP](docs/product/mvp-scope.md), [delivery plan](docs/deliv
 ## Product principles
 
 - **Focused service boundary:** business systems remain systems of record; TradeSieve owns screening evidence, cases, decisions, and provenance.
-- **One contract, multiple interfaces:** REST/OpenAPI is canonical; CLI and MCP are typed adapters over the same application service.
+- **One contract, multiple interfaces:** Pydantic application models are canonical; generated REST/OpenAPI, JSON Schema, CLI, MCP, and event adapters share them.
 - **Evidence before score:** results identify source/rule/input/model versions, facts, uncertainty, and required action.
 - **Human clearance only:** automation may hold or escalate; only an authorized reviewer can issue a scoped, expiring release.
 - **As-of-time readiness:** raw sources, deltas, hashes, and decisions are immutable and replayable; complete historic reconstruction is a later coverage question.
@@ -58,7 +58,8 @@ See [Phase 1 service MVP](docs/product/mvp-scope.md), [delivery plan](docs/deliv
 | `docs/delivery/` | Agile operating model, Phase 1 plan and backlog |
 | `docs/getting-started/` | Target/released user and integration journeys |
 | `docs/research/` | Regulatory, community, academic, and industry research |
-| `api/openapi/` | Versioned canonical HTTP contract |
+| `api/openapi/` | Generated versioned HTTP contract |
+| `api/schemas/` | Generated shared JSON Schema registry for every adapter |
 | `examples/` | Synthetic requests and safe expected responses |
 | `research/sources.yaml` | Machine-readable source registry |
 | `src/tradesieve/` | Python domain/application/port package skeleton |
@@ -75,8 +76,15 @@ The [Docker reference deployment](docs/getting-started/docker-reference.md) star
 ## Current contract artifacts
 
 - [Draft OpenAPI 3.1 contract](api/openapi/tradesieve.v1.json)
+- [Generated shared JSON Schema registry](api/schemas/tradesieve.contracts.v1.json)
 - [Synthetic transaction request](examples/requests/transaction-screening.json)
+- [Structurally valid incomplete onboarding request](examples/requests/customer-onboarding.incomplete.json)
 - [Expected review-required response](examples/responses/transaction-screening.review-required.json)
+- [Minimal case-state webhook](examples/events/case.state-changed.json)
+
+These artifacts are generated from `tradesieve.application.contracts`. Run
+`uv run --locked python scripts/generate_contract.py --check` to detect drift; edit the
+models and executable examples, not generated JSON.
 
 ## Explicit non-goals
 
