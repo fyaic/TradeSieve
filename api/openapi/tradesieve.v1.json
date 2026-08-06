@@ -481,6 +481,15 @@
           "business_action": {
             "$ref": "#/components/schemas/BusinessAction"
           },
+          "rule_evaluations": {
+            "items": {
+              "$ref": "#/components/schemas/RuleEvaluationRecord"
+            },
+            "maxItems": 256,
+            "minItems": 1,
+            "title": "Rule Evaluations",
+            "type": "array"
+          },
           "findings": {
             "items": {
               "$ref": "#/components/schemas/Finding"
@@ -533,6 +542,7 @@
           "signal",
           "highest_priority",
           "business_action",
+          "rule_evaluations",
           "findings",
           "required_evidence",
           "holds",
@@ -1687,6 +1697,36 @@
         "title": "GoodsLine",
         "type": "object"
       },
+      "HashedVersionReference": {
+        "additionalProperties": false,
+        "description": "Exact immutable SemVer identity used by deterministic policy evaluation.",
+        "properties": {
+          "resource_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Resource Id",
+            "type": "string"
+          },
+          "version": {
+            "pattern": "^(?:0|[1-9][0-9]{0,8})\\.(?:0|[1-9][0-9]{0,8})\\.(?:0|[1-9][0-9]{0,8})$",
+            "title": "Version",
+            "type": "string"
+          },
+          "content_hash": {
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Content Hash",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource_id",
+          "version",
+          "content_hash"
+        ],
+        "title": "HashedVersionReference",
+        "type": "object"
+      },
       "Health": {
         "additionalProperties": false,
         "properties": {
@@ -2743,6 +2783,68 @@
         "title": "Route",
         "type": "object"
       },
+      "RuleEvaluationOutcome": {
+        "description": "Fact-presence result only; no value grants legal permission.",
+        "enum": [
+          "FACTS_PRESENT",
+          "MISSING_FACTS",
+          "NOT_APPLICABLE"
+        ],
+        "title": "RuleEvaluationOutcome",
+        "type": "string"
+      },
+      "RuleEvaluationRecord": {
+        "additionalProperties": false,
+        "description": "Deterministic rule trace; FACTS_PRESENT is not clearance or permission.",
+        "properties": {
+          "evaluation_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Evaluation Id",
+            "type": "string"
+          },
+          "bundle": {
+            "$ref": "#/components/schemas/HashedVersionReference"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/HashedVersionReference"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/RuleEvaluationOutcome"
+          },
+          "missing_fact_paths": {
+            "items": {
+              "$ref": "#/components/schemas/RuleFactPath"
+            },
+            "maxItems": 32,
+            "title": "Missing Fact Paths",
+            "type": "array"
+          }
+        },
+        "required": [
+          "evaluation_id",
+          "bundle",
+          "rule",
+          "outcome",
+          "missing_fact_paths"
+        ],
+        "title": "RuleEvaluationRecord",
+        "type": "object"
+      },
+      "RuleFactPath": {
+        "enum": [
+          "proposed_action",
+          "legal_nexus",
+          "activities",
+          "parties",
+          "goods",
+          "route",
+          "payment"
+        ],
+        "title": "RuleFactPath",
+        "type": "string"
+      },
       "ScreeningCompletedEventData": {
         "additionalProperties": false,
         "properties": {
@@ -2989,6 +3091,15 @@
             "title": "Summary",
             "type": "string"
           },
+          "rule_evaluations": {
+            "items": {
+              "$ref": "#/components/schemas/RuleEvaluationRecord"
+            },
+            "maxItems": 256,
+            "minItems": 1,
+            "title": "Rule Evaluations",
+            "type": "array"
+          },
           "findings": {
             "items": {
               "$ref": "#/components/schemas/Finding"
@@ -3038,6 +3149,7 @@
           "highest_priority",
           "business_action",
           "summary",
+          "rule_evaluations",
           "findings",
           "required_evidence",
           "holds",
@@ -3214,11 +3326,15 @@
             "title": "Sources",
             "type": "array"
           },
+          "rule_bundle": {
+            "$ref": "#/components/schemas/HashedVersionReference"
+          },
           "rules": {
             "items": {
-              "$ref": "#/components/schemas/VersionReference"
+              "$ref": "#/components/schemas/HashedVersionReference"
             },
             "maxItems": 256,
+            "minItems": 1,
             "title": "Rules",
             "type": "array"
           },
@@ -3238,6 +3354,7 @@
           "input_schema",
           "input_hash",
           "sources",
+          "rule_bundle",
           "rules",
           "matcher"
         ],
@@ -3677,6 +3794,59 @@
           "highest_priority": "P1",
           "business_action": "HOLD",
           "summary": "Synthetic transaction has unresolved party identity, goods classification, end-use, and legal-nexus evidence.",
+          "rule_evaluations": [
+            {
+              "evaluation_id": "eval-goods-completeness-001",
+              "bundle": {
+                "resource_id": "synthetic-phase1-rule-bundle",
+                "version": "1.0.0",
+                "content_hash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+              },
+              "rule": {
+                "resource_id": "demo-goods-completeness",
+                "version": "1.0.0",
+                "content_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "outcome": "MISSING_FACTS",
+              "missing_fact_paths": [
+                "goods"
+              ]
+            },
+            {
+              "evaluation_id": "eval-party-completeness-001",
+              "bundle": {
+                "resource_id": "synthetic-phase1-rule-bundle",
+                "version": "1.0.0",
+                "content_hash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+              },
+              "rule": {
+                "resource_id": "demo-party-completeness",
+                "version": "1.0.0",
+                "content_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+              },
+              "outcome": "MISSING_FACTS",
+              "missing_fact_paths": [
+                "parties"
+              ]
+            },
+            {
+              "evaluation_id": "eval-nexus-completeness-001",
+              "bundle": {
+                "resource_id": "synthetic-phase1-rule-bundle",
+                "version": "1.0.0",
+                "content_hash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+              },
+              "rule": {
+                "resource_id": "demo-policy-scope",
+                "version": "1.0.0",
+                "content_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "outcome": "MISSING_FACTS",
+              "missing_fact_paths": [
+                "legal_nexus"
+              ]
+            }
+          ],
           "findings": [
             {
               "finding_id": "fnd-party-001",
@@ -3831,16 +4001,26 @@
                 "content_hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
               }
             ],
+            "rule_bundle": {
+              "resource_id": "synthetic-phase1-rule-bundle",
+              "version": "1.0.0",
+              "content_hash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+            },
             "rules": [
               {
-                "resource_id": "demo-eu-russia",
-                "version": "1",
+                "resource_id": "demo-goods-completeness",
+                "version": "1.0.0",
+                "content_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              {
+                "resource_id": "demo-party-completeness",
+                "version": "1.0.0",
                 "content_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
               },
               {
                 "resource_id": "demo-policy-scope",
-                "version": "1",
-                "content_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+                "version": "1.0.0",
+                "content_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
               }
             ],
             "matcher": {
@@ -3850,7 +4030,7 @@
             },
             "models": []
           },
-          "result_hash": "sha256:10db1745d9b6d2bd335ea70d505147a5fbfafed01f70a64f789dec33504a855e",
+          "result_hash": "sha256:48c8b113dee5956f66b9dd728197e73983c88c2a549e5cc62d9f7ae3b9818c5e",
           "created_at": "2026-08-06T08:00:00Z"
         }
       },
@@ -3876,7 +4056,7 @@
             "case_state": "REVIEW_REQUIRED",
             "business_action": "HOLD",
             "signal": "YELLOW",
-            "result_hash": "sha256:10db1745d9b6d2bd335ea70d505147a5fbfafed01f70a64f789dec33504a855e"
+            "result_hash": "sha256:48c8b113dee5956f66b9dd728197e73983c88c2a549e5cc62d9f7ae3b9818c5e"
           }
         }
       },

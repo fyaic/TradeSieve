@@ -516,6 +516,7 @@ def exact_grant(
 DEFAULT_TARGET_FACTS = ResolvedTargetFacts(
     case_state=CaseState.REVIEW_REQUIRED,
     submitting_actor_id="submitter-2",
+    author_actor_id="policy-author-2",
     clearance_eligible=True,
 )
 
@@ -544,6 +545,13 @@ FINAL_OPERATIONS = {
     Operation.RECORD_CLOSED_NO_ACTION: HumanDecisionType.CLOSED_NO_ACTION,
 }
 
+FINAL_POLICY_OPERATIONS = {
+    Operation.POLICY_APPROVE,
+    Operation.POLICY_ACTIVATE,
+    Operation.POLICY_RETIRE,
+    Operation.POLICY_ROLLBACK,
+}
+
 
 @pytest.mark.parametrize("operation", list(Operation))
 def test_default_matrix_explicitly_allows_each_mapped_operation(
@@ -565,6 +573,101 @@ def test_default_matrix_explicitly_allows_each_mapped_operation(
 
 def test_default_policy_matrix_is_exhaustive() -> None:
     assert set(DEFAULT_POLICIES) == set(Operation)
+
+
+@pytest.mark.parametrize(
+    ("principal_type", "expected_reason"),
+    [
+        (ActorType.HUMAN, AuthorizationReason.ALLOWED),
+        (ActorType.SERVICE, AuthorizationReason.ALLOWED),
+        (ActorType.AGENT, AuthorizationReason.ACTOR_TYPE_DENIED),
+    ],
+)
+def test_policy_draft_requires_author_role_and_rejects_agents(
+    principal_type: ActorType,
+    expected_reason: AuthorizationReason,
+) -> None:
+    events: list[AuthorizationAuditEvent] = []
+    authorization_request = request(
+        Operation.POLICY_DRAFT,
+        principal=actor(
+            actor_type=principal_type,
+            scopes=frozenset({Scope.POLICY_OPERATE}),
+            roles=frozenset({Role.POLICY_AUTHOR}),
+        ),
+    )
+    service, _ = service_for(authorization_request, events)
+    if expected_reason is AuthorizationReason.ALLOWED:
+        service.require(authorization_request, now=NOW)
+        assert events[-1].outcome is AuthorizationOutcome.ALLOW
+    else:
+        with pytest.raises(AuthorizationDenied):
+            service.require(authorization_request, now=NOW)
+        assert events[-1].outcome is AuthorizationOutcome.DENY
+    assert events[-1].reason is expected_reason
+
+    missing_role_request = request(
+        Operation.POLICY_DRAFT,
+        principal=actor(
+            actor_type=ActorType.HUMAN,
+            scopes=frozenset({Scope.POLICY_OPERATE}),
+            roles=frozenset(),
+        ),
+    )
+    missing_role_service, _ = service_for(missing_role_request, events)
+    with pytest.raises(AuthorizationDenied):
+        missing_role_service.require(missing_role_request, now=NOW)
+    assert events[-1].reason is AuthorizationReason.ROLE_DENIED
+
+
+@pytest.mark.parametrize("operation", sorted(FINAL_POLICY_OPERATIONS, key=str))
+@pytest.mark.parametrize("principal_type", [ActorType.SERVICE, ActorType.AGENT])
+def test_non_humans_cannot_run_final_policy_lifecycle_operations(
+    operation: Operation,
+    principal_type: ActorType,
+) -> None:
+    events: list[AuthorizationAuditEvent] = []
+    authorization_request = request(
+        operation,
+        principal=actor(
+            actor_type=principal_type,
+            scopes=frozenset({Scope.POLICY_APPROVE}),
+            roles=frozenset({Role.POLICY_APPROVER}),
+        ),
+    )
+    service, entitlements = service_for(authorization_request, events)
+    with pytest.raises(AuthorizationDenied):
+        service.require(authorization_request, now=NOW)
+    assert events[-1].reason is AuthorizationReason.ACTOR_TYPE_DENIED
+    assert events[-1].outcome is AuthorizationOutcome.DENY
+    assert entitlements.calls == []
+
+
+@pytest.mark.parametrize("operation", sorted(FINAL_POLICY_OPERATIONS, key=str))
+@pytest.mark.parametrize("author_actor_id", [None, "reviewer-1"])
+def test_final_policy_lifecycle_requires_distinct_known_author_and_audits_denial(
+    operation: Operation,
+    author_actor_id: str | None,
+) -> None:
+    events: list[AuthorizationAuditEvent] = []
+    authorization_request = request(
+        operation,
+        principal=actor(
+            scopes=frozenset({Scope.POLICY_APPROVE}),
+            roles=frozenset({Role.POLICY_APPROVER}),
+        ),
+    )
+    service, entitlements = service_for(
+        authorization_request,
+        events,
+        facts=ResolvedTargetFacts(author_actor_id=author_actor_id),
+    )
+    with pytest.raises(AuthorizationDenied) as exc_info:
+        service.require(authorization_request, now=NOW)
+    assert exc_info.value.code is PublicDenialCode.FORBIDDEN
+    assert events[-1].reason is (AuthorizationReason.AUTHOR_APPROVER_SEPARATION_DENIED)
+    assert events[-1].outcome is AuthorizationOutcome.DENY
+    assert entitlements.calls == [exact_grant(authorization_request)]
 
 
 @pytest.mark.parametrize(

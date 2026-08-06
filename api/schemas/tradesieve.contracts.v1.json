@@ -54,6 +54,15 @@
         "business_action": {
           "$ref": "#/$defs/BusinessAction"
         },
+        "rule_evaluations": {
+          "items": {
+            "$ref": "#/$defs/RuleEvaluationRecord"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "title": "Rule Evaluations",
+          "type": "array"
+        },
         "findings": {
           "items": {
             "$ref": "#/$defs/Finding"
@@ -106,6 +115,7 @@
         "signal",
         "highest_priority",
         "business_action",
+        "rule_evaluations",
         "findings",
         "required_evidence",
         "holds",
@@ -1260,6 +1270,36 @@
       "title": "GoodsLine",
       "type": "object"
     },
+    "HashedVersionReference": {
+      "additionalProperties": false,
+      "description": "Exact immutable SemVer identity used by deterministic policy evaluation.",
+      "properties": {
+        "resource_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "version": {
+          "pattern": "^(?:0|[1-9][0-9]{0,8})\\.(?:0|[1-9][0-9]{0,8})\\.(?:0|[1-9][0-9]{0,8})$",
+          "title": "Version",
+          "type": "string"
+        },
+        "content_hash": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "resource_id",
+        "version",
+        "content_hash"
+      ],
+      "title": "HashedVersionReference",
+      "type": "object"
+    },
     "Health": {
       "additionalProperties": false,
       "properties": {
@@ -2316,6 +2356,68 @@
       "title": "Route",
       "type": "object"
     },
+    "RuleEvaluationOutcome": {
+      "description": "Fact-presence result only; no value grants legal permission.",
+      "enum": [
+        "FACTS_PRESENT",
+        "MISSING_FACTS",
+        "NOT_APPLICABLE"
+      ],
+      "title": "RuleEvaluationOutcome",
+      "type": "string"
+    },
+    "RuleEvaluationRecord": {
+      "additionalProperties": false,
+      "description": "Deterministic rule trace; FACTS_PRESENT is not clearance or permission.",
+      "properties": {
+        "evaluation_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+          "title": "Evaluation Id",
+          "type": "string"
+        },
+        "bundle": {
+          "$ref": "#/$defs/HashedVersionReference"
+        },
+        "rule": {
+          "$ref": "#/$defs/HashedVersionReference"
+        },
+        "outcome": {
+          "$ref": "#/$defs/RuleEvaluationOutcome"
+        },
+        "missing_fact_paths": {
+          "items": {
+            "$ref": "#/$defs/RuleFactPath"
+          },
+          "maxItems": 32,
+          "title": "Missing Fact Paths",
+          "type": "array"
+        }
+      },
+      "required": [
+        "evaluation_id",
+        "bundle",
+        "rule",
+        "outcome",
+        "missing_fact_paths"
+      ],
+      "title": "RuleEvaluationRecord",
+      "type": "object"
+    },
+    "RuleFactPath": {
+      "enum": [
+        "proposed_action",
+        "legal_nexus",
+        "activities",
+        "parties",
+        "goods",
+        "route",
+        "payment"
+      ],
+      "title": "RuleFactPath",
+      "type": "string"
+    },
     "ScreeningCompletedEventData": {
       "additionalProperties": false,
       "properties": {
@@ -2562,6 +2664,15 @@
           "title": "Summary",
           "type": "string"
         },
+        "rule_evaluations": {
+          "items": {
+            "$ref": "#/$defs/RuleEvaluationRecord"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "title": "Rule Evaluations",
+          "type": "array"
+        },
         "findings": {
           "items": {
             "$ref": "#/$defs/Finding"
@@ -2611,6 +2722,7 @@
         "highest_priority",
         "business_action",
         "summary",
+        "rule_evaluations",
         "findings",
         "required_evidence",
         "holds",
@@ -2787,11 +2899,15 @@
           "title": "Sources",
           "type": "array"
         },
+        "rule_bundle": {
+          "$ref": "#/$defs/HashedVersionReference"
+        },
         "rules": {
           "items": {
-            "$ref": "#/$defs/VersionReference"
+            "$ref": "#/$defs/HashedVersionReference"
           },
           "maxItems": 256,
+          "minItems": 1,
           "title": "Rules",
           "type": "array"
         },
@@ -2811,6 +2927,7 @@
         "input_schema",
         "input_hash",
         "sources",
+        "rule_bundle",
         "rules",
         "matcher"
       ],

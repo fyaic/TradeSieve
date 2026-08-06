@@ -8,6 +8,13 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ValidationError
 
+from tradesieve.application.contract_examples import (
+    event_examples,
+    incomplete_customer_onboarding_request,
+    structurally_invalid_request,
+    transaction_review_required_result,
+    transaction_screening_request,
+)
 from tradesieve.application.contracts import (
     Case,
     CaseStateChangedEventData,
@@ -17,6 +24,7 @@ from tradesieve.application.contracts import (
     EventEnvelope,
     ExternalObject,
     GoodsLine,
+    HashedVersionReference,
     HumanDecision,
     HumanDecisionRecordedEventData,
     HumanDecisionRequest,
@@ -26,6 +34,9 @@ from tradesieve.application.contracts import (
     ProposedAction,
     RegulatedActivity,
     RelationshipType,
+    RuleEvaluationOutcome,
+    RuleEvaluationRecord,
+    RuleFactPath,
     ScreeningRequest,
     ScreeningResult,
     SourceStatus,
@@ -34,6 +45,23 @@ from tradesieve.application.contracts import (
 )
 
 HASH = "sha256:" + "a" * 64
+
+
+def test_executable_contract_examples_round_trip_in_unit_suite() -> None:
+    request = transaction_screening_request()
+    incomplete = incomplete_customer_onboarding_request()
+    invalid = structurally_invalid_request(incomplete)
+    with pytest.raises(ValidationError):
+        ScreeningRequest.model_validate(invalid)
+
+    result = transaction_review_required_result(request)
+    assert result.result_hash == result.canonical_result_hash()
+    assert len(result.rule_evaluations) == 3
+    assert set(event_examples(result)) == {
+        "screening.completed",
+        "case.state_changed",
+        "human_decision.recorded",
+    }
 
 
 def incomplete_request() -> dict[str, object]:
@@ -540,6 +568,23 @@ def minimal_result() -> dict[str, object]:
         "highest_priority": "P1",
         "business_action": "HOLD",
         "summary": "Material facts remain incomplete.",
+        "rule_evaluations": [
+            {
+                "evaluation_id": "rule-evaluation-1",
+                "bundle": {
+                    "resource_id": "rule-bundle-1",
+                    "version": "1.0.0",
+                    "content_hash": "sha256:" + "c" * 64,
+                },
+                "rule": {
+                    "resource_id": "rule-1",
+                    "version": "1.0.0",
+                    "content_hash": "sha256:" + "d" * 64,
+                },
+                "outcome": "MISSING_FACTS",
+                "missing_fact_paths": ["goods"],
+            }
+        ],
         "findings": [
             {
                 "finding_id": "finding-1",
@@ -574,14 +619,190 @@ def minimal_result() -> dict[str, object]:
         "version_set": {
             "input_schema": "1.0.0",
             "input_hash": HASH,
+            "rule_bundle": {
+                "resource_id": "rule-bundle-1",
+                "version": "1.0.0",
+                "content_hash": "sha256:" + "c" * 64,
+            },
             "sources": [],
-            "rules": [],
+            "rules": [
+                {
+                    "resource_id": "rule-1",
+                    "version": "1.0.0",
+                    "content_hash": "sha256:" + "d" * 64,
+                }
+            ],
             "matcher": {"resource_id": "matcher", "version": "1"},
             "models": [],
         },
         "result_hash": "sha256:" + "b" * 64,
         "created_at": "2026-08-06T08:00:00Z",
     }
+
+
+def minimal_case() -> dict[str, object]:
+    result = minimal_result()
+    return {
+        "tenant_id": result["tenant_id"],
+        "correlation_id": result["correlation_id"],
+        "case_id": result["case_id"],
+        "state": result["state"],
+        "signal": result["signal"],
+        "highest_priority": result["highest_priority"],
+        "business_action": result["business_action"],
+        "rule_evaluations": result["rule_evaluations"],
+        "findings": result["findings"],
+        "required_evidence": result["required_evidence"],
+        "holds": result["holds"],
+        "version_set": result["version_set"],
+        "effective_human_decision": None,
+        "updated_at": "2026-08-06T08:00:00Z",
+    }
+
+
+def test_rule_evaluation_uses_finite_paths_strict_semver_and_non_clearance() -> None:
+    result = ScreeningResult.model_validate(minimal_result())
+    evaluation = result.rule_evaluations[0]
+    assert evaluation.outcome is RuleEvaluationOutcome.MISSING_FACTS
+    assert evaluation.missing_fact_paths == [RuleFactPath.GOODS]
+
+    base = evaluation.model_dump(mode="json")
+    for bad_path in ["goods.line-1.classification", "unknown", "GOODS"]:
+        invalid = copy.deepcopy(base)
+        invalid["missing_fact_paths"] = [bad_path]
+        with pytest.raises(ValidationError):
+            RuleEvaluationRecord.model_validate(invalid)
+    too_many = copy.deepcopy(base)
+    too_many["missing_fact_paths"] = ["goods"] * 33
+    with pytest.raises(ValidationError, match="at most 32"):
+        RuleEvaluationRecord.model_validate(too_many)
+    unsorted = copy.deepcopy(base)
+    unsorted["missing_fact_paths"] = ["goods", "activities"]
+    with pytest.raises(ValidationError, match="sorted and unique"):
+        RuleEvaluationRecord.model_validate(unsorted)
+
+    for field in ("bundle", "rule"):
+        for bad_version in ["1", "1.0", "01.0.0", " 1.0.0 ", "1000000000.0.0"]:
+            invalid = copy.deepcopy(base)
+            reference = invalid[field]
+            assert isinstance(reference, dict)
+            reference["version"] = bad_version
+            with pytest.raises(
+                ValidationError, match="strict release semantic version"
+            ):
+                RuleEvaluationRecord.model_validate(invalid)
+
+    assert (
+        HashedVersionReference(
+            resource_id="rule-1",
+            version="999999999.999999999.999999999",
+            content_hash=HASH,
+        ).version
+        == "999999999.999999999.999999999"
+    )
+
+    for outcome, missing in [
+        (RuleEvaluationOutcome.FACTS_PRESENT, ["goods"]),
+        (RuleEvaluationOutcome.NOT_APPLICABLE, ["goods"]),
+        (RuleEvaluationOutcome.MISSING_FACTS, []),
+    ]:
+        invalid = copy.deepcopy(base)
+        invalid["outcome"] = outcome
+        invalid["missing_fact_paths"] = missing
+        with pytest.raises(ValidationError, match="only MISSING_FACTS"):
+            RuleEvaluationRecord.model_validate(invalid)
+
+
+def _graph_payload(model: type[ScreeningResult] | type[Case]) -> dict[str, object]:
+    return minimal_result() if model is ScreeningResult else minimal_case()
+
+
+@pytest.mark.parametrize("model", [ScreeningResult, Case])
+def test_result_and_case_require_complete_exact_rule_evaluation_graph(
+    model: type[ScreeningResult] | type[Case],
+) -> None:
+    empty = _graph_payload(model)
+    empty["rule_evaluations"] = []
+    with pytest.raises(ValidationError, match="at least 1"):
+        model.model_validate(empty)
+
+    duplicate_evaluation = _graph_payload(model)
+    evaluations = duplicate_evaluation["rule_evaluations"]
+    assert isinstance(evaluations, list)
+    evaluations.append(copy.deepcopy(evaluations[0]))
+    with pytest.raises(ValidationError, match="duplicate evaluation_id"):
+        model.model_validate(duplicate_evaluation)
+
+    duplicate_rule = _graph_payload(model)
+    evaluations = duplicate_rule["rule_evaluations"]
+    assert isinstance(evaluations, list)
+    duplicate = copy.deepcopy(evaluations[0])
+    assert isinstance(duplicate, dict)
+    duplicate["evaluation_id"] = "rule-evaluation-2"
+    duplicate["outcome"] = "NOT_APPLICABLE"
+    duplicate["missing_fact_paths"] = []
+    evaluations.append(duplicate)
+    with pytest.raises(ValidationError, match="identities must be unique"):
+        model.model_validate(duplicate_rule)
+
+    unordered_evaluations = _graph_payload(model)
+    evaluations = unordered_evaluations["rule_evaluations"]
+    assert isinstance(evaluations, list)
+    second = copy.deepcopy(evaluations[0])
+    assert isinstance(second, dict)
+    second["evaluation_id"] = "rule-evaluation-2"
+    second["rule"] = {
+        "resource_id": "rule-2",
+        "version": "1.0.0",
+        "content_hash": "sha256:" + "e" * 64,
+    }
+    second["outcome"] = "NOT_APPLICABLE"
+    second["missing_fact_paths"] = []
+    evaluations.insert(0, second)
+    version_set = unordered_evaluations["version_set"]
+    assert isinstance(version_set, dict)
+    rules = version_set["rules"]
+    assert isinstance(rules, list)
+    rules.append(second["rule"])
+    with pytest.raises(ValidationError, match="sorted by rule identity"):
+        model.model_validate(unordered_evaluations)
+
+    bundle_mismatch = _graph_payload(model)
+    evaluations = bundle_mismatch["rule_evaluations"]
+    assert isinstance(evaluations, list)
+    evaluation = evaluations[0]
+    assert isinstance(evaluation, dict)
+    bundle_ref = evaluation["bundle"]
+    assert isinstance(bundle_ref, dict)
+    bundle_ref["content_hash"] = "sha256:" + "e" * 64
+    with pytest.raises(ValidationError, match="version_set.rule_bundle"):
+        model.model_validate(bundle_mismatch)
+
+    rule_mismatch = _graph_payload(model)
+    evaluations = rule_mismatch["rule_evaluations"]
+    assert isinstance(evaluations, list)
+    evaluation = evaluations[0]
+    assert isinstance(evaluation, dict)
+    rule_ref = evaluation["rule"]
+    assert isinstance(rule_ref, dict)
+    rule_ref["content_hash"] = "sha256:" + "e" * 64
+    with pytest.raises(ValidationError, match="exactly match every"):
+        model.model_validate(rule_mismatch)
+
+    extra_version_rule = _graph_payload(model)
+    version_set = extra_version_rule["version_set"]
+    assert isinstance(version_set, dict)
+    rules = version_set["rules"]
+    assert isinstance(rules, list)
+    rules.append(
+        {
+            "resource_id": "rule-2",
+            "version": "1.0.0",
+            "content_hash": "sha256:" + "e" * 64,
+        }
+    )
+    with pytest.raises(ValidationError, match="exactly match every"):
+        model.model_validate(extra_version_rule)
 
 
 def test_result_ids_and_required_evidence_references_are_unambiguous() -> None:
@@ -607,6 +828,17 @@ def test_result_ids_and_required_evidence_references_are_unambiguous() -> None:
     ):
         ScreeningResult.model_validate(dangling_payload)
 
+    unknown_evaluation_payload = copy.deepcopy(result_payload)
+    findings = unknown_evaluation_payload["findings"]
+    assert isinstance(findings, list)
+    finding = findings[0]
+    assert isinstance(finding, dict)
+    finding["rule_evaluation_refs"] = ["missing-evaluation"]
+    with pytest.raises(
+        ValidationError, match="unknown rule evaluation refs: missing-evaluation"
+    ):
+        ScreeningResult.model_validate(unknown_evaluation_payload)
+
 
 def test_semantic_result_hash_excludes_trace_and_itself() -> None:
     result = ScreeningResult.model_validate(minimal_result())
@@ -620,24 +852,7 @@ def test_semantic_result_hash_excludes_trace_and_itself() -> None:
 
 
 def test_case_projection_keeps_evidence_and_version_provenance() -> None:
-    result_payload = minimal_result()
-    case = Case.model_validate(
-        {
-            "tenant_id": result_payload["tenant_id"],
-            "correlation_id": result_payload["correlation_id"],
-            "case_id": result_payload["case_id"],
-            "state": result_payload["state"],
-            "signal": result_payload["signal"],
-            "highest_priority": result_payload["highest_priority"],
-            "business_action": result_payload["business_action"],
-            "findings": result_payload["findings"],
-            "required_evidence": result_payload["required_evidence"],
-            "holds": result_payload["holds"],
-            "version_set": result_payload["version_set"],
-            "effective_human_decision": None,
-            "updated_at": "2026-08-06T08:00:00Z",
-        }
-    )
+    case = Case.model_validate(minimal_case())
 
     assert case.required_evidence[0].requirement_ref == "requirement-1"
     assert case.version_set.input_hash == HASH
@@ -649,8 +864,15 @@ def test_version_set_rejects_duplicate_resource_ids() -> None:
         VersionSet(
             input_schema="1.0.0",
             input_hash=HASH,
+            rule_bundle=HashedVersionReference(
+                resource_id="bundle-1", version="1.0.0", content_hash=HASH
+            ),
             sources=[version, copy.deepcopy(version)],
-            rules=[],
+            rules=[
+                HashedVersionReference(
+                    resource_id="rule-1", version="1.0.0", content_hash=HASH
+                )
+            ],
             matcher=VersionReference(resource_id="matcher", version="1"),
             models=[],
         )
@@ -658,12 +880,39 @@ def test_version_set_rejects_duplicate_resource_ids() -> None:
     version_set = VersionSet(
         input_schema="1.0.0",
         input_hash=HASH,
+        rule_bundle=HashedVersionReference(
+            resource_id="bundle-1", version="1.0.0", content_hash=HASH
+        ),
         sources=[],
-        rules=[],
+        rules=[
+            HashedVersionReference(
+                resource_id="rule-1", version="1.0.0", content_hash=HASH
+            )
+        ],
         matcher=VersionReference(resource_id="matcher", version="1"),
         models=[],
     )
     assert version_set.input_hash == HASH
+
+    with pytest.raises(ValidationError, match="sorted by immutable identity"):
+        VersionSet(
+            input_schema="1.0.0",
+            input_hash=HASH,
+            rule_bundle=HashedVersionReference(
+                resource_id="bundle-1", version="1.0.0", content_hash=HASH
+            ),
+            sources=[],
+            rules=[
+                HashedVersionReference(
+                    resource_id="z-rule", version="1.0.0", content_hash=HASH
+                ),
+                HashedVersionReference(
+                    resource_id="a-rule", version="1.0.0", content_hash=HASH
+                ),
+            ],
+            matcher=VersionReference(resource_id="matcher", version="1"),
+            models=[],
+        )
 
 
 def test_human_clearance_requires_a_timezone_aware_expiry() -> None:

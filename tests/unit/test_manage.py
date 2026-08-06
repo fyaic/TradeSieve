@@ -8,6 +8,7 @@ from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
+import psycopg
 import pytest
 from alembic.config import Config
 
@@ -105,7 +106,7 @@ def test_inspect_runtime_returns_status_and_details(
     assert manage.inspect_runtime(Settings()) == (0 if ready else 1)
     payload = json.loads(capsys.readouterr().out)
     assert payload["ready"] is ready
-    assert payload["expected_migration"] == "20260806_0002"
+    assert payload["expected_migration"] == "20260806_0003"
     assert payload["expected_source_coverage"] == "synthetic-demo-sources-v1"
     assert payload["expected_rule_coverage"] == "synthetic-demo-rules-v1"
 
@@ -186,3 +187,129 @@ def test_main_propagates_list_sources_exit_status(
     with pytest.raises(SystemExit) as exc_info:
         manage.main()
     assert exc_info.value.code == 2
+
+
+def test_list_rules_prints_safe_active_projection(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    class FakeView:
+        def model_dump(self, *, mode: str) -> dict[str, object]:
+            assert mode == "json"
+            return {
+                "summary": {
+                    "tenant_id": "demo-tenant",
+                    "deployment_id": "demo",
+                    "rule_set_id": "synthetic-demo-rules-v1",
+                    "bundle_id": "synthetic-demo-bundle-v1",
+                    "state": "ACTIVE",
+                    "active": True,
+                },
+                "rules": [
+                    {
+                        "rule_id": "synthetic-rule",
+                        "citations": [
+                            {
+                                "citation_ref": "synthetic-citation",
+                                "policy_content_hash": "sha256:" + "a" * 64,
+                            }
+                        ],
+                    }
+                ],
+            }
+
+    class FakeService:
+        def current_active(self, authorized: object) -> FakeView:
+            assert authorized == "authorized-read"
+            return FakeView()
+
+    monkeypatch.setattr(manage, "connect", lambda settings: nullcontext(object()))
+    monkeypatch.setattr(
+        manage,
+        "build_demo_rule_services",
+        lambda settings, connection: ("bundle", FakeService(), "authorization"),
+    )
+    monkeypatch.setattr(
+        manage,
+        "authorize_demo_rule_request",
+        lambda *args, **kwargs: "authorized-read",
+    )
+    assert manage.list_rules(Settings()) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert set(payload) == {"active_bundle", "status"}
+    assert payload["status"] == "ACTIVE"
+    assert payload["active_bundle"]["summary"]["state"] == "ACTIVE"
+    serialized = json.dumps(payload)
+    assert "private_policy_text" not in serialized
+    assert "internal_notes" not in serialized
+
+
+@pytest.mark.parametrize(
+    ("active", "expected_status"),
+    [(None, "NO_ACTIVE_BUNDLE"), ("unavailable", "UNAVAILABLE")],
+)
+def test_list_rules_returns_safe_unavailable_exit(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    active: object,
+    expected_status: str,
+) -> None:
+    class FakeService:
+        def current_active(self, authorized: object) -> None:
+            assert authorized == "authorized-read"
+            if active == "unavailable":
+                raise psycopg.OperationalError("private database detail")
+            return None
+
+    monkeypatch.setattr(manage, "connect", lambda settings: nullcontext(object()))
+    monkeypatch.setattr(
+        manage,
+        "build_demo_rule_services",
+        lambda settings, connection: ("bundle", FakeService(), "authorization"),
+    )
+    monkeypatch.setattr(
+        manage,
+        "authorize_demo_rule_request",
+        lambda *args, **kwargs: "authorized-read",
+    )
+    assert manage.list_rules(Settings()) == 2
+    assert json.loads(capsys.readouterr().out) == {
+        "active_bundle": None,
+        "status": expected_status,
+    }
+
+
+def test_list_rules_is_hard_disabled_before_identity_in_production(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    settings = Settings(
+        mode="production",
+        database_url="postgresql://service:strong-password@db/tradesieve",  # pragma: allowlist secret
+        demo_bootstrap_enabled=False,
+        rule_bundle_tenant_id="tenant-1",
+        deployment_id="production-1",
+        required_source_set="approved-sources-v1",
+        required_rule_set="approved-rules-v1",
+    )
+    monkeypatch.setattr(
+        manage,
+        "build_demo_rule_services",
+        lambda settings, connection: pytest.fail("identity path must not run"),
+    )
+    assert manage.list_rules(settings) == 3
+    assert json.loads(capsys.readouterr().out) == {
+        "active_bundle": None,
+        "status": "DISABLED",
+    }
+
+
+def test_main_propagates_list_rules_exit_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["tradesieve.manage", "list-rules"])
+    monkeypatch.setattr(manage, "get_settings", Settings)
+    monkeypatch.setattr(manage, "list_rules", lambda settings: 3)
+    with pytest.raises(SystemExit) as exc_info:
+        manage.main()
+    assert exc_info.value.code == 3

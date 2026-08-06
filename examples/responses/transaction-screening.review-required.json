@@ -9,6 +9,59 @@
   "highest_priority": "P1",
   "business_action": "HOLD",
   "summary": "Synthetic transaction has unresolved party identity, goods classification, end-use, and legal-nexus evidence.",
+  "rule_evaluations": [
+    {
+      "evaluation_id": "eval-goods-completeness-001",
+      "bundle": {
+        "resource_id": "synthetic-phase1-rule-bundle",
+        "version": "1.0.0",
+        "content_hash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+      },
+      "rule": {
+        "resource_id": "demo-goods-completeness",
+        "version": "1.0.0",
+        "content_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "outcome": "MISSING_FACTS",
+      "missing_fact_paths": [
+        "goods"
+      ]
+    },
+    {
+      "evaluation_id": "eval-party-completeness-001",
+      "bundle": {
+        "resource_id": "synthetic-phase1-rule-bundle",
+        "version": "1.0.0",
+        "content_hash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+      },
+      "rule": {
+        "resource_id": "demo-party-completeness",
+        "version": "1.0.0",
+        "content_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "outcome": "MISSING_FACTS",
+      "missing_fact_paths": [
+        "parties"
+      ]
+    },
+    {
+      "evaluation_id": "eval-nexus-completeness-001",
+      "bundle": {
+        "resource_id": "synthetic-phase1-rule-bundle",
+        "version": "1.0.0",
+        "content_hash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+      },
+      "rule": {
+        "resource_id": "demo-policy-scope",
+        "version": "1.0.0",
+        "content_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "outcome": "MISSING_FACTS",
+      "missing_fact_paths": [
+        "legal_nexus"
+      ]
+    }
+  ],
   "findings": [
     {
       "finding_id": "fnd-party-001",
@@ -163,16 +216,26 @@
         "content_hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
       }
     ],
+    "rule_bundle": {
+      "resource_id": "synthetic-phase1-rule-bundle",
+      "version": "1.0.0",
+      "content_hash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+    },
     "rules": [
       {
-        "resource_id": "demo-eu-russia",
-        "version": "1",
+        "resource_id": "demo-goods-completeness",
+        "version": "1.0.0",
+        "content_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      {
+        "resource_id": "demo-party-completeness",
+        "version": "1.0.0",
         "content_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
       },
       {
         "resource_id": "demo-policy-scope",
-        "version": "1",
-        "content_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+        "version": "1.0.0",
+        "content_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
       }
     ],
     "matcher": {
@@ -182,6 +245,6 @@
     },
     "models": []
   },
-  "result_hash": "sha256:10db1745d9b6d2bd335ea70d505147a5fbfafed01f70a64f789dec33504a855e",
+  "result_hash": "sha256:48c8b113dee5956f66b9dd728197e73983c88c2a549e5cc62d9f7ae3b9818c5e",
   "created_at": "2026-08-06T08:00:00Z"
 }

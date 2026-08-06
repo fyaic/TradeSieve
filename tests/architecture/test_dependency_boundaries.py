@@ -108,3 +108,29 @@ def test_outward_import_forms_are_detected(
         FORBIDDEN_IMPORTS["domain"],
     )
     assert f"domain/boundary_violation.py imports {expected_import}" in violations
+
+
+def test_demo_runtime_entrypoints_never_construct_authorized_requests_directly() -> (
+    None
+):
+    """AuthorizationService must remain the sole demo authorization factory."""
+
+    violations: list[str] = []
+    for name in ("demo_rule_bundle.py", "manage.py", "runtime.py"):
+        path = PACKAGE_ROOT / name
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            direct_name = (
+                isinstance(node.func, ast.Name) and node.func.id == "AuthorizedRequest"
+            )
+            direct_attribute = (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr == "AuthorizedRequest"
+            )
+            if direct_name or direct_attribute:
+                violations.append(f"{name}:{node.lineno}")
+    assert not violations, "direct AuthorizedRequest construction found: " + ", ".join(
+        violations
+    )

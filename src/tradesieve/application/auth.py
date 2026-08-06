@@ -52,6 +52,8 @@ class Scope(StrEnum):
     HUMAN_DECISION = "decision:human"
     SOURCE_READ = "source:read"
     SOURCE_OPERATE = "source:operate"
+    POLICY_READ = "policy:read"
+    POLICY_OPERATE = "policy:operate"
     POLICY_APPROVE = "policy:approve"
     AUDIT_EXPORT = "audit:export"
 
@@ -60,6 +62,7 @@ class Role(StrEnum):
     COMPLIANCE_REVIEWER = "compliance_reviewer"
     COMPLIANCE_OWNER = "compliance_owner"
     SOURCE_OPERATOR = "source_operator"
+    POLICY_AUTHOR = "policy_author"
     POLICY_APPROVER = "policy_approver"
     AUDITOR = "auditor"
 
@@ -77,7 +80,12 @@ class Operation(StrEnum):
     RECORD_CLOSED_NO_ACTION = "RECORD_CLOSED_NO_ACTION"
     SOURCE_READ = "SOURCE_READ"
     SOURCE_OPERATE = "SOURCE_OPERATE"
+    POLICY_READ = "POLICY_READ"
+    POLICY_DRAFT = "POLICY_DRAFT"
     POLICY_APPROVE = "POLICY_APPROVE"
+    POLICY_ACTIVATE = "POLICY_ACTIVATE"
+    POLICY_RETIRE = "POLICY_RETIRE"
+    POLICY_ROLLBACK = "POLICY_ROLLBACK"
     AUDIT_EXPORT = "AUDIT_EXPORT"
 
 
@@ -94,6 +102,7 @@ class AuthorizationReason(StrEnum):
     CLEARANCE_NOT_ELIGIBLE = "CLEARANCE_NOT_ELIGIBLE"
     DECISION_CONTEXT_MISMATCH = "DECISION_CONTEXT_MISMATCH"
     FOUR_EYES_DENIED = "FOUR_EYES_DENIED"
+    AUTHOR_APPROVER_SEPARATION_DENIED = "AUTHOR_APPROVER_SEPARATION_DENIED"
 
 
 class AuthorizationOutcome(StrEnum):
@@ -433,6 +442,7 @@ class AuthorizationPolicy:
     expected_decision: HumanDecisionType | None = None
     four_eyes_required: bool = False
     clearance_eligibility_required: bool = False
+    author_approver_separation_required: bool = False
 
 
 ALL_ACTORS = frozenset(ActorType)
@@ -505,10 +515,35 @@ DEFAULT_POLICIES: Mapping[Operation, AuthorizationPolicy] = MappingProxyType(
             HUMAN_OR_SERVICE,
             frozenset({Role.SOURCE_OPERATOR}),
         ),
+        Operation.POLICY_READ: AuthorizationPolicy(Scope.POLICY_READ, ALL_ACTORS),
+        Operation.POLICY_DRAFT: AuthorizationPolicy(
+            Scope.POLICY_OPERATE,
+            HUMAN_OR_SERVICE,
+            frozenset({Role.POLICY_AUTHOR}),
+        ),
         Operation.POLICY_APPROVE: AuthorizationPolicy(
             Scope.POLICY_APPROVE,
             HUMANS,
             frozenset({Role.POLICY_APPROVER, Role.COMPLIANCE_OWNER}),
+            author_approver_separation_required=True,
+        ),
+        Operation.POLICY_ACTIVATE: AuthorizationPolicy(
+            Scope.POLICY_APPROVE,
+            HUMANS,
+            frozenset({Role.POLICY_APPROVER, Role.COMPLIANCE_OWNER}),
+            author_approver_separation_required=True,
+        ),
+        Operation.POLICY_RETIRE: AuthorizationPolicy(
+            Scope.POLICY_APPROVE,
+            HUMANS,
+            frozenset({Role.POLICY_APPROVER, Role.COMPLIANCE_OWNER}),
+            author_approver_separation_required=True,
+        ),
+        Operation.POLICY_ROLLBACK: AuthorizationPolicy(
+            Scope.POLICY_APPROVE,
+            HUMANS,
+            frozenset({Role.POLICY_APPROVER, Role.COMPLIANCE_OWNER}),
+            author_approver_separation_required=True,
         ),
         Operation.AUDIT_EXPORT: AuthorizationPolicy(
             Scope.AUDIT_EXPORT,
@@ -540,11 +575,14 @@ class ResolvedTargetFacts:
 
     case_state: CaseState | None = None
     submitting_actor_id: str | None = None
+    author_actor_id: str | None = None
     clearance_eligible: bool = False
 
     def __post_init__(self) -> None:
         if self.submitting_actor_id is not None:
             _require_context_identifier(self.submitting_actor_id, "submitting_actor_id")
+        if self.author_actor_id is not None:
+            _require_context_identifier(self.author_actor_id, "author_actor_id")
 
 
 @dataclass(frozen=True, slots=True)
@@ -725,4 +763,9 @@ class AuthorizationService:
             or target_facts.submitting_actor_id == actor.subject
         ):
             return AuthorizationReason.FOUR_EYES_DENIED
+        if policy.author_approver_separation_required and (
+            target_facts.author_actor_id is None
+            or target_facts.author_actor_id == actor.subject
+        ):
+            return AuthorizationReason.AUTHOR_APPROVER_SEPARATION_DENIED
         return AuthorizationReason.ALLOWED

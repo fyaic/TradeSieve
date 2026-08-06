@@ -18,6 +18,6 @@
     "case_state": "REVIEW_REQUIRED",
     "business_action": "HOLD",
     "signal": "YELLOW",
-    "result_hash": "sha256:10db1745d9b6d2bd335ea70d505147a5fbfafed01f70a64f789dec33504a855e"
+    "result_hash": "sha256:48c8b113dee5956f66b9dd728197e73983c88c2a549e5cc62d9f7ae3b9818c5e"
   }
 }
