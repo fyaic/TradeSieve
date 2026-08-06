@@ -1,6 +1,6 @@
 # Development setup
 
-**Status:** TS-102 runtime foundation. This workflow validates the development package and contracts; it does not start a screening service or imply production readiness.
+**Status:** TS-201 runtime source-registry foundation. This workflow validates the development package and contracts; it does not start a screening service or imply production readiness.
 
 ## Prerequisites
 

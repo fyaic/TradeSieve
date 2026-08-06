@@ -8,8 +8,15 @@ import json
 from alembic import command
 from alembic.config import Config
 
+from tradesieve.adapters.postgres_source_registry import PostgresSourceRegistry
+from tradesieve.application.source_registry import SourceRegistryService
 from tradesieve.config import Settings, get_settings
-from tradesieve.runtime import MIGRATION_REVISION, bootstrap_demo, check_readiness
+from tradesieve.runtime import (
+    MIGRATION_REVISION,
+    bootstrap_demo,
+    check_readiness,
+    connect,
+)
 
 
 def sqlalchemy_database_url(database_url: str) -> str:
@@ -63,17 +70,37 @@ def inspect_runtime(settings: Settings) -> int:
     return 0 if status.ready else 1
 
 
+def list_sources(settings: Settings) -> int:
+    """Print the private operations-safe source registry projection as JSON."""
+
+    with connect(settings) as connection:
+        listing = SourceRegistryService(
+            PostgresSourceRegistry(connection)
+        ).query_source_set(settings.deployment_id, settings.required_source_set)
+    print(
+        json.dumps(
+            listing.model_dump(mode="json"),
+            sort_keys=True,
+        )
+    )
+    return 0 if listing.ready else 2
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("migrate", "bootstrap-demo", "inspect"))
+    parser.add_argument(
+        "command", choices=("migrate", "bootstrap-demo", "inspect", "list-sources")
+    )
     args = parser.parse_args()
     settings = get_settings()
     if args.command == "migrate":
         migrate(settings)
     elif args.command == "bootstrap-demo":
         bootstrap_demo(settings)
-    else:
+    elif args.command == "inspect":
         raise SystemExit(inspect_runtime(settings))
+    else:
+        raise SystemExit(list_sources(settings))
 
 
 if __name__ == "__main__":  # pragma: no cover

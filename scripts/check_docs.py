@@ -37,6 +37,7 @@ REQUIRED = (
     "docs/architecture/initial-system-shape.md",
     "docs/architecture/mvp-service-architecture.md",
     "docs/architecture/domain-model.md",
+    "docs/architecture/source-registry.md",
     "docs/architecture/integration-design.md",
     "docs/architecture/agent-interface-principles.md",
     "docs/architecture/security-and-trust.md",

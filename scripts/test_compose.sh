@@ -21,6 +21,52 @@ run_bounded() {
   fi
 }
 
+assert_source_listing() {
+  local expected_status="$1"
+  local expected_ready="$2"
+  local expected_exit="$3"
+  local output
+  local actual_exit
+  if output="$("${compose[@]}" run --rm --no-deps app \
+    python -m tradesieve.manage list-sources)"; then
+    actual_exit=0
+  else
+    actual_exit=$?
+  fi
+  if [[ "$actual_exit" != "$expected_exit" ]]; then
+    echo "list-sources exit $actual_exit; expected $expected_exit" >&2
+    exit 1
+  fi
+  python -c '
+import json
+import sys
+
+expected_status, expected_ready = sys.argv[1], sys.argv[2] == "true"
+payload = json.load(sys.stdin)
+expected_keys = {
+    "deployment_id", "source_set_id", "ready", "status", "issues", "sources"
+}
+assert set(payload) == expected_keys, payload
+assert payload["ready"] is expected_ready, payload
+assert payload["status"] == expected_status, payload
+assert payload["sources"], payload
+assert payload["sources"][0]["status"] == expected_status, payload
+assert payload["sources"][0]["required"] is True, payload
+assert [item["source_id"] for item in payload["issues"]] == sorted(
+    item["source_id"] for item in payload["issues"]
+), payload
+if expected_ready:
+    assert payload["issues"] == [], payload
+else:
+    assert payload["issues"] == [
+        {"source_id": "synthetic-source-v1", "status": expected_status}
+    ], payload
+serialized = json.dumps(payload)
+assert "credential_secret_ref" not in serialized, serialized
+assert "contractual_constraints" not in serialized, serialized
+' "$expected_status" "$expected_ready" <<<"$output"
+}
+
 cleanup() {
   "${compose[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
 }
@@ -100,6 +146,18 @@ done
 curl --fail --silent --show-error "http://127.0.0.1:${host_port}/health/live" >/dev/null
 curl --fail --silent --show-error "http://127.0.0.1:${host_port}/health/ready" >/dev/null
 "${compose[@]}" run --rm --no-deps app python -m tradesieve.manage inspect
+assert_source_listing "CURRENT" "true" "0"
+
+"${compose[@]}" exec -T postgres psql -U tradesieve -d tradesieve \
+  -c "INSERT INTO source_set_manifest (deployment_id, source_set_id, required_source_ids) VALUES ('constraint-probe', 'mixed-id-order', '[\"A-source\", \"a-source\", \"a.source\", \"a:source\"]'::jsonb)" >/dev/null
+if "${compose[@]}" exec -T postgres psql -U tradesieve -d tradesieve \
+  -c "INSERT INTO source_set_manifest (deployment_id, source_set_id, required_source_ids) VALUES ('constraint-probe', 'invalid-order', '[\"a-source\", \"A-source\"]'::jsonb)" \
+  >/dev/null 2>&1; then
+  echo "source manifest constraint accepted non-C ordering" >&2
+  exit 1
+fi
+"${compose[@]}" exec -T postgres psql -U tradesieve -d tradesieve \
+  -c "DELETE FROM source_set_manifest WHERE deployment_id = 'constraint-probe'" >/dev/null
 
 "${compose[@]}" exec -T postgres psql -U tradesieve -d tradesieve \
   -c "CREATE TABLE ts102_persistence_probe (marker TEXT PRIMARY KEY); INSERT INTO ts102_persistence_probe VALUES ('survives-recreate')" >/dev/null
@@ -112,13 +170,35 @@ if [[ "$persistence_marker" != "survives-recreate" ]]; then
 fi
 
 "${compose[@]}" exec -T postgres psql -U tradesieve -d tradesieve \
-  -c "UPDATE runtime_coverage SET active = FALSE WHERE coverage_kind = 'SOURCE'" >/dev/null
+  -c "UPDATE source_runtime_observation SET retrieved_at = CURRENT_TIMESTAMP - INTERVAL '3 hours', observed_at = CURRENT_TIMESTAMP WHERE deployment_id = 'demo' AND source_id = 'synthetic-source-v1'" >/dev/null
 readiness_code="$(curl --silent --output /dev/null --write-out '%{http_code}' \
   "http://127.0.0.1:${host_port}/health/ready")"
 if [[ "$readiness_code" != "503" ]]; then
-  echo "missing required source coverage did not fail closed: $readiness_code" >&2
+  echo "stale required source did not fail closed: $readiness_code" >&2
   exit 1
 fi
+assert_source_listing "STALE" "false" "2"
+
+"${compose[@]}" exec -T postgres psql -U tradesieve -d tradesieve \
+  -c "UPDATE source_runtime_observation SET availability = 'UNAVAILABLE', observed_at = CURRENT_TIMESTAMP WHERE deployment_id = 'demo' AND source_id = 'synthetic-source-v1'" >/dev/null
+readiness_payload="$(curl --silent --output - \
+  "http://127.0.0.1:${host_port}/health/ready")"
+readiness_code="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+  "http://127.0.0.1:${host_port}/health/ready")"
+if [[ "$readiness_code" != "503" ]]; then
+  echo "unavailable required source did not fail closed" >&2
+  exit 1
+fi
+python -c '
+import json
+import sys
+
+payload = json.load(sys.stdin)
+assert payload["status"] == "UNAVAILABLE", payload
+assert payload["checks"]["required_source_coverage"] == "UNAVAILABLE", payload
+assert "synthetic-source-v1" not in json.dumps(payload), payload
+' <<<"$readiness_payload"
+assert_source_listing "UNAVAILABLE" "false" "2"
 
 "${compose[@]}" run --rm --no-deps bootstrap-demo
 "${compose[@]}" stop postgres

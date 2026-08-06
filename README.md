@@ -10,7 +10,7 @@ TradeSieve is designed as an independently deployable service beside CRM, order,
 
 ## Project status
 
-**Phase 1 implementation has started; no runnable screening MVP exists yet.** The repository includes a locked Python project, CI quality gates, and a Docker reference stack that proves app/worker/PostgreSQL health and fail-closed readiness. Screening and review behavior remain acceptance targets. The [target MVP user experience](docs/getting-started/mvp-user-experience.md) is not a working screening quickstart until implementation and release gates pass.
+**Phase 1 implementation has started; no runnable screening MVP exists yet.** The repository includes a locked Python project, CI quality gates, and a Docker reference stack that proves app/worker/PostgreSQL health, governed source freshness, and fail-closed readiness. Screening and review behavior remain acceptance targets. The [target MVP user experience](docs/getting-started/mvp-user-experience.md) is not a working screening quickstart until implementation and release gates pass.
 
 Nothing in this repository is legal advice or an automatic legal-clearance mechanism.
 
@@ -71,7 +71,7 @@ Start with the [documentation index](docs/README.md).
 
 Developers can reproduce all non-container local gates from a clean checkout with `./scripts/check.sh`. Full reference-deployment acceptance additionally requires `./scripts/test_compose.sh`; see the [development setup](docs/getting-started/development.md) for pinned prerequisites and scope.
 
-The [Docker reference deployment](docs/getting-started/docker-reference.md) starts only the runtime health/readiness foundation; it does not screen transactions or grant legal clearance.
+The [Docker reference deployment](docs/getting-started/docker-reference.md) starts the runtime health/readiness and governed source-registry foundation; it does not screen transactions or grant legal clearance.
 
 ## Current contract artifacts
 
