@@ -405,6 +405,83 @@ class RawObjectMetadata:
             object.__setattr__(instance, field, value)
         return instance
 
+    @classmethod
+    def reconstitute(
+        cls,
+        *,
+        deployment_id: str,
+        source_id: str,
+        object_id: str,
+        original_name: str,
+        media_type: str,
+        charset: str,
+        retrieved_at: datetime,
+        effective_from: datetime | None,
+        byte_length: int,
+        content_hash: str,
+    ) -> RawObjectMetadata:
+        """Rebuild a persisted metadata row without trusting stored identity."""
+
+        _require_id(deployment_id, "deployment_id")
+        _require_id(source_id, "source_id")
+        _require_id(object_id, "object_id")
+        _require_text(original_name, "original_name", MAX_ORIGINAL_NAME_LENGTH)
+        if (
+            "/" in original_name
+            or "\\" in original_name
+            or original_name in {".", ".."}
+        ):
+            raise ValueError("original_name must be a plain object name")
+        if (
+            not isinstance(media_type, str)
+            or SAFE_MEDIA_TYPE.fullmatch(media_type) is None
+        ):
+            raise ValueError("media_type must be a bounded lowercase media type")
+        if not isinstance(charset, str) or SAFE_CHARSET.fullmatch(charset) is None:
+            raise ValueError("charset must be a bounded charset token")
+        retrieved = _require_utc(retrieved_at, "retrieved_at")
+        effective = (
+            _require_utc(effective_from, "effective_from")
+            if effective_from is not None
+            else None
+        )
+        if (
+            isinstance(byte_length, bool)
+            or not isinstance(byte_length, int)
+            or not 0 <= byte_length <= MAX_RAW_OBJECT_BYTES
+        ):
+            raise ValueError("byte_length is outside the raw-object bound")
+        _require_hash(content_hash, "content_hash")
+        expected_object_id = _derived_raw_object_id(
+            deployment_id=deployment_id,
+            source_id=source_id,
+            original_name=original_name,
+            media_type=media_type,
+            charset=charset,
+            retrieved_at=retrieved,
+            effective_from=effective,
+            byte_length=byte_length,
+            content_hash=content_hash,
+        )
+        if object_id != expected_object_id:
+            raise RawObjectIntegrityError
+        instance = object.__new__(cls)
+        values = {
+            "deployment_id": deployment_id,
+            "source_id": source_id,
+            "object_id": object_id,
+            "original_name": original_name,
+            "media_type": media_type,
+            "charset": charset,
+            "retrieved_at": retrieved,
+            "effective_from": effective,
+            "byte_length": byte_length,
+            "content_hash": content_hash,
+        }
+        for field, value in values.items():
+            object.__setattr__(instance, field, value)
+        return instance
+
     def reference(self) -> RawObjectRef:
         return RawObjectRef(self.object_id, self.content_hash, self.byte_length)
 

@@ -128,6 +128,115 @@ def test_raw_metadata_derives_identity_and_hash_from_bytes_and_verifies_reads() 
     assert raw_metadata(RAW_BYTES + b" ").object_id != metadata.object_id
 
 
+def test_raw_metadata_reconstitution_revalidates_every_persisted_field() -> None:
+    metadata = raw_metadata()
+    persisted = {
+        "deployment_id": metadata.deployment_id,
+        "source_id": metadata.source_id,
+        "object_id": metadata.object_id,
+        "original_name": metadata.original_name,
+        "media_type": metadata.media_type,
+        "charset": metadata.charset,
+        "retrieved_at": metadata.retrieved_at,
+        "effective_from": metadata.effective_from,
+        "byte_length": metadata.byte_length,
+        "content_hash": metadata.content_hash,
+    }
+
+    assert RawObjectMetadata.reconstitute(**persisted) == metadata  # type: ignore[arg-type]
+
+    without_effective = RawObjectMetadata.from_bytes(
+        deployment_id="demo-deployment",
+        source_id="synthetic-source",
+        original_name="synthetic-source.json",
+        media_type="application/json",
+        charset="utf-8",
+        retrieved_at=NOW,
+        effective_from=None,
+        content=RAW_BYTES,
+    )
+    assert (
+        RawObjectMetadata.reconstitute(
+            deployment_id=without_effective.deployment_id,
+            source_id=without_effective.source_id,
+            object_id=without_effective.object_id,
+            original_name=without_effective.original_name,
+            media_type=without_effective.media_type,
+            charset=without_effective.charset,
+            retrieved_at=without_effective.retrieved_at,
+            effective_from=without_effective.effective_from,
+            byte_length=without_effective.byte_length,
+            content_hash=without_effective.content_hash,
+        )
+        == without_effective
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("deployment_id", "unsafe id"),
+        ("source_id", "unsafe id"),
+        ("object_id", "unsafe id"),
+        ("original_name", "."),
+        ("original_name", "../private.json"),
+        ("media_type", "Application/JSON"),
+        ("charset", "utf 8"),
+        ("retrieved_at", "2026-08-06T12:00:00Z"),
+        ("retrieved_at", datetime(2026, 8, 6, 12)),
+        (
+            "retrieved_at",
+            datetime(2026, 8, 6, 12, tzinfo=timezone(timedelta(hours=8))),
+        ),
+        ("effective_from", datetime(2026, 8, 5, 12)),
+        (
+            "effective_from",
+            datetime(2026, 8, 5, 12, tzinfo=timezone(timedelta(hours=8))),
+        ),
+        ("byte_length", True),
+        ("byte_length", MAX_RAW_OBJECT_BYTES + 1),
+        ("content_hash", "not-a-hash"),
+    ],
+)
+def test_raw_metadata_reconstitution_rejects_corrupt_rows(
+    field: str, value: object
+) -> None:
+    metadata = raw_metadata()
+    persisted: dict[str, object] = {
+        "deployment_id": metadata.deployment_id,
+        "source_id": metadata.source_id,
+        "object_id": metadata.object_id,
+        "original_name": metadata.original_name,
+        "media_type": metadata.media_type,
+        "charset": metadata.charset,
+        "retrieved_at": metadata.retrieved_at,
+        "effective_from": metadata.effective_from,
+        "byte_length": metadata.byte_length,
+        "content_hash": metadata.content_hash,
+    }
+    persisted[field] = value
+
+    with pytest.raises(ValueError):
+        RawObjectMetadata.reconstitute(**persisted)  # type: ignore[arg-type]
+
+
+def test_raw_metadata_reconstitution_rejects_well_formed_identity_corruption() -> None:
+    metadata = raw_metadata()
+    with pytest.raises(RawObjectIntegrityError):
+        RawObjectMetadata.reconstitute(
+            deployment_id=metadata.deployment_id,
+            source_id=metadata.source_id,
+            object_id="raw-corrupt",
+            original_name=metadata.original_name,
+            media_type=metadata.media_type,
+            charset=metadata.charset,
+            retrieved_at=metadata.retrieved_at,
+            effective_from=metadata.effective_from,
+            byte_length=metadata.byte_length,
+            content_hash=metadata.content_hash,
+        )
+
+
 @pytest.mark.parametrize("content", [None, b"", RAW_BYTES + b" "])
 def test_raw_reads_fail_closed_when_missing_or_hash_mismatched(
     content: bytes | None,
