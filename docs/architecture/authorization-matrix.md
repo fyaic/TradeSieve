@@ -54,6 +54,12 @@ exact visible-object result from trusted storage. `open` means `INCOMPLETE`,
 | `RECORD_CLOSED_NO_ACTION` | `decision:human` | Human | Compliance reviewer or owner | Open case; matching decision; four-eyes |
 | `SOURCE_READ` | `source:read` | Human, service, agent | None | Exact target grant |
 | `SOURCE_OPERATE` | `source:operate` | Human, service | Source operator | Exact target grant |
+| `SOURCE_SNAPSHOT_INGEST` | `source:operate` | Human, service | Source operator | Exact target grant; retrieve + quarantine workflow |
+| `SOURCE_SNAPSHOT_PARSE` | `source:operate` | Human, service | Source operator | Exact target grant |
+| `SOURCE_SNAPSHOT_VALIDATE` | `source:operate` | Human, service | Source operator | Exact target grant |
+| `SOURCE_SNAPSHOT_APPROVE` | `source:approve` | Human | Source approver or compliance owner | Exact target grant; distinct trusted creator |
+| `SOURCE_SNAPSHOT_ACTIVATE` | `source:approve` | Human | Source approver or compliance owner | Exact target grant; distinct trusted creator |
+| `SOURCE_SNAPSHOT_ROLLBACK` | `source:approve` | Human | Source approver or compliance owner | Exact target grant; distinct trusted creator |
 | `POLICY_APPROVE` | `policy:approve` | Human | Policy approver or compliance owner | Exact target grant |
 | `AUDIT_EXPORT` | `audit:export` | Human | Auditor or compliance owner | Exact target grant |
 
@@ -65,6 +71,12 @@ The final-disposition four-eyes flag is part of the typed policy and defaults on
 trusted resolver supplies the submitting actor; missing submitter context also denies.
 Issue #8 owns the production decision about where four-eyes is mandatory, along with
 role assignments, step-up/emergency access, and maximum token/decision expiry.
+
+Source snapshot retrieval, parsing, and validation are preparation operations: they
+cannot activate a snapshot. Approval, activation, and rollback are distinct named-human
+operations and use the trusted snapshot creator for separation. `SOURCE_OPERATE` remains
+for TS-201 compatibility. `source:approve` and the source-approver role define policy
+shape only; production grants and named owners remain deferred deployment decisions.
 
 ## Evaluation and outward behavior
 

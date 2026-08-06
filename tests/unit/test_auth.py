@@ -552,6 +552,18 @@ FINAL_POLICY_OPERATIONS = {
     Operation.POLICY_ROLLBACK,
 }
 
+SOURCE_OPERATOR_OPERATIONS = {
+    Operation.SOURCE_SNAPSHOT_INGEST,
+    Operation.SOURCE_SNAPSHOT_PARSE,
+    Operation.SOURCE_SNAPSHOT_VALIDATE,
+}
+
+SOURCE_APPROVAL_OPERATIONS = {
+    Operation.SOURCE_SNAPSHOT_APPROVE,
+    Operation.SOURCE_SNAPSHOT_ACTIVATE,
+    Operation.SOURCE_SNAPSHOT_ROLLBACK,
+}
+
 
 @pytest.mark.parametrize("operation", list(Operation))
 def test_default_matrix_explicitly_allows_each_mapped_operation(
@@ -573,6 +585,179 @@ def test_default_matrix_explicitly_allows_each_mapped_operation(
 
 def test_default_policy_matrix_is_exhaustive() -> None:
     assert set(DEFAULT_POLICIES) == set(Operation)
+
+
+@pytest.mark.parametrize("operation", sorted(SOURCE_OPERATOR_OPERATIONS, key=str))
+@pytest.mark.parametrize("principal_type", [ActorType.HUMAN, ActorType.SERVICE])
+def test_source_snapshot_operator_commands_allow_only_named_human_or_service_operator(
+    operation: Operation,
+    principal_type: ActorType,
+) -> None:
+    events: list[AuthorizationAuditEvent] = []
+    authorization_request = request(
+        operation,
+        principal=actor(
+            actor_type=principal_type,
+            scopes=frozenset({Scope.SOURCE_OPERATE}),
+            roles=frozenset({Role.SOURCE_OPERATOR}),
+        ),
+    )
+    service, _ = service_for(authorization_request, events)
+
+    assert service.require(authorization_request, now=NOW).operation is operation
+    assert events[-1].reason is AuthorizationReason.ALLOWED
+
+
+@pytest.mark.parametrize("operation", sorted(SOURCE_OPERATOR_OPERATIONS, key=str))
+@pytest.mark.parametrize(
+    ("principal", "reason"),
+    [
+        (
+            actor(
+                actor_type=ActorType.AGENT,
+                scopes=frozenset({Scope.SOURCE_OPERATE}),
+                roles=frozenset({Role.SOURCE_OPERATOR}),
+            ),
+            AuthorizationReason.ACTOR_TYPE_DENIED,
+        ),
+        (
+            actor(
+                scopes=frozenset({Scope.SOURCE_READ}),
+                roles=frozenset({Role.SOURCE_OPERATOR}),
+            ),
+            AuthorizationReason.MISSING_SCOPE,
+        ),
+        (
+            actor(
+                scopes=frozenset({Scope.SOURCE_OPERATE}),
+                roles=frozenset(),
+            ),
+            AuthorizationReason.ROLE_DENIED,
+        ),
+    ],
+)
+def test_source_snapshot_operator_commands_fail_before_target_lookup(
+    operation: Operation,
+    principal: ActorContext,
+    reason: AuthorizationReason,
+) -> None:
+    events: list[AuthorizationAuditEvent] = []
+    authorization_request = request(operation, principal=principal)
+    service, entitlements = service_for(authorization_request, events)
+
+    with pytest.raises(AuthorizationDenied):
+        service.require(authorization_request, now=NOW)
+    assert events[-1].reason is reason
+    assert entitlements.calls == []
+
+
+@pytest.mark.parametrize("operation", sorted(SOURCE_APPROVAL_OPERATIONS, key=str))
+@pytest.mark.parametrize("role", [Role.SOURCE_APPROVER, Role.COMPLIANCE_OWNER])
+def test_source_snapshot_final_lifecycle_requires_distinct_named_human_approver(
+    operation: Operation,
+    role: Role,
+) -> None:
+    events: list[AuthorizationAuditEvent] = []
+    authorization_request = request(
+        operation,
+        principal=actor(
+            actor_type=ActorType.HUMAN,
+            scopes=frozenset({Scope.SOURCE_APPROVE}),
+            roles=frozenset({role}),
+        ),
+    )
+    service, _ = service_for(
+        authorization_request,
+        events,
+        facts=ResolvedTargetFacts(author_actor_id="source-operator-1"),
+    )
+
+    assert service.require(authorization_request, now=NOW).operation is operation
+    assert events[-1].reason is AuthorizationReason.ALLOWED
+
+
+@pytest.mark.parametrize("operation", sorted(SOURCE_APPROVAL_OPERATIONS, key=str))
+@pytest.mark.parametrize("principal_type", [ActorType.SERVICE, ActorType.AGENT])
+def test_nonhumans_cannot_approve_activate_or_rollback_source_snapshots(
+    operation: Operation,
+    principal_type: ActorType,
+) -> None:
+    events: list[AuthorizationAuditEvent] = []
+    authorization_request = request(
+        operation,
+        principal=actor(
+            actor_type=principal_type,
+            scopes=frozenset({Scope.SOURCE_APPROVE}),
+            roles=frozenset({Role.SOURCE_APPROVER}),
+        ),
+    )
+    service, entitlements = service_for(authorization_request, events)
+
+    with pytest.raises(AuthorizationDenied):
+        service.require(authorization_request, now=NOW)
+    assert events[-1].reason is AuthorizationReason.ACTOR_TYPE_DENIED
+    assert entitlements.calls == []
+
+
+@pytest.mark.parametrize("operation", sorted(SOURCE_APPROVAL_OPERATIONS, key=str))
+@pytest.mark.parametrize("creator_actor_id", [None, "reviewer-1"])
+def test_source_snapshot_final_lifecycle_denies_missing_or_same_creator(
+    operation: Operation,
+    creator_actor_id: str | None,
+) -> None:
+    events: list[AuthorizationAuditEvent] = []
+    authorization_request = request(
+        operation,
+        principal=actor(
+            scopes=frozenset({Scope.SOURCE_APPROVE}),
+            roles=frozenset({Role.SOURCE_APPROVER}),
+        ),
+    )
+    service, entitlements = service_for(
+        authorization_request,
+        events,
+        facts=ResolvedTargetFacts(author_actor_id=creator_actor_id),
+    )
+
+    with pytest.raises(AuthorizationDenied):
+        service.require(authorization_request, now=NOW)
+    assert events[-1].reason is AuthorizationReason.AUTHOR_APPROVER_SEPARATION_DENIED
+    assert entitlements.calls == [exact_grant(authorization_request)]
+
+
+@pytest.mark.parametrize("operation", sorted(SOURCE_APPROVAL_OPERATIONS, key=str))
+@pytest.mark.parametrize(
+    ("scopes", "roles", "reason"),
+    [
+        (
+            frozenset({Scope.SOURCE_OPERATE}),
+            frozenset({Role.SOURCE_APPROVER}),
+            AuthorizationReason.MISSING_SCOPE,
+        ),
+        (
+            frozenset({Scope.SOURCE_APPROVE}),
+            frozenset({Role.SOURCE_OPERATOR}),
+            AuthorizationReason.ROLE_DENIED,
+        ),
+    ],
+)
+def test_source_snapshot_final_lifecycle_requires_exact_scope_and_role(
+    operation: Operation,
+    scopes: frozenset[Scope],
+    roles: frozenset[Role],
+    reason: AuthorizationReason,
+) -> None:
+    events: list[AuthorizationAuditEvent] = []
+    authorization_request = request(
+        operation,
+        principal=actor(scopes=scopes, roles=roles),
+    )
+    service, entitlements = service_for(authorization_request, events)
+
+    with pytest.raises(AuthorizationDenied):
+        service.require(authorization_request, now=NOW)
+    assert events[-1].reason is reason
+    assert entitlements.calls == []
 
 
 @pytest.mark.parametrize(

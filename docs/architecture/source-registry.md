@@ -1,8 +1,9 @@
 # Runtime source registry
 
 **Status:** Implemented TS-201 boundary for source governance and runtime
-freshness. Immutable source objects, validation/diff, approval, activation history,
-and rollback belong to TS-202.
+freshness. TS-202 Slice A now defines immutable source objects, validation/diff,
+authorization, lifecycle, persistence ports, and in-memory reference semantics;
+application/durable/runtime integration remains later slices.
 
 ## Purpose and authority
 
@@ -108,6 +109,8 @@ Production configuration rejects demo bootstrap.
 
 The `active_snapshot_id`, retrieval time, and effective time are trusted runtime
 facts needed for freshness and forward compatibility. TS-201 does not claim that
-this pointer is an immutable snapshot ledger. TS-202 owns raw-object retention,
-hashes, parsing and validation, diff, approval, atomic activation history,
-rollback, and audit evidence.
+this pointer is an immutable snapshot ledger. The accepted
+[TS-202 snapshot boundary](source-snapshots.md) owns raw-object retention, hashes,
+parsing and validation, diff, approval, atomic activation history, rollback, and
+audit evidence. Slice A's repository port requires an activation/rollback event and
+this observation to update in one future PostgreSQL transaction.

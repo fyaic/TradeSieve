@@ -10,7 +10,7 @@ TradeSieve is designed as an independently deployable service beside CRM, order,
 
 ## Project status
 
-**Phase 1 implementation has started; no runnable screening MVP exists yet.** The repository includes a locked Python project, CI quality gates, and a Docker reference stack that proves app/worker/PostgreSQL health, governed source freshness, one versioned and cited synthetic rule bundle, and fail-closed readiness. The private demo CLI can inspect the active safe rule projection; it does not submit screenings or grant clearance. Screening and review behavior remain acceptance targets. The [target MVP user experience](docs/getting-started/mvp-user-experience.md) is not a working screening quickstart until implementation and release gates pass.
+**Phase 1 implementation has started; no runnable screening MVP exists yet.** The repository includes a locked Python project, CI quality gates, and a Docker reference stack that proves app/worker/PostgreSQL health, governed source freshness, one versioned and cited synthetic rule bundle, and fail-closed readiness. It also contains the TS-202 Slice A immutable source-snapshot domain, authorization policies, ports, and in-memory reference adapters; the parser, application workflow, durable storage, and runtime demo are not implemented yet. The private demo CLI can inspect the active safe rule projection; it does not submit screenings or grant clearance. Screening and review behavior remain acceptance targets. The [target MVP user experience](docs/getting-started/mvp-user-experience.md) is not a working screening quickstart until implementation and release gates pass.
 
 Nothing in this repository is legal advice or an automatic legal-clearance mechanism.
 
