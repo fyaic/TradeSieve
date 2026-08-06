@@ -14,6 +14,7 @@ uv run --locked pytest
 uv build
 ./scripts/check_docs.sh
 npx --yes @redocly/cli@2.44.2 lint api/openapi/tradesieve.v1.json
-git ls-files -z | xargs -0 uv run --locked detect-secrets-hook --baseline .secrets.baseline
+git ls-files --cached --others --exclude-standard -z \
+  | xargs -0 uv run --locked detect-secrets-hook --baseline .secrets.baseline
 uv export --locked --all-groups --no-emit-project --format requirements-txt \
   | uv run --locked pip-audit --requirement /dev/stdin --strict --progress-spinner off
