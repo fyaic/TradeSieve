@@ -100,7 +100,9 @@ application query DTO.
 upserts the synthetic manifest and governance record and records a new current
 synthetic observation. The monotonic observation guard still applies: a future or
 otherwise newer stored observation is never silently overwritten, and the command
-fails with an explicit conflict. Production configuration rejects demo bootstrap.
+fails with an explicit conflict. The same command delegates rule setup to the
+authorized TS-205 rule-bundle services; it does not insert a rule coverage marker.
+Production configuration rejects demo bootstrap.
 
 ## Snapshot boundary
 

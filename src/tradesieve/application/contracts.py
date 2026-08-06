@@ -45,6 +45,11 @@ ContentHash = Annotated[
     str,
     StringConstraints(pattern=r"^sha256:[a-f0-9]{64}$"),
 ]
+STRICT_SEMVER_PATTERN = (
+    r"^(?:0|[1-9][0-9]{0,8})\."
+    r"(?:0|[1-9][0-9]{0,8})\."
+    r"(?:0|[1-9][0-9]{0,8})$"
+)
 POSITIVE_DECIMAL_PATTERN = (
     r"^(?:[1-9][0-9]{0,17}(?:\.[0-9]{1,6})?|"
     r"0\.(?!0{1,6}$)[0-9]{1,6})$"
@@ -73,6 +78,12 @@ def _require_percentage_string(value: object) -> object:
 
 def _require_confidence_string(value: object) -> object:
     return _require_decimal_string(value, CONFIDENCE_PATTERN, "confidence")
+
+
+def _require_semantic_version(value: object) -> object:
+    if not isinstance(value, str) or re.fullmatch(STRICT_SEMVER_PATTERN, value) is None:
+        raise ValueError("version must be a strict release semantic version")
+    return value
 
 
 def _serialize_decimal(value: Decimal) -> str:
@@ -110,6 +121,11 @@ MoneyAmount = Annotated[
     Field(gt=0, max_digits=24, decimal_places=6),
     PlainSerializer(_serialize_decimal, return_type=str, when_used="json"),
     WithJsonSchema({"type": "string", "pattern": POSITIVE_DECIMAL_PATTERN}),
+]
+SemanticVersion = Annotated[
+    str,
+    BeforeValidator(_require_semantic_version),
+    WithJsonSchema({"type": "string", "pattern": STRICT_SEMVER_PATTERN}),
 ]
 
 
@@ -302,6 +318,24 @@ class SourceStatusValue(StrEnum):
     STALE = "STALE"
     UNAVAILABLE = "UNAVAILABLE"
     QUARANTINED = "QUARANTINED"
+
+
+class RuleEvaluationOutcome(StrEnum):
+    """Fact-presence result only; no value grants legal permission."""
+
+    FACTS_PRESENT = "FACTS_PRESENT"
+    MISSING_FACTS = "MISSING_FACTS"
+    NOT_APPLICABLE = "NOT_APPLICABLE"
+
+
+class RuleFactPath(StrEnum):
+    PROPOSED_ACTION = "proposed_action"
+    LEGAL_NEXUS = "legal_nexus"
+    ACTIVITIES = "activities"
+    PARTIES = "parties"
+    GOODS = "goods"
+    ROUTE = "route"
+    PAYMENT = "payment"
 
 
 class EventType(StrEnum):
@@ -670,11 +704,20 @@ class VersionReference(ContractModel):
     content_hash: ContentHash | None = None
 
 
+class HashedVersionReference(ContractModel):
+    """Exact immutable SemVer identity used by deterministic policy evaluation."""
+
+    resource_id: Reference
+    version: SemanticVersion
+    content_hash: ContentHash
+
+
 class VersionSet(ContractModel):
     input_schema: ShortText
     input_hash: ContentHash
     sources: Annotated[list[VersionReference], Field(max_length=256)]
-    rules: Annotated[list[VersionReference], Field(max_length=256)]
+    rule_bundle: HashedVersionReference
+    rules: Annotated[list[HashedVersionReference], Field(min_length=1, max_length=256)]
     matcher: VersionReference
     models: Annotated[list[VersionReference], Field(max_length=64)] = Field(
         default_factory=list
@@ -692,6 +735,33 @@ class VersionSet(ContractModel):
                 raise ValueError(
                     f"duplicate {category} resource_id: {', '.join(duplicates)}"
                 )
+        rule_identities = [
+            (item.resource_id, item.version, item.content_hash) for item in self.rules
+        ]
+        if rule_identities != sorted(rule_identities):
+            raise ValueError("rules must be sorted by immutable identity")
+        return self
+
+
+class RuleEvaluationRecord(ContractModel):
+    """Deterministic rule trace; FACTS_PRESENT is not clearance or permission."""
+
+    evaluation_id: Reference
+    bundle: HashedVersionReference
+    rule: HashedVersionReference
+    outcome: RuleEvaluationOutcome
+    missing_fact_paths: Annotated[list[RuleFactPath], Field(max_length=32)]
+
+    @model_validator(mode="after")
+    def validate_missing_fact_paths(self) -> RuleEvaluationRecord:
+        if sorted(set(self.missing_fact_paths), key=str) != self.missing_fact_paths:
+            raise ValueError("missing_fact_paths must be sorted and unique")
+        if (self.outcome is RuleEvaluationOutcome.MISSING_FACTS) != bool(
+            self.missing_fact_paths
+        ):
+            raise ValueError(
+                "only MISSING_FACTS evaluations may contain missing fact paths"
+            )
         return self
 
 
@@ -761,6 +831,9 @@ class ScreeningResult(ContractModel):
     highest_priority: Priority
     business_action: BusinessAction
     summary: LongText
+    rule_evaluations: Annotated[
+        list[RuleEvaluationRecord], Field(min_length=1, max_length=256)
+    ]
     findings: Annotated[list[Finding], Field(max_length=512)]
     required_evidence: Annotated[list[EvidenceRequirement], Field(max_length=256)]
     holds: Annotated[list[Hold], Field(max_length=64)]
@@ -770,7 +843,13 @@ class ScreeningResult(ContractModel):
 
     @model_validator(mode="after")
     def validate_result_references(self) -> ScreeningResult:
-        _validate_result_graph(self.findings, self.required_evidence, self.holds)
+        _validate_result_graph(
+            self.rule_evaluations,
+            self.findings,
+            self.required_evidence,
+            self.holds,
+            self.version_set,
+        )
         return self
 
     def canonical_result_hash(self) -> str:
@@ -872,11 +951,14 @@ class HumanDecision(HumanDecisionRequest):
 
 
 def _validate_result_graph(
+    rule_evaluations: list[RuleEvaluationRecord],
     findings: list[Finding],
     required_evidence: list[EvidenceRequirement],
     holds: list[Hold],
+    version_set: VersionSet,
 ) -> None:
     groups = {
+        "evaluation_id": [item.evaluation_id for item in rule_evaluations],
         "finding_id": [item.finding_id for item in findings],
         "requirement_ref": [item.requirement_ref for item in required_evidence],
         "hold_id": [item.hold_id for item in holds],
@@ -899,6 +981,55 @@ def _validate_result_graph(
     if unknown_refs:
         raise ValueError(f"unknown required evidence refs: {', '.join(unknown_refs)}")
 
+    evaluation_refs = set(groups["evaluation_id"])
+    used_evaluation_refs = {
+        reference for finding in findings for reference in finding.rule_evaluation_refs
+    }
+    unknown_evaluations = sorted(used_evaluation_refs - evaluation_refs)
+    if unknown_evaluations:
+        raise ValueError(
+            "unknown rule evaluation refs: " + ", ".join(unknown_evaluations)
+        )
+
+    evaluation_bundles = {
+        (
+            evaluation.bundle.resource_id,
+            evaluation.bundle.version,
+            evaluation.bundle.content_hash,
+        )
+        for evaluation in rule_evaluations
+    }
+    expected_bundle = (
+        version_set.rule_bundle.resource_id,
+        version_set.rule_bundle.version,
+        version_set.rule_bundle.content_hash,
+    )
+    if evaluation_bundles != {expected_bundle}:
+        raise ValueError(
+            "rule evaluation bundles must exactly match version_set.rule_bundle"
+        )
+
+    evaluation_rules = [
+        (
+            evaluation.rule.resource_id,
+            evaluation.rule.version,
+            evaluation.rule.content_hash,
+        )
+        for evaluation in rule_evaluations
+    ]
+    if len(set(evaluation_rules)) != len(evaluation_rules):
+        raise ValueError("rule evaluation identities must be unique")
+    if evaluation_rules != sorted(evaluation_rules):
+        raise ValueError("rule evaluations must be sorted by rule identity")
+    version_rules = {
+        (item.resource_id, item.version, item.content_hash)
+        for item in version_set.rules
+    }
+    if set(evaluation_rules) != version_rules:
+        raise ValueError(
+            "rule evaluations must exactly match every version_set.rules identity"
+        )
+
 
 class Case(ContractModel):
     tenant_id: Reference
@@ -908,6 +1039,9 @@ class Case(ContractModel):
     signal: Signal
     highest_priority: Priority
     business_action: BusinessAction
+    rule_evaluations: Annotated[
+        list[RuleEvaluationRecord], Field(min_length=1, max_length=256)
+    ]
     findings: Annotated[list[Finding], Field(max_length=512)]
     required_evidence: Annotated[list[EvidenceRequirement], Field(max_length=256)]
     holds: Annotated[list[Hold], Field(max_length=64)]
@@ -917,7 +1051,13 @@ class Case(ContractModel):
 
     @model_validator(mode="after")
     def validate_case_references(self) -> Case:
-        _validate_result_graph(self.findings, self.required_evidence, self.holds)
+        _validate_result_graph(
+            self.rule_evaluations,
+            self.findings,
+            self.required_evidence,
+            self.holds,
+            self.version_set,
+        )
         return self
 
 
@@ -1081,6 +1221,7 @@ CONTRACT_MODELS: tuple[type[ContractModel], ...] = (
     OwnershipControlRelationship,
     Party,
     PaymentPath,
+    RuleEvaluationRecord,
     ReviewRequest,
     Route,
     ScreeningCompletedEventData,

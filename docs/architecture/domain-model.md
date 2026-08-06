@@ -17,6 +17,7 @@
 | --- | --- | --- |
 | `Source` | Governance metadata and runtime freshness policy for an external/internal source | Stable deployment/source-set/source ID; incomplete records remain inactive |
 | `SourceSnapshot` | Immutable retrieved/accepted source version | Hash, retrieval/effective time, parser version, activation event |
+| `RuleBundle` | Immutable governed set of cited, fixture-backed rule versions | Tenant/deployment/rule-set namespace plus bundle/version/content hash; lifecycle events select the active version |
 | `Assertion` | Source-native and normalized fact with locator | Cannot exist without provenance/snapshot |
 | `Entity` | Canonical person/organization/vessel/etc. candidate | Merges are versioned assertions, never destructive source edits |
 | `Relationship` | Ownership/control/directorship/agency/etc. | Subject/object/type/provenance/validity/reviewer state |
@@ -115,6 +116,11 @@ The implemented TS-201 registry keeps governance separate from the latest runtim
 observation and derives freshness at query time. See the
 [runtime source registry](source-registry.md) for activation, required-set, status,
 redaction, and TS-202 snapshot-boundary semantics.
+
+The implemented TS-205 rule-bundle aggregate keeps private immutable content,
+append-only lifecycle events, authorization decisions, and command audits separate.
+See [versioned rule bundles](rule-bundles.md) for governance, readiness, safe
+projection, and the TS-202/TS-303 boundaries.
 
 ## Case event examples
 

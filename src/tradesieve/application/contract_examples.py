@@ -296,6 +296,53 @@ def transaction_review_required_result(request: ScreeningRequest) -> ScreeningRe
             "Synthetic transaction has unresolved party identity, goods "
             "classification, end-use, and legal-nexus evidence."
         ),
+        "rule_evaluations": [
+            {
+                "evaluation_id": "eval-goods-completeness-001",
+                "bundle": {
+                    "resource_id": "synthetic-phase1-rule-bundle",
+                    "version": "1.0.0",
+                    "content_hash": "sha256:" + "8" * 64,
+                },
+                "rule": {
+                    "resource_id": "demo-goods-completeness",
+                    "version": "1.0.0",
+                    "content_hash": "sha256:" + "2" * 64,
+                },
+                "outcome": "MISSING_FACTS",
+                "missing_fact_paths": ["goods"],
+            },
+            {
+                "evaluation_id": "eval-party-completeness-001",
+                "bundle": {
+                    "resource_id": "synthetic-phase1-rule-bundle",
+                    "version": "1.0.0",
+                    "content_hash": "sha256:" + "8" * 64,
+                },
+                "rule": {
+                    "resource_id": "demo-party-completeness",
+                    "version": "1.0.0",
+                    "content_hash": "sha256:" + "1" * 64,
+                },
+                "outcome": "MISSING_FACTS",
+                "missing_fact_paths": ["parties"],
+            },
+            {
+                "evaluation_id": "eval-nexus-completeness-001",
+                "bundle": {
+                    "resource_id": "synthetic-phase1-rule-bundle",
+                    "version": "1.0.0",
+                    "content_hash": "sha256:" + "8" * 64,
+                },
+                "rule": {
+                    "resource_id": "demo-policy-scope",
+                    "version": "1.0.0",
+                    "content_hash": "sha256:" + "3" * 64,
+                },
+                "outcome": "MISSING_FACTS",
+                "missing_fact_paths": ["legal_nexus"],
+            },
+        ],
         "findings": [
             {
                 "finding_id": "fnd-party-001",
@@ -418,6 +465,11 @@ def transaction_review_required_result(request: ScreeningRequest) -> ScreeningRe
         "version_set": {
             "input_schema": "1.0.0",
             "input_hash": request.canonical_input_hash(),
+            "rule_bundle": {
+                "resource_id": "synthetic-phase1-rule-bundle",
+                "version": "1.0.0",
+                "content_hash": "sha256:" + "8" * 64,
+            },
             "sources": [
                 {
                     "resource_id": "demo-sanctions",
@@ -432,14 +484,19 @@ def transaction_review_required_result(request: ScreeningRequest) -> ScreeningRe
             ],
             "rules": [
                 {
-                    "resource_id": "demo-eu-russia",
-                    "version": "1",
+                    "resource_id": "demo-goods-completeness",
+                    "version": "1.0.0",
+                    "content_hash": "sha256:" + "2" * 64,
+                },
+                {
+                    "resource_id": "demo-party-completeness",
+                    "version": "1.0.0",
                     "content_hash": "sha256:" + "1" * 64,
                 },
                 {
                     "resource_id": "demo-policy-scope",
-                    "version": "1",
-                    "content_hash": "sha256:" + "2" * 64,
+                    "version": "1.0.0",
+                    "content_hash": "sha256:" + "3" * 64,
                 },
             ],
             "matcher": {

@@ -30,7 +30,7 @@ class FakeConnection:
         self,
         *,
         revision: str | None = runtime.MIGRATION_REVISION,
-        coverage: list[tuple[Any, ...]] | None = None,
+        rule_ready: bool = True,
         source_manifest: list[str] | None = None,
         source_entries: list[tuple[Any, ...]] | None = None,
         observation_insert_rows: list[tuple[Any, ...]] | None = None,
@@ -39,7 +39,7 @@ class FakeConnection:
         fail_query: str | None = None,
     ) -> None:
         self.revision = revision
-        self.coverage = coverage if coverage is not None else required_coverage()
+        self.rule_ready = rule_ready
         self.source_manifest = (
             ["synthetic-source-v1"] if source_manifest is None else source_manifest
         )
@@ -85,15 +85,9 @@ class FakeConnection:
             return FakeResult(
                 [] if self.current_observation is None else [self.current_observation]
             )
-        if "SELECT coverage_kind" in query:
-            return FakeResult(self.coverage)
         if "SELECT observed_at" in query:
             return FakeResult([] if self.heartbeat is None else [(self.heartbeat,)])
         return FakeResult([])
-
-
-def required_coverage() -> list[tuple[Any, ...]]:
-    return [("RULE", "synthetic-demo-rules-v1")]
 
 
 def source_registration_row(*, active: bool = True) -> tuple[Any, ...]:
@@ -151,6 +145,22 @@ def source_entry(
 def use_connection(monkeypatch: pytest.MonkeyPatch, connection: FakeConnection) -> None:
     monkeypatch.setattr(runtime, "connect", lambda settings: cast(Any, connection))
 
+    class FakeRuleReadiness:
+        def __init__(self, repository: object, **kwargs: object) -> None:
+            assert repository is not None
+            assert kwargs == {
+                "deployment_id": "demo",
+                "rule_set_id": "synthetic-demo-rules-v1",
+            }
+
+        def is_current_active_ready(self, tenant_id: str) -> bool:
+            assert tenant_id == "demo-tenant"
+            if connection.fail_query == "rule_bundle":
+                raise ValueError("synthetic rule read failure")
+            return connection.rule_ready
+
+    monkeypatch.setattr(runtime, "RuleBundleReadinessService", FakeRuleReadiness)
+
 
 def test_connect_passes_timeout_and_autocommit(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, object] = {}
@@ -202,10 +212,10 @@ def test_readiness_rejects_missing_or_wrong_migration(
     assert status.checks["migration"] == expected_migration
 
 
-def test_readiness_rejects_coverage_query_failure(
+def test_readiness_rejects_rule_bundle_query_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    use_connection(monkeypatch, FakeConnection(fail_query="runtime_coverage"))
+    use_connection(monkeypatch, FakeConnection(fail_query="rule_bundle"))
     status = runtime.check_readiness(Settings())
     assert status.ready is False
     assert status.checks["migration"] == "OK"
@@ -245,7 +255,7 @@ def test_readiness_rejects_missing_rule_coverage(
 ) -> None:
     use_connection(
         monkeypatch,
-        FakeConnection(coverage=[]),
+        FakeConnection(rule_ready=False),
     )
     status = runtime.check_readiness(Settings())
     assert status.ready is False
@@ -319,11 +329,19 @@ def test_bootstrap_and_worker_heartbeat_write_expected_rows(
 ) -> None:
     connection = FakeConnection()
     use_connection(monkeypatch, connection)
+    bootstrapped: list[tuple[Settings, object]] = []
+    monkeypatch.setattr(
+        runtime,
+        "_bootstrap_demo_rule_bundle",
+        lambda settings, active_connection, now: bootstrapped.append(
+            (settings, active_connection)
+        ),
+    )
     runtime.bootstrap_demo(Settings())
     runtime.record_worker_heartbeat(Settings())
-    assert (
-        sum("INSERT INTO runtime_coverage" in query for query, _ in connection.executed)
-        == 1
+    assert bootstrapped == [(Settings(), connection)]
+    assert not any(
+        "INSERT INTO runtime_coverage" in query for query, _ in connection.executed
     )
     assert any(
         "INSERT INTO source_set_manifest" in query for query, _ in connection.executed

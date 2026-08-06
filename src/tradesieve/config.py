@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://tradesieve:local_demo_only@postgres:5432/tradesieve"  # pragma: allowlist secret
     debug: bool = False
     demo_bootstrap_enabled: bool = True
+    rule_bundle_tenant_id: RuntimeId = "demo-tenant"
     deployment_id: RuntimeId = "demo"
     required_source_set: RuntimeId = "synthetic-demo-sources-v1"
     required_rule_set: RuntimeId = "synthetic-demo-rules-v1"
@@ -63,6 +64,8 @@ class Settings(BaseSettings):
             unsafe.append("debug mode")
         if self.demo_bootstrap_enabled:
             unsafe.append("demo bootstrap")
+        if self.rule_bundle_tenant_id.lower().startswith(DEMO_COVERAGE_PREFIXES):
+            unsafe.append("demo/synthetic rule-bundle tenant identity")
         if self.deployment_id.lower().startswith(DEMO_COVERAGE_PREFIXES):
             unsafe.append("demo deployment identity")
         if self.required_source_set.lower().startswith(DEMO_COVERAGE_PREFIXES):

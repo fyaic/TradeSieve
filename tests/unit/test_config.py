@@ -14,6 +14,7 @@ def production_settings(**overrides: object) -> Settings:
         "database_url": "postgresql://service:strong-password@db/tradesieve",  # pragma: allowlist secret
         "debug": False,
         "demo_bootstrap_enabled": False,
+        "rule_bundle_tenant_id": "tenant-eu-1",
         "deployment_id": "production-eu-1",
         "required_source_set": "approved-sources-v1",
         "required_rule_set": "approved-rules-v1",
@@ -26,6 +27,7 @@ def test_demo_configuration_is_explicit() -> None:
     settings = Settings()
     assert settings.mode == "demo"
     assert settings.demo_bootstrap_enabled is True
+    assert settings.rule_bundle_tenant_id == "demo-tenant"
     assert settings.required_source_set.startswith("synthetic")
 
 
@@ -58,6 +60,7 @@ def test_worker_stale_threshold_must_exceed_heartbeat(stale_after: int) -> None:
         },  # pragma: allowlist secret
         {"debug": True},
         {"demo_bootstrap_enabled": True},
+        {"rule_bundle_tenant_id": "synthetic-tenant"},
         {"deployment_id": "demo-eu-1"},
         {"required_source_set": "synthetic-source"},
         {"required_rule_set": "demo-rule"},
@@ -76,7 +79,12 @@ def test_safe_production_configuration_validates() -> None:
 
 @pytest.mark.parametrize(
     "field",
-    ["deployment_id", "required_source_set", "required_rule_set"],
+    [
+        "rule_bundle_tenant_id",
+        "deployment_id",
+        "required_source_set",
+        "required_rule_set",
+    ],
 )
 def test_runtime_registry_identifiers_are_bounded_and_safe(field: str) -> None:
     for value in ["", "bad/id", "x" * 129]:
