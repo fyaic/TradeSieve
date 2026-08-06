@@ -22,7 +22,7 @@ This repository is designed for collaboration with coding and research agents. A
 ## Architecture rules
 
 - Preserve the independent-control-plane boundary in ADR-0001.
-- Keep REST/OpenAPI as the canonical application contract. CLI and MCP must be adapters over the same authorization and application services.
+- Keep Pydantic application models as the canonical contract source for generated REST/OpenAPI, event, CLI, and MCP adapters. Every adapter must use the same authorization and application services.
 - Keep source facts, deterministic rules, model suggestions, reviewer decisions, and downstream enforcement events distinct in schemas and audit logs.
 - Design for immutable raw snapshots, hashes, diffs, effective dates, source/rule/model versions, and replay.
 - MCP tools that mutate cases or holds must be narrowly scoped, authenticated, auditable, and confirmation-gated. Prefer read-only tools by default.
