@@ -1,0 +1,11 @@
+**
+!.dockerignore
+!LICENSE
+!README.md
+!alembic.ini
+!migrations/
+!migrations/**
+!pyproject.toml
+!src/
+!src/**
+!uv.lock
