@@ -34,6 +34,7 @@ TradeSieve documentation is decision-oriented: requirements preserve what is nee
 - [Integration design](architecture/integration-design.md)
 - [Agent interface principles](architecture/agent-interface-principles.md)
 - [Security, privacy, and trust](architecture/security-and-trust.md)
+- [Identity and authorization matrix](architecture/authorization-matrix.md)
 - [Implementation blueprint](architecture/implementation-blueprint.md)
 
 ## Architecture decisions
@@ -43,6 +44,7 @@ TradeSieve documentation is decision-oriented: requirements preserve what is nee
 - [ADR-0003: One contract, multiple interfaces](decisions/0003-one-contract-multiple-interfaces.md)
 - [ADR-0004: Phase 1 modular Python service](decisions/0004-phase-1-modular-python-service.md)
 - [ADR-0005: Pydantic canonical contract source](decisions/0005-pydantic-canonical-contract-source.md)
+- [ADR-0006: Verified identity and deny-default authorization](decisions/0006-verified-identity-and-deny-default-authorization.md)
 
 ## Delivery
 

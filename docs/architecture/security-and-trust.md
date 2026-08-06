@@ -22,11 +22,17 @@ TradeSieve must protect both confidentiality and control integrity. A data leak 
 
 - Integrate with the operator identity provider using OIDC/OAuth; do not build password management for production.
 - API clients use client credentials or workload identity with audience-restricted short-lived tokens.
+- Accept JWT access-token claims only through the signature-verifying provider boundary described by [ADR-0006](../decisions/0006-verified-identity-and-deny-default-authorization.md); application code never decodes an unverified JWT.
 - Authorize every application command/query on tenant, role/scope, action, object, and relevant case state.
-- Suggested scopes: `screening:submit`, `screening:read`, `case:read`, `evidence:submit`, `review:request`, `finding:resolve`, `decision:human-clear`, `source:operate`, `policy:approve`, `audit:export`.
-- `decision:human-clear` requires a named human identity, reviewer role, case completeness, optional step-up, and four-eyes policy where configured; service-account and agent tokens are denied.
+- Application scopes: `screening:submit`, `screening:read`, `case:read`, `case:hold`, `evidence:submit`, `review:request`, `finding:resolve`, `decision:human`, `source:read`, `source:operate`, `policy:approve`, `audit:export`.
+- Every final disposition under `decision:human` requires a named human identity, reviewer role, trusted case state and eligibility facts, an exact decision match, and four-eyes policy where configured; service-account and agent tokens are denied.
+- Map issuer-local or pairwise subjects through a trusted identity directory; use the stable canonical actor ID for entitlements, audit, and four-eyes comparison while retaining client identity separately.
+- Resolve object visibility, persisted case state, clearance eligibility, and submitting actor from trusted storage. Never accept those authorization facts from a request payload.
 - Source activation separates operator preparation from compliance/data approval for material changes.
 - PostgreSQL roles separate migrations, application read/write, worker, audit export, and backup. Row-level security is defense in depth.
+
+The exhaustive scope/role/state rules and non-leaking denial mapping are in the
+[identity and authorization matrix](authorization-matrix.md).
 
 ## Agent and MCP threats
 

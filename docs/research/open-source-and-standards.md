@@ -98,6 +98,8 @@ OPA should evaluate already-normalized facts. It should not parse regulations or
 | JSON Schema 2020-12 | Shared request/result/evidence schemas | [Specification](https://json-schema.org/specification) |
 | AsyncAPI | Event contracts if/when a broker is selected | [Documentation](https://www.asyncapi.com/docs) |
 | CLI Guidelines | Composable stdout/stderr, JSON output, errors, help | [clig.dev](https://clig.dev/) |
+| RFC 9068 | OAuth 2.0 JWT access-token profile and resource-server validation | [RFC Editor](https://www.rfc-editor.org/rfc/rfc9068.html) |
+| RFC 8725 | JWT security best current practices and cross-JWT defenses | [RFC Editor](https://www.rfc-editor.org/rfc/rfc8725.html) |
 
 ## Reuse gate
 

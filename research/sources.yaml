@@ -5,6 +5,24 @@ policy:
   production_use_requires_licence_review: true
   current_claims_require_revalidation: true
 sources:
+  - id: rfc-9068
+    title: JSON Web Token (JWT) Profile for OAuth 2.0 Access Tokens
+    category: internet-standard
+    authority: IETF
+    jurisdiction: Global
+    url: https://www.rfc-editor.org/rfc/rfc9068.html
+    use: JWT access-token typing, claims, and resource-server validation baseline
+    access: Public Internet Standards Track RFC
+
+  - id: rfc-8725
+    title: JSON Web Token Best Current Practices
+    category: internet-standard
+    authority: IETF
+    jurisdiction: Global
+    url: https://www.rfc-editor.org/rfc/rfc8725.html
+    use: JWT algorithm, key, cross-JWT confusion, and validation threat model
+    access: Public Best Current Practice RFC
+
   - id: eu-sanctions-overview
     title: EU sanctions overview and related resources
     category: official-regulatory
