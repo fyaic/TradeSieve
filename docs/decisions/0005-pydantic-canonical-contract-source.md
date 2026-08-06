@@ -35,6 +35,18 @@ explicitly unknown. Application completeness controls—not schema defaults—mu
 those gaps into typed findings, required evidence, and holds. No contract default may
 imply a green or cleared result.
 
+Application request models carry `tenant_id` and `correlation_id` for persistence and
+audit. In REST, verified identity context is authoritative for tenant and the
+`X-Correlation-ID` header is authoritative for correlation; an adapter must reject a
+body mismatch. TS-601 and TS-501 implement those enforcement points. Semantic input
+hashes include tenant scope but exclude correlation because a retry trace must not
+change the business snapshot.
+
+Event envelopes expose `event_type` at the top level for routing and include a matching
+`data.kind` because Pydantic's generated discriminated union needs a discriminator
+inside the nested object. Model validation rejects any mismatch. Webhook examples and
+consumers use both fields as one versioned shape.
+
 ## Consequences
 
 - Contract changes begin in the application models, then regenerate reviewed artifacts.

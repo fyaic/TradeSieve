@@ -59,7 +59,10 @@ Confidence = Annotated[
     Field(ge=0, le=1, max_digits=6, decimal_places=5),
 ]
 
-MONEY_PATTERN = r"^(?:0|[1-9][0-9]{0,17})(?:\.[0-9]{1,6})?$"
+MONEY_PATTERN = (
+    r"^(?:[1-9][0-9]{0,17}(?:\.[0-9]{1,6})?|"
+    r"0\.(?!0{1,6}$)[0-9]{1,6})$"
+)
 
 
 def _require_money_string(value: object) -> object:
@@ -99,6 +102,20 @@ class ProposedAction(StrEnum):
     BOOKING = "BOOKING"
     SHIPMENT_RELEASE = "SHIPMENT_RELEASE"
     PAYMENT = "PAYMENT"
+
+
+class RegulatedActivity(StrEnum):
+    SALE = "SALE"
+    SUPPLY = "SUPPLY"
+    EXPORT = "EXPORT"
+    TRANSFER = "TRANSFER"
+    BROKERING = "BROKERING"
+    TECHNICAL_ASSISTANCE = "TECHNICAL_ASSISTANCE"
+    FINANCING = "FINANCING"
+    TRANSPORT = "TRANSPORT"
+    TRANSIT = "TRANSIT"
+    IMPORT = "IMPORT"
+    OTHER = "OTHER"
 
 
 class PartyRole(StrEnum):
@@ -336,6 +353,7 @@ class LegalNexus(ContractModel):
     nexus_ref: Reference
     nexus_type: LegalNexusType
     jurisdiction: CountryCode | None = None
+    regime_code: Reference | None = None
     basis: LongText | None = None
     fact_class: FactClass = FactClass.UNKNOWN
     evidence_refs: Annotated[list[Reference], Field(max_length=64)] = Field(
@@ -357,6 +375,7 @@ class GoodsLine(ContractModel):
     line_ref: Reference
     description: LongText | None = None
     manufacturer: ShortText | None = None
+    manufacturer_ref: Reference | None = None
     model_or_part_number: ShortText | None = None
     technical_specification: LongText | None = None
     software_version: ShortText | None = None
@@ -426,11 +445,24 @@ def _duplicates(values: list[str]) -> list[str]:
 
 class ScreeningRequest(ContractModel):
     schema_version: Literal["1.0.0"] = SCHEMA_VERSION
-    tenant_id: Reference
-    correlation_id: Reference
+    tenant_id: Reference = Field(
+        description=(
+            "Application tenant scope. REST derives the authoritative value from the "
+            "authenticated principal and rejects a body mismatch."
+        )
+    )
+    correlation_id: Reference = Field(
+        description=(
+            "Application trace identifier. REST treats X-Correlation-ID as "
+            "authoritative and rejects a body mismatch."
+        )
+    )
     data_classification: DataClassification
     external_object: ExternalObject
     proposed_action: ProposedAction
+    activities: Annotated[list[RegulatedActivity], Field(max_length=16)] = Field(
+        default_factory=list
+    )
     action_due_at: AwareDatetime | None = None
     legal_nexus: Annotated[list[LegalNexus], Field(max_length=64)] = Field(
         default_factory=list
@@ -494,6 +526,8 @@ class ScreeningRequest(ContractModel):
         for nexus in self.legal_nexus:
             used_evidence_refs.update(nexus.evidence_refs)
         for line in self.goods:
+            if line.manufacturer_ref:
+                used_party_refs.add(line.manufacturer_ref)
             if line.end_use and line.end_use.end_user_ref:
                 used_party_refs.add(line.end_use.end_user_ref)
             for candidate in line.classification_candidates:
@@ -549,10 +583,15 @@ class ScreeningRequest(ContractModel):
         return self
 
     def canonical_input_hash(self) -> str:
-        """Return the stable hash used to bind a result to this input snapshot."""
+        """Hash semantic input, excluding only transport correlation metadata.
+
+        Tenant scope remains included so identical payloads in distinct tenants cannot
+        share an idempotency identity. ``correlation_id`` is excluded because a retry
+        or reconciliation trace must not change the semantic business snapshot.
+        """
 
         payload = json.dumps(
-            self.model_dump(mode="json"),
+            self.model_dump(mode="json", exclude={"correlation_id"}),
             ensure_ascii=False,
             separators=(",", ":"),
             sort_keys=True,
@@ -609,6 +648,9 @@ class Finding(ContractModel):
     source_refs: Annotated[list[Reference], Field(max_length=64)] = Field(
         default_factory=list
     )
+    rule_evaluation_refs: Annotated[list[Reference], Field(max_length=256)] = Field(
+        default_factory=list
+    )
     uncertainty: Annotated[list[Uncertainty], Field(max_length=64)] = Field(
         default_factory=list
     )
@@ -659,9 +701,17 @@ class ScreeningResult(ContractModel):
     result_hash: ContentHash
     created_at: AwareDatetime
 
+    @model_validator(mode="after")
+    def validate_result_references(self) -> ScreeningResult:
+        _validate_result_graph(self.findings, self.required_evidence, self.holds)
+        return self
+
 
 class DecisionScope(ContractModel):
     proposed_action: ProposedAction
+    activities: Annotated[list[RegulatedActivity], Field(max_length=16)] = Field(
+        default_factory=list
+    )
     external_object: ExternalObject
     party_refs: Annotated[list[Reference], Field(max_length=256)] = Field(
         default_factory=list
@@ -703,6 +753,35 @@ class HumanDecision(HumanDecisionRequest):
     effective_from: AwareDatetime
 
 
+def _validate_result_graph(
+    findings: list[Finding],
+    required_evidence: list[EvidenceRequirement],
+    holds: list[Hold],
+) -> None:
+    groups = {
+        "finding_id": [item.finding_id for item in findings],
+        "requirement_ref": [item.requirement_ref for item in required_evidence],
+        "hold_id": [item.hold_id for item in holds],
+    }
+    duplicate_messages = [
+        f"duplicate {name}: {', '.join(duplicates)}"
+        for name, values in groups.items()
+        if (duplicates := _duplicates(values))
+    ]
+    if duplicate_messages:
+        raise ValueError("; ".join(duplicate_messages))
+
+    requirement_refs = set(groups["requirement_ref"])
+    used_requirement_refs = {
+        reference
+        for finding in findings
+        for reference in finding.required_evidence_refs
+    }
+    unknown_refs = sorted(used_requirement_refs - requirement_refs)
+    if unknown_refs:
+        raise ValueError(f"unknown required evidence refs: {', '.join(unknown_refs)}")
+
+
 class Case(ContractModel):
     tenant_id: Reference
     correlation_id: Reference
@@ -712,9 +791,16 @@ class Case(ContractModel):
     highest_priority: Priority
     business_action: BusinessAction
     findings: Annotated[list[Finding], Field(max_length=512)]
+    required_evidence: Annotated[list[EvidenceRequirement], Field(max_length=256)]
     holds: Annotated[list[Hold], Field(max_length=64)]
+    version_set: VersionSet
     effective_human_decision: HumanDecision | None = None
     updated_at: AwareDatetime
+
+    @model_validator(mode="after")
+    def validate_case_references(self) -> Case:
+        _validate_result_graph(self.findings, self.required_evidence, self.holds)
+        return self
 
 
 class EvidenceSubmission(ContractModel):

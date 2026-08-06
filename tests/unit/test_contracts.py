@@ -9,6 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from tradesieve.application.contracts import (
+    Case,
     ClassificationCandidate,
     ClassificationScheme,
     DecisionScope,
@@ -20,8 +21,10 @@ from tradesieve.application.contracts import (
     OwnershipControlRelationship,
     PaymentPath,
     ProposedAction,
+    RegulatedActivity,
     RelationshipType,
     ScreeningRequest,
+    ScreeningResult,
     VersionReference,
     VersionSet,
 )
@@ -56,6 +59,7 @@ def test_incomplete_business_facts_are_valid_transport_shape() -> None:
     request = ScreeningRequest.model_validate(incomplete_request())
 
     assert request.proposed_action is ProposedAction.CUSTOMER_ONBOARDING
+    assert request.activities == []
     assert request.parties == []
     assert request.goods == []
     assert request.route is None
@@ -63,6 +67,27 @@ def test_incomplete_business_facts_are_valid_transport_shape() -> None:
     assert request.tenant_id.startswith("0")
     assert request.canonical_input_hash().startswith("sha256:")
     assert request.canonical_input_hash() == request.canonical_input_hash()
+
+
+def test_semantic_input_hash_excludes_trace_but_includes_business_scope() -> None:
+    original_payload = incomplete_request()
+    original = ScreeningRequest.model_validate(original_payload)
+
+    retry_payload = copy.deepcopy(original_payload)
+    retry_payload["correlation_id"] = "correlation-retry-2"
+    retry = ScreeningRequest.model_validate(retry_payload)
+
+    changed_payload = copy.deepcopy(original_payload)
+    changed_payload["proposed_action"] = "QUOTE_RELEASE"
+    changed = ScreeningRequest.model_validate(changed_payload)
+
+    other_tenant_payload = copy.deepcopy(original_payload)
+    other_tenant_payload["tenant_id"] = "tenant-2"
+    other_tenant = ScreeningRequest.model_validate(other_tenant_payload)
+
+    assert retry.canonical_input_hash() == original.canonical_input_hash()
+    assert changed.canonical_input_hash() != original.canonical_input_hash()
+    assert other_tenant.canonical_input_hash() != original.canonical_input_hash()
 
 
 def test_structural_constraints_remain_fail_closed() -> None:
@@ -91,6 +116,7 @@ def test_duplicate_and_dangling_request_references_are_rejected() -> None:
     payload["goods"] = [
         {
             "line_ref": "line-1",
+            "manufacturer_ref": "missing-manufacturer",
             "end_use": {"end_user_ref": "missing-party"},
         }
     ]
@@ -109,7 +135,10 @@ def test_duplicate_and_dangling_request_references_are_rejected() -> None:
     with pytest.raises(ValidationError) as exc_info:
         ScreeningRequest.model_validate(payload)
     message = str(exc_info.value)
-    assert "unknown party refs: missing-party, missing-payer" in message
+    assert (
+        "unknown party refs: missing-manufacturer, missing-party, missing-payer"
+        in message
+    )
     assert "unknown goods refs: missing-line" in message
     assert "unknown evidence refs: missing-doc" in message
 
@@ -163,10 +192,12 @@ def test_valid_reference_graph_covers_all_typed_fact_groups() -> None:
     payload = incomplete_request()
     payload.update(
         {
+            "activities": ["SALE", "EXPORT", "TRANSPORT"],
             "legal_nexus": [
                 {
                     "nexus_ref": "nexus-eu",
                     "nexus_type": "REGULATORY_REGIME",
+                    "regime_code": "EU",
                     "basis": "EU trade-compliance scope pending Member State review",
                     "fact_class": "UNKNOWN",
                     "evidence_refs": ["doc-1"],
@@ -177,6 +208,11 @@ def test_valid_reference_graph_covers_all_typed_fact_groups() -> None:
                     "party_ref": "owner-1",
                     "roles": ["BENEFICIAL_OWNER"],
                     "entity_type": "PERSON",
+                },
+                {
+                    "party_ref": "manufacturer-1",
+                    "roles": ["SUPPLIER"],
+                    "entity_type": "ORGANIZATION",
                 },
                 {
                     "party_ref": "buyer-1",
@@ -213,6 +249,7 @@ def test_valid_reference_graph_covers_all_typed_fact_groups() -> None:
                 {
                     "line_ref": "line-1",
                     "description": "Synthetic module",
+                    "manufacturer_ref": "manufacturer-1",
                     "quantity": "10",
                     "quantity_unit": "each",
                     "classification_candidates": [
@@ -254,7 +291,9 @@ def test_valid_reference_graph_covers_all_typed_fact_groups() -> None:
     request = ScreeningRequest.model_validate(payload)
 
     assert request.goods[0].classification_candidates[0].candidate_only is True
+    assert request.legal_nexus[0].regime_code == "EU"
     assert request.goods[0].quantity_unit == "each"
+    assert request.activities[1].value == "EXPORT"
     assert request.payment is not None
     assert str(request.payment.amount) == "100.25"
 
@@ -329,6 +368,115 @@ def test_money_accepts_and_preserves_bounded_decimal_strings() -> None:
     with pytest.raises(ValidationError, match="canonical decimal strings"):
         PaymentPath.model_validate_json(b'{"payment_ref":"payment-1","amount":"01.00"}')
 
+    for invalid in (b'"1e2"', b'"0"', b'"0.000000"'):
+        payload = b'{"payment_ref":"payment-1","amount":' + invalid + b"}"
+        with pytest.raises(ValidationError, match="canonical decimal strings"):
+            PaymentPath.model_validate_json(payload)
+
+
+def minimal_result() -> dict[str, object]:
+    return {
+        "schema_version": "1.0.0",
+        "tenant_id": "tenant-1",
+        "correlation_id": "correlation-1",
+        "screening_id": "screening-1",
+        "case_id": "case-1",
+        "state": "REVIEW_REQUIRED",
+        "signal": "YELLOW",
+        "highest_priority": "P1",
+        "business_action": "HOLD",
+        "summary": "Material facts remain incomplete.",
+        "findings": [
+            {
+                "finding_id": "finding-1",
+                "kind": "FACT_INCOMPLETE",
+                "priority": "P1",
+                "status": "OPEN",
+                "fact_class": "UNKNOWN",
+                "summary": "A required fact has not been supplied.",
+                "required_evidence_refs": ["requirement-1"],
+                "rule_evaluation_refs": ["rule-evaluation-1"],
+                "required_action": "OBTAIN_EVIDENCE",
+                "owner_role": "COMPLIANCE_REVIEWER",
+            }
+        ],
+        "required_evidence": [
+            {
+                "requirement_ref": "requirement-1",
+                "evidence_type": "OTHER",
+                "description": "Supply the missing fact evidence.",
+                "status": "REQUIRED",
+            }
+        ],
+        "holds": [
+            {
+                "hold_id": "hold-1",
+                "scope": "QUOTE_RELEASE",
+                "reason": "A material fact is missing.",
+                "release_condition": "Resolve the open P1 finding.",
+                "active": True,
+            }
+        ],
+        "version_set": {
+            "input_schema": "1.0.0",
+            "input_hash": HASH,
+            "sources": [],
+            "rules": [],
+            "matcher": {"resource_id": "matcher", "version": "1"},
+            "models": [],
+        },
+        "result_hash": "sha256:" + "b" * 64,
+        "created_at": "2026-08-06T08:00:00Z",
+    }
+
+
+def test_result_ids_and_required_evidence_references_are_unambiguous() -> None:
+    result_payload = minimal_result()
+    result = ScreeningResult.model_validate(result_payload)
+    assert result.findings[0].required_evidence_refs == ["requirement-1"]
+
+    duplicate_payload = copy.deepcopy(result_payload)
+    findings = duplicate_payload["findings"]
+    assert isinstance(findings, list)
+    findings.append(copy.deepcopy(findings[0]))
+    with pytest.raises(ValidationError, match="duplicate finding_id: finding-1"):
+        ScreeningResult.model_validate(duplicate_payload)
+
+    dangling_payload = copy.deepcopy(result_payload)
+    dangling_findings = dangling_payload["findings"]
+    assert isinstance(dangling_findings, list)
+    dangling_finding = dangling_findings[0]
+    assert isinstance(dangling_finding, dict)
+    dangling_finding["required_evidence_refs"] = ["missing-requirement"]
+    with pytest.raises(
+        ValidationError, match="unknown required evidence refs: missing-requirement"
+    ):
+        ScreeningResult.model_validate(dangling_payload)
+
+
+def test_case_projection_keeps_evidence_and_version_provenance() -> None:
+    result_payload = minimal_result()
+    case = Case.model_validate(
+        {
+            "tenant_id": result_payload["tenant_id"],
+            "correlation_id": result_payload["correlation_id"],
+            "case_id": result_payload["case_id"],
+            "state": result_payload["state"],
+            "signal": result_payload["signal"],
+            "highest_priority": result_payload["highest_priority"],
+            "business_action": result_payload["business_action"],
+            "findings": result_payload["findings"],
+            "required_evidence": result_payload["required_evidence"],
+            "holds": result_payload["holds"],
+            "version_set": result_payload["version_set"],
+            "effective_human_decision": None,
+            "updated_at": "2026-08-06T08:00:00Z",
+        }
+    )
+
+    assert case.required_evidence[0].requirement_ref == "requirement-1"
+    assert case.version_set.input_hash == HASH
+
 
 def test_version_set_rejects_duplicate_resource_ids() -> None:
     version = VersionReference(resource_id="source-1", version="2026-08-06")
@@ -356,6 +504,7 @@ def test_version_set_rejects_duplicate_resource_ids() -> None:
 def test_human_clearance_requires_a_timezone_aware_expiry() -> None:
     scope = DecisionScope(
         proposed_action=ProposedAction.QUOTE_RELEASE,
+        activities=[RegulatedActivity.SALE, RegulatedActivity.EXPORT],
         external_object=ExternalObject(
             system="synthetic-crm",
             object_type="QUOTE",
