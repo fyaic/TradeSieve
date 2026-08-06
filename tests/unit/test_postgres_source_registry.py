@@ -83,7 +83,7 @@ def registration() -> SourceRegistration:
         legal_scope="Synthetic legal scope",
         data_scope="Synthetic data scope",
         access_method=SourceAccessMethod.API,
-        credential_secret_ref="vault:sources/source-1",
+        credential_secret_ref="vault:sources/source-1",  # pragma: allowlist secret
         licence_summary="Public-safe licence summary",
         contractual_constraints="Private contract note",
         refresh_expectation=timedelta(hours=1),

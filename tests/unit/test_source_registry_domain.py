@@ -39,7 +39,7 @@ def registration(**overrides: object) -> SourceRegistration:
         "legal_scope": "Synthetic legal scope",
         "data_scope": "Synthetic entity records",
         "access_method": SourceAccessMethod.INTERNAL,
-        "credential_secret_ref": "vault:tradesieve/sources/source-1",
+        "credential_secret_ref": "vault:tradesieve/sources/source-1",  # pragma: allowlist secret
         "licence_summary": "Synthetic fixture; no production use",
         "contractual_constraints": "Private synthetic contract note",
         "refresh_expectation": timedelta(hours=1),
@@ -113,7 +113,7 @@ def test_complete_governance_activates_immutably() -> None:
         {"source_id": "bad/id"},
         {"name": "x" * (MAX_SHORT_TEXT_LENGTH + 1)},
         {"legal_scope": "x" * (MAX_LONG_TEXT_LENGTH + 1)},
-        {"credential_secret_ref": "raw-password"},
+        {"credential_secret_ref": "raw-password"},  # pragma: allowlist secret
         {"refresh_expectation": timedelta(0)},
         {"refresh_expectation": timedelta(microseconds=1)},
         {"stale_after": timedelta(seconds=MAX_FRESHNESS_SECONDS + 1)},
