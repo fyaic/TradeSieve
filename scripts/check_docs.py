@@ -45,6 +45,7 @@ REQUIRED = (
     "docs/decisions/0002-human-clearance-only.md",
     "docs/decisions/0003-one-contract-multiple-interfaces.md",
     "docs/decisions/0004-phase-1-modular-python-service.md",
+    "docs/decisions/0005-pydantic-canonical-contract-source.md",
     "docs/delivery/agile-operating-model.md",
     "docs/delivery/phase-1-plan.md",
     "docs/delivery/phase-1-backlog.md",
