@@ -82,13 +82,14 @@ Deliverables:
 
 Exit gate: compliance, security, product, engineering, and operations sign off on intended use and residual risks.
 
-## Near-term issues to create
+## Initial GitHub issues
 
-1. Inventory CRM/OMS/payment schemas and business events.
-2. Define the first jurisdiction/legal-nexus matrix.
-3. Prototype EU and OFAC source snapshots with hashes and diffs.
-4. Build the multilingual synthetic fixture specification.
-5. Benchmark yente versus Watchman on identical data.
-6. Design the canonical screening request/result schemas.
-7. Define reviewer roles and release-expiry rules.
-8. Threat-model MCP/CLI/API access and prompt-injection paths.
+1. [Inventory CRM, OMS, booking, and payment events](https://github.com/veil-chow-fyaic/TradeSieve/issues/1).
+2. [Define the first jurisdiction and legal-nexus matrix](https://github.com/veil-chow-fyaic/TradeSieve/issues/2).
+3. [Prototype an EU sanctions snapshot, hash, diff, and replay](https://github.com/veil-chow-fyaic/TradeSieve/issues/3).
+4. [Prototype OFAC SLS snapshot, delta, and replay](https://github.com/veil-chow-fyaic/TradeSieve/issues/4).
+5. [Specify a multilingual party-screening fixture set](https://github.com/veil-chow-fyaic/TradeSieve/issues/5).
+6. [Benchmark yente, Watchman, and probabilistic baselines](https://github.com/veil-chow-fyaic/TradeSieve/issues/6).
+7. [Design canonical screening request, result, evidence, and event contracts](https://github.com/veil-chow-fyaic/TradeSieve/issues/7).
+8. [Design reviewer roles, human release, expiry, and segregation of duties](https://github.com/veil-chow-fyaic/TradeSieve/issues/8).
+9. [Threat-model API, CLI, and MCP access](https://github.com/veil-chow-fyaic/TradeSieve/issues/9).
