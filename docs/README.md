@@ -31,6 +31,7 @@ TradeSieve documentation is decision-oriented: requirements preserve what is nee
 - [Initial system shape](architecture/initial-system-shape.md)
 - [Phase 1 service architecture](architecture/mvp-service-architecture.md)
 - [Domain and data model](architecture/domain-model.md)
+- [Runtime source registry](architecture/source-registry.md)
 - [Integration design](architecture/integration-design.md)
 - [Agent interface principles](architecture/agent-interface-principles.md)
 - [Security, privacy, and trust](architecture/security-and-trust.md)

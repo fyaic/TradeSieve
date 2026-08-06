@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -104,7 +105,7 @@ def test_inspect_runtime_returns_status_and_details(
     assert manage.inspect_runtime(Settings()) == (0 if ready else 1)
     payload = json.loads(capsys.readouterr().out)
     assert payload["ready"] is ready
-    assert payload["expected_migration"] == "20260806_0001"
+    assert payload["expected_migration"] == "20260806_0002"
     assert payload["expected_source_coverage"] == "synthetic-demo-sources-v1"
     assert payload["expected_rule_coverage"] == "synthetic-demo-rules-v1"
 
@@ -131,3 +132,57 @@ def test_main_propagates_inspect_exit_status(monkeypatch: pytest.MonkeyPatch) ->
     with pytest.raises(SystemExit) as exc_info:
         manage.main()
     assert exc_info.value.code == 1
+
+
+@pytest.mark.parametrize(("ready", "expected_exit"), [(True, 0), (False, 2)])
+def test_list_sources_prints_one_safe_envelope_and_distinct_exit(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    ready: bool,
+    expected_exit: int,
+) -> None:
+    class FakeListing:
+        def __init__(self, listing_ready: bool) -> None:
+            self.ready = listing_ready
+
+        def model_dump(self, *, mode: str) -> dict[str, object]:
+            assert mode == "json"
+            return {
+                "deployment_id": "demo",
+                "source_set_id": "synthetic-demo-sources-v1",
+                "ready": self.ready,
+                "status": "CURRENT" if self.ready else "UNAVAILABLE",
+                "issues": [],
+                "sources": [],
+            }
+
+    class FakeService:
+        def __init__(self, repository: object) -> None:
+            assert repository is not None
+
+        def query_source_set(
+            self, deployment_id: str, source_set_id: str
+        ) -> FakeListing:
+            assert (deployment_id, source_set_id) == (
+                "demo",
+                "synthetic-demo-sources-v1",
+            )
+            return FakeListing(ready)
+
+    monkeypatch.setattr(manage, "connect", lambda settings: nullcontext(object()))
+    monkeypatch.setattr(manage, "SourceRegistryService", FakeService)
+    assert manage.list_sources(Settings()) == expected_exit
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ready"] is ready
+    assert isinstance(payload["sources"], list)
+
+
+def test_main_propagates_list_sources_exit_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["tradesieve.manage", "list-sources"])
+    monkeypatch.setattr(manage, "get_settings", Settings)
+    monkeypatch.setattr(manage, "list_sources", lambda settings: 2)
+    with pytest.raises(SystemExit) as exc_info:
+        manage.main()
+    assert exc_info.value.code == 2

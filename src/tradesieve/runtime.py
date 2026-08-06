@@ -9,9 +9,20 @@ from typing import Any
 import psycopg
 from psycopg import Connection
 
+from tradesieve.adapters.postgres_source_registry import PostgresSourceRegistry
+from tradesieve.application.source_registry import (
+    SourceRegistryService,
+    readiness_check_value,
+)
 from tradesieve.config import Settings
+from tradesieve.domain.source_registry import (
+    SourceAccessMethod,
+    SourceAvailability,
+    SourceRegistration,
+    SourceRuntimeObservation,
+)
 
-MIGRATION_REVISION = "20260806_0001"
+MIGRATION_REVISION = "20260806_0002"
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,16 +72,20 @@ def check_readiness(settings: Settings) -> RuntimeStatus:
         checks["migration"] = "OK"
 
         try:
+            source_readiness = SourceRegistryService(
+                PostgresSourceRegistry(connection)
+            ).required_set_readiness(
+                settings.deployment_id, settings.required_source_set
+            )
             rows = connection.execute(
                 "SELECT coverage_kind, coverage_id FROM runtime_coverage "
-                "WHERE active IS TRUE"
+                "WHERE active IS TRUE AND coverage_kind = 'RULE'"
             ).fetchall()
-        except psycopg.Error:
+        except (psycopg.Error, TypeError, ValueError):
             return RuntimeStatus(ready=False, checks=checks)
 
+    checks["required_source_coverage"] = readiness_check_value(source_readiness)
     active = {(str(kind), str(identifier)) for kind, identifier in rows}
-    if ("SOURCE", settings.required_source_set) in active:
-        checks["required_source_coverage"] = "OK"
     if ("RULE", settings.required_rule_set) in active:
         checks["required_rule_coverage"] = "OK"
     ready = all(value == "OK" for value in checks.values())
@@ -81,17 +96,49 @@ def bootstrap_demo(settings: Settings) -> None:
     if settings.mode != "demo" or not settings.demo_bootstrap_enabled:
         raise RuntimeError("demo bootstrap is disabled outside explicit demo mode")
     with connect(settings) as connection:
-        for kind, identifier in (
-            ("SOURCE", settings.required_source_set),
-            ("RULE", settings.required_rule_set),
-        ):
-            connection.execute(
-                "INSERT INTO runtime_coverage (coverage_kind, coverage_id, active) "
-                "VALUES (%s, %s, TRUE) "
-                "ON CONFLICT (coverage_kind, coverage_id) DO UPDATE "
-                "SET active = EXCLUDED.active, updated_at = CURRENT_TIMESTAMP",
-                (kind, identifier),
+        registry = SourceRegistryService(PostgresSourceRegistry(connection))
+        registry.define_required_sources(
+            settings.deployment_id,
+            settings.required_source_set,
+            ("synthetic-source-v1",),
+        )
+        registry.register(
+            SourceRegistration(
+                deployment_id=settings.deployment_id,
+                source_set_id=settings.required_source_set,
+                source_id="synthetic-source-v1",
+                name="Synthetic source fixture",
+                owner="TradeSieve demo",
+                responsible_operator="demo-source-operator",
+                jurisdiction="SYNTHETIC",
+                legal_scope="Synthetic screening behavior only",
+                data_scope="Synthetic entities with no production data",
+                access_method=SourceAccessMethod.INTERNAL,
+                licence_summary="Synthetic demo fixture; no production use",
+                refresh_expectation=timedelta(hours=1),
+                stale_after=timedelta(hours=2),
             )
+        )
+        registry.activate(settings.deployment_id, "synthetic-source-v1")
+        now = datetime.now(UTC)
+        registry.record_observation(
+            SourceRuntimeObservation(
+                deployment_id=settings.deployment_id,
+                source_id="synthetic-source-v1",
+                availability=SourceAvailability.AVAILABLE,
+                observed_at=now,
+                active_snapshot_id="synthetic-snapshot-v1",
+                retrieved_at=now,
+                effective_from=now,
+            )
+        )
+        connection.execute(
+            "INSERT INTO runtime_coverage (coverage_kind, coverage_id, active) "
+            "VALUES ('RULE', %s, TRUE) "
+            "ON CONFLICT (coverage_kind, coverage_id) DO UPDATE "
+            "SET active = EXCLUDED.active, updated_at = CURRENT_TIMESTAMP",
+            (settings.required_rule_set,),
+        )
 
 
 def record_worker_heartbeat(settings: Settings) -> None:

@@ -15,7 +15,7 @@
 
 | Aggregate | Purpose | Identity/invariant |
 | --- | --- | --- |
-| `Source` | Governance metadata for an external/internal source | Stable source ID; owner/scope/access/licence required |
+| `Source` | Governance metadata and runtime freshness policy for an external/internal source | Stable deployment/source-set/source ID; incomplete records remain inactive |
 | `SourceSnapshot` | Immutable retrieved/accepted source version | Hash, retrieval/effective time, parser version, activation event |
 | `Assertion` | Source-native and normalized fact with locator | Cannot exist without provenance/snapshot |
 | `Entity` | Canonical person/organization/vessel/etc. candidate | Merges are versioned assertions, never destructive source edits |
@@ -110,6 +110,11 @@ At minimum, preserve:
 - `business_action_due_at`: when the calling workflow needs an answer.
 
 This supports current replay and prepares for bitemporal/as-of reasoning without pretending Phase 1 has complete historical coverage.
+
+The implemented TS-201 registry keeps governance separate from the latest runtime
+observation and derives freshness at query time. See the
+[runtime source registry](source-registry.md) for activation, required-set, status,
+redaction, and TS-202 snapshot-boundary semantics.
 
 ## Case event examples
 

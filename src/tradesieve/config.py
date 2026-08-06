@@ -6,13 +6,21 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal, Self
 
-from pydantic import Field, model_validator
+from pydantic import Field, StringConstraints, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEMO_PASSWORD_MARKER = "local_demo_only"  # pragma: allowlist secret
 DEMO_COVERAGE_PREFIXES = ("demo", "synthetic")
 Port = Annotated[int, Field(ge=1, le=65535)]
 PositiveSeconds = Annotated[int, Field(gt=0)]
+RuntimeId = Annotated[
+    str,
+    StringConstraints(
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+    ),
+]
 
 
 class Settings(BaseSettings):
@@ -29,8 +37,9 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://tradesieve:local_demo_only@postgres:5432/tradesieve"  # pragma: allowlist secret
     debug: bool = False
     demo_bootstrap_enabled: bool = True
-    required_source_set: str = "synthetic-demo-sources-v1"
-    required_rule_set: str = "synthetic-demo-rules-v1"
+    deployment_id: RuntimeId = "demo"
+    required_source_set: RuntimeId = "synthetic-demo-sources-v1"
+    required_rule_set: RuntimeId = "synthetic-demo-rules-v1"
     migration_root: Path = Path(".")
     http_host: str = "0.0.0.0"
     http_port: Port = 8080
@@ -54,6 +63,8 @@ class Settings(BaseSettings):
             unsafe.append("debug mode")
         if self.demo_bootstrap_enabled:
             unsafe.append("demo bootstrap")
+        if self.deployment_id.lower().startswith(DEMO_COVERAGE_PREFIXES):
+            unsafe.append("demo deployment identity")
         if self.required_source_set.lower().startswith(DEMO_COVERAGE_PREFIXES):
             unsafe.append("synthetic/demo required source coverage")
         if self.required_rule_set.lower().startswith(DEMO_COVERAGE_PREFIXES):
