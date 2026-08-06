@@ -469,15 +469,7 @@
             "$ref": "#/components/schemas/ExternalObject"
           },
           "proposed_action": {
-            "type": "string",
-            "enum": [
-              "CUSTOMER_ONBOARDING",
-              "QUOTE_RELEASE",
-              "ORDER_ACCEPTANCE",
-              "BOOKING",
-              "SHIPMENT_RELEASE",
-              "PAYMENT"
-            ]
+            "$ref": "#/components/schemas/ProposedAction"
           },
           "action_due_at": {
             "type": [
@@ -972,6 +964,7 @@
           "scope",
           "rationale",
           "resolved_finding_ids",
+          "evidence_refs",
           "expires_at"
         ],
         "properties": {
@@ -988,7 +981,14 @@
           },
           "resolved_finding_ids": {
             "type": "array",
-            "minItems": 1,
+            "description": "Findings resolved by this decision. May be empty for HUMAN_BLOCKED or CLOSED_NO_ACTION; application policy requires HUMAN_CLEARED to resolve every open P0/P1 finding.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidence_refs": {
+            "type": "array",
+            "description": "Evidence considered for the disposition. May be empty for CLOSED_NO_ACTION; application policy enforces sufficient evidence for HUMAN_CLEARED and any configured block policy.",
             "items": {
               "type": "string"
             }
@@ -1009,7 +1009,12 @@
           "decision_id",
           "decision",
           "scope",
+          "rationale",
+          "resolved_finding_ids",
+          "evidence_refs",
+          "version_set",
           "reviewer_id",
+          "reviewer_role",
           "recorded_at",
           "expires_at"
         ],
@@ -1023,7 +1028,28 @@
           "scope": {
             "$ref": "#/components/schemas/DecisionScope"
           },
+          "rationale": {
+            "type": "string"
+          },
+          "resolved_finding_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "version_set": {
+            "$ref": "#/components/schemas/VersionSet"
+          },
           "reviewer_id": {
+            "type": "string"
+          },
+          "reviewer_role": {
             "type": "string"
           },
           "recorded_at": {
@@ -1048,7 +1074,7 @@
         ],
         "properties": {
           "proposed_action": {
-            "type": "string"
+            "$ref": "#/components/schemas/ProposedAction"
           },
           "external_object": {
             "$ref": "#/components/schemas/ExternalObject"
@@ -1138,6 +1164,17 @@
           "CLOSED_NO_ACTION"
         ]
       },
+      "ProposedAction": {
+        "type": "string",
+        "enum": [
+          "CUSTOMER_ONBOARDING",
+          "QUOTE_RELEASE",
+          "ORDER_ACCEPTANCE",
+          "BOOKING",
+          "SHIPMENT_RELEASE",
+          "PAYMENT"
+        ]
+      },
       "HumanDecisionType": {
         "type": "string",
         "enum": [
@@ -1148,11 +1185,13 @@
       },
       "Signal": {
         "type": "string",
+        "description": "Decision-support presentation signal. NOT_APPLICABLE is used when the proposal is CLOSED_NO_ACTION; it is not a clearance signal.",
         "enum": [
           "RED",
           "YELLOW",
           "GREEN_CANDIDATE",
-          "GREEN_HUMAN"
+          "GREEN_HUMAN",
+          "NOT_APPLICABLE"
         ]
       },
       "Priority": {

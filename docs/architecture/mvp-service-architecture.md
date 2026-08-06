@@ -160,6 +160,8 @@ stateDiagram-v2
 
 `HUMAN_BLOCKED` and `CLOSED_NO_ACTION` are also authorized human/business dispositions. They record that the named proposal will not proceed; they are not generated autonomously from a match score.
 
+Presentation signals remain distinct from case dispositions. `RED` and `YELLOW` summarize active risk/review states, `GREEN_CANDIDATE` is an automation-only assessment, `GREEN_HUMAN` requires an effective `HUMAN_CLEARED` decision, and `NOT_APPLICABLE` represents `CLOSED_NO_ACTION`. A withdrawn or otherwise closed proposal is therefore never rendered as green.
+
 ## Source pipeline
 
 ```mermaid

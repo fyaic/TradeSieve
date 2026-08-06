@@ -132,16 +132,18 @@ def validate_instance(
         "object": dict,
         "array": list,
         "string": str,
-        "number": (int, float),
-        "integer": int,
         "boolean": bool,
         "null": type(None),
     }
-    if expected and not any(
-        isinstance(instance, type_map[item])
-        for item in expected_types
-        if item in type_map
-    ):
+
+    def matches_type(type_name: str) -> bool:
+        if type_name == "number":
+            return isinstance(instance, (int, float)) and not isinstance(instance, bool)
+        if type_name == "integer":
+            return isinstance(instance, int) and not isinstance(instance, bool)
+        return type_name in type_map and isinstance(instance, type_map[type_name])
+
+    if expected and not any(matches_type(item) for item in expected_types):
         return [f"{path}: expected type {expected!r}, got {type(instance).__name__}"]
 
     if isinstance(instance, dict):
@@ -213,6 +215,68 @@ def check_openapi() -> list[str]:
     response_schema = spec["components"]["schemas"]["ScreeningResult"]
     errors.extend(validate_instance(request, request_schema, spec, "request example"))
     errors.extend(validate_instance(response, response_schema, spec, "response example"))
+
+    for numeric_type in ("number", "integer"):
+        if not validate_instance(True, {"type": numeric_type}, spec, "boolean fixture"):
+            errors.append(
+                f"OpenAPI validator regression: boolean accepted as {numeric_type}"
+            )
+
+    closed_no_action_request = {
+        "decision": "CLOSED_NO_ACTION",
+        "scope": {
+            "proposed_action": "QUOTE_RELEASE",
+            "external_object": {
+                "system": "synthetic-crm",
+                "object_type": "QUOTE",
+                "object_id": "demo-withdrawn-001",
+                "object_version": "1",
+            },
+        },
+        "rationale": "Synthetic proposal was withdrawn by the requester.",
+        "resolved_finding_ids": [],
+        "evidence_refs": [],
+        "expires_at": None,
+    }
+    errors.extend(
+        validate_instance(
+            closed_no_action_request,
+            spec["components"]["schemas"]["HumanDecisionRequest"],
+            spec,
+            "CLOSED_NO_ACTION contract fixture",
+        )
+    )
+    if "NOT_APPLICABLE" not in spec["components"]["schemas"]["Signal"]["enum"]:
+        errors.append("OpenAPI signal contract lacks CLOSED_NO_ACTION representation")
+
+    required_decision_fields = {
+        "rationale",
+        "resolved_finding_ids",
+        "evidence_refs",
+        "version_set",
+        "reviewer_id",
+        "reviewer_role",
+        "recorded_at",
+    }
+    actual_decision_fields = set(
+        spec["components"]["schemas"]["HumanDecision"].get("required", [])
+    )
+    missing_decision_fields = sorted(required_decision_fields - actual_decision_fields)
+    if missing_decision_fields:
+        errors.append(
+            "OpenAPI human decision record lacks required provenance fields: "
+            f"{missing_decision_fields}"
+        )
+
+    proposed_action_ref = {"$ref": "#/components/schemas/ProposedAction"}
+    screening_action = spec["components"]["schemas"]["ScreeningRequest"]["properties"][
+        "proposed_action"
+    ]
+    decision_action = spec["components"]["schemas"]["DecisionScope"]["properties"][
+        "proposed_action"
+    ]
+    if screening_action != proposed_action_ref or decision_action != proposed_action_ref:
+        errors.append("OpenAPI intake and decision scopes do not share ProposedAction")
     return errors
 
 
