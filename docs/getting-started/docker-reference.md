@@ -33,6 +33,8 @@ The application image uses the Docker Official Image for Python 3.13.14 through 
 
 The reference database is the Docker Official Image for PostgreSQL 18.4, accessed through Google's Docker Hub pull-through cache and pinned to the same official multi-platform digest. The acceptance script verifies the server and `psql` minor versions. PostgreSQL 18 stores its versioned data below `/var/lib/postgresql`; the named volume mounts that parent path so data survives container recreation.
 
+PostgreSQL, migrations, bootstrap, worker, and the app's database path stay on an internal network. Only the app also joins a narrow edge bridge so Docker can publish its health endpoint to `127.0.0.1`; no PostgreSQL or worker port is published.
+
 To run the one-shot steps independently:
 
 ```bash

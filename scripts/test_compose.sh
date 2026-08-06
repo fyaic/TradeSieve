@@ -82,6 +82,12 @@ fi
 
 "${compose[@]}" up -d --wait
 
+published_port="$("${compose[@]}" port app 8080)"
+if [[ "$published_port" != "127.0.0.1:${host_port}" ]]; then
+  echo "unexpected app port mapping: $published_port" >&2
+  exit 1
+fi
+
 for service in postgres app worker; do
   container_id="$("${compose[@]}" ps -q "$service")"
   health="$(docker inspect --format '{{.State.Health.Status}}' "$container_id")"
@@ -130,6 +136,16 @@ fi
 
 if [[ -n "$("${compose[@]}" ps -aq)" ]]; then
   echo "compose teardown left project containers behind" >&2
+  exit 1
+fi
+if [[ -n "$(docker network ls --quiet --filter \
+  "label=com.docker.compose.project=${compose_project}")" ]]; then
+  echo "compose teardown left project networks behind" >&2
+  exit 1
+fi
+if [[ -n "$(docker volume ls --quiet --filter \
+  "label=com.docker.compose.project=${compose_project}")" ]]; then
+  echo "compose teardown left project volumes behind" >&2
   exit 1
 fi
 
