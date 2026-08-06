@@ -612,6 +612,35 @@
         "title": "CaseStateChangedEventData",
         "type": "object"
       },
+      "ChangedSourceRecordView": {
+        "additionalProperties": false,
+        "properties": {
+          "source_record_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Source Record Id",
+            "type": "string"
+          },
+          "previous_record_hash": {
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Previous Record Hash",
+            "type": "string"
+          },
+          "new_record_hash": {
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "New Record Hash",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_record_id",
+          "previous_record_hash",
+          "new_record_hash"
+        ],
+        "title": "ChangedSourceRecordView",
+        "type": "object"
+      },
       "ClassificationCandidate": {
         "additionalProperties": false,
         "description": "Proposed classification only; never an automatic legal determination.",
@@ -1483,6 +1512,14 @@
         "title": "FindingStatus",
         "type": "string"
       },
+      "FiniteParserId": {
+        "description": "Closed Phase 1 parser inventory; callers cannot select executable code.",
+        "enum": [
+          "synthetic-json-v1"
+        ],
+        "title": "FiniteParserId",
+        "type": "string"
+      },
       "GoodsLine": {
         "additionalProperties": false,
         "properties": {
@@ -2182,6 +2219,15 @@
           "OTHER"
         ],
         "title": "LegalNexusType",
+        "type": "string"
+      },
+      "LifecycleActorType": {
+        "enum": [
+          "HUMAN",
+          "SERVICE",
+          "AGENT"
+        ],
+        "title": "LifecycleActorType",
         "type": "string"
       },
       "OwnershipControlRelationship": {
@@ -3172,6 +3218,533 @@
         "title": "Signal",
         "type": "string"
       },
+      "SourceSnapshotDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/SourceSnapshotSummary"
+          },
+          "diff": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceSnapshotDiffView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "summary",
+          "diff"
+        ],
+        "title": "SourceSnapshotDetail",
+        "type": "object"
+      },
+      "SourceSnapshotDiffView": {
+        "additionalProperties": false,
+        "properties": {
+          "previous_snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceSnapshotReferenceView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "new_snapshot": {
+            "$ref": "#/components/schemas/SourceSnapshotReferenceView"
+          },
+          "content_hash": {
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "added_record_ids": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 512,
+            "title": "Added Record Ids",
+            "type": "array"
+          },
+          "removed_record_ids": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 512,
+            "title": "Removed Record Ids",
+            "type": "array"
+          },
+          "changed_records": {
+            "items": {
+              "$ref": "#/components/schemas/ChangedSourceRecordView"
+            },
+            "maxItems": 512,
+            "title": "Changed Records",
+            "type": "array"
+          }
+        },
+        "required": [
+          "previous_snapshot",
+          "new_snapshot",
+          "content_hash",
+          "added_record_ids",
+          "removed_record_ids",
+          "changed_records"
+        ],
+        "title": "SourceSnapshotDiffView",
+        "type": "object"
+      },
+      "SourceSnapshotEventType": {
+        "enum": [
+          "RETRIEVED",
+          "QUARANTINED",
+          "PARSED",
+          "VALIDATION_FAILED",
+          "VALIDATED",
+          "APPROVED",
+          "ACTIVATED",
+          "ROLLED_BACK"
+        ],
+        "title": "SourceSnapshotEventType",
+        "type": "string"
+      },
+      "SourceSnapshotHistory": {
+        "additionalProperties": false,
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/SourceSnapshotHistoryRecord"
+            },
+            "maxItems": 512,
+            "title": "Events",
+            "type": "array"
+          }
+        },
+        "required": [
+          "events"
+        ],
+        "title": "SourceSnapshotHistory",
+        "type": "object"
+      },
+      "SourceSnapshotHistoryRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "sequence": {
+            "maximum": 9223372036854775807,
+            "minimum": 1,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "event_type": {
+            "$ref": "#/components/schemas/SourceSnapshotEventType"
+          },
+          "raw_object_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Raw Object Id",
+            "type": "string"
+          },
+          "raw_content_hash": {
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Raw Content Hash",
+            "type": "string"
+          },
+          "raw_byte_length": {
+            "maximum": 1048576,
+            "minimum": 0,
+            "title": "Raw Byte Length",
+            "type": "integer"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceSnapshotReferenceView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "previous_active_snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceSnapshotReferenceView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "actor_type": {
+            "$ref": "#/components/schemas/LifecycleActorType"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "validation_passed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validation Passed"
+          },
+          "validation_reason_codes": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationReasonCode"
+            },
+            "maxItems": 12,
+            "title": "Validation Reason Codes",
+            "type": "array"
+          },
+          "validation_report_hash": {
+            "anyOf": [
+              {
+                "pattern": "^sha256:[a-f0-9]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validation Report Hash"
+          },
+          "diff_content_hash": {
+            "anyOf": [
+              {
+                "pattern": "^sha256:[a-f0-9]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diff Content Hash"
+          }
+        },
+        "required": [
+          "sequence",
+          "event_type",
+          "raw_object_id",
+          "raw_content_hash",
+          "raw_byte_length",
+          "snapshot",
+          "previous_active_snapshot",
+          "actor_type",
+          "occurred_at",
+          "validation_passed",
+          "validation_reason_codes",
+          "validation_report_hash",
+          "diff_content_hash"
+        ],
+        "title": "SourceSnapshotHistoryRecord",
+        "type": "object"
+      },
+      "SourceSnapshotListing": {
+        "additionalProperties": false,
+        "properties": {
+          "snapshots": {
+            "items": {
+              "$ref": "#/components/schemas/SourceSnapshotSummary"
+            },
+            "maxItems": 512,
+            "title": "Snapshots",
+            "type": "array"
+          }
+        },
+        "required": [
+          "snapshots"
+        ],
+        "title": "SourceSnapshotListing",
+        "type": "object"
+      },
+      "SourceSnapshotReferenceView": {
+        "additionalProperties": false,
+        "properties": {
+          "snapshot_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Snapshot Id",
+            "type": "string"
+          },
+          "content_hash": {
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Content Hash",
+            "type": "string"
+          }
+        },
+        "required": [
+          "snapshot_id",
+          "content_hash"
+        ],
+        "title": "SourceSnapshotReferenceView",
+        "type": "object"
+      },
+      "SourceSnapshotState": {
+        "enum": [
+          "PARSED",
+          "QUARANTINED",
+          "VALIDATED",
+          "APPROVED",
+          "ACTIVE",
+          "SUPERSEDED",
+          "ROLLED_BACK"
+        ],
+        "title": "SourceSnapshotState",
+        "type": "string"
+      },
+      "SourceSnapshotSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "deployment_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Deployment Id",
+            "type": "string"
+          },
+          "source_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Source Id",
+            "type": "string"
+          },
+          "snapshot_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Snapshot Id",
+            "type": "string"
+          },
+          "snapshot_content_hash": {
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Snapshot Content Hash",
+            "type": "string"
+          },
+          "raw_object_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Raw Object Id",
+            "type": "string"
+          },
+          "raw_content_hash": {
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Raw Content Hash",
+            "type": "string"
+          },
+          "raw_byte_length": {
+            "maximum": 1048576,
+            "minimum": 0,
+            "title": "Raw Byte Length",
+            "type": "integer"
+          },
+          "media_type": {
+            "maxLength": 129,
+            "minLength": 3,
+            "pattern": "^[a-z0-9][a-z0-9!#$&^_.+-]{0,63}/[a-z0-9][a-z0-9!#$&^_.+-]{0,63}$",
+            "title": "Media Type",
+            "type": "string"
+          },
+          "charset": {
+            "maxLength": 32,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$",
+            "title": "Charset",
+            "type": "string"
+          },
+          "parser_id": {
+            "$ref": "#/components/schemas/FiniteParserId"
+          },
+          "parser_version": {
+            "pattern": "^(?:0|[1-9][0-9]{0,8})\\.(?:0|[1-9][0-9]{0,8})\\.(?:0|[1-9][0-9]{0,8})$",
+            "title": "Parser Version",
+            "type": "string"
+          },
+          "schema_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Schema Id",
+            "type": "string"
+          },
+          "declared_record_count": {
+            "maximum": 512,
+            "minimum": 0,
+            "title": "Declared Record Count",
+            "type": "integer"
+          },
+          "record_count": {
+            "maximum": 512,
+            "minimum": 0,
+            "title": "Record Count",
+            "type": "integer"
+          },
+          "retrieved_at": {
+            "format": "date-time",
+            "title": "Retrieved At",
+            "type": "string"
+          },
+          "effective_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective From"
+          },
+          "parsed_at": {
+            "format": "date-time",
+            "title": "Parsed At",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SourceSnapshotState"
+          },
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "validation_passed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validation Passed"
+          },
+          "validation_reason_codes": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationReasonCode"
+            },
+            "maxItems": 12,
+            "title": "Validation Reason Codes",
+            "type": "array"
+          },
+          "validated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validated At"
+          },
+          "validation_report_hash": {
+            "anyOf": [
+              {
+                "pattern": "^sha256:[a-f0-9]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validation Report Hash"
+          },
+          "previous_snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceSnapshotReferenceView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "diff_content_hash": {
+            "anyOf": [
+              {
+                "pattern": "^sha256:[a-f0-9]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diff Content Hash"
+          },
+          "added_record_count": {
+            "maximum": 512,
+            "minimum": 0,
+            "title": "Added Record Count",
+            "type": "integer"
+          },
+          "removed_record_count": {
+            "maximum": 512,
+            "minimum": 0,
+            "title": "Removed Record Count",
+            "type": "integer"
+          },
+          "changed_record_count": {
+            "maximum": 512,
+            "minimum": 0,
+            "title": "Changed Record Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deployment_id",
+          "source_id",
+          "snapshot_id",
+          "snapshot_content_hash",
+          "raw_object_id",
+          "raw_content_hash",
+          "raw_byte_length",
+          "media_type",
+          "charset",
+          "parser_id",
+          "parser_version",
+          "schema_id",
+          "declared_record_count",
+          "record_count",
+          "retrieved_at",
+          "effective_from",
+          "parsed_at",
+          "state",
+          "active",
+          "validation_passed",
+          "validation_reason_codes",
+          "validated_at",
+          "validation_report_hash",
+          "previous_snapshot",
+          "diff_content_hash",
+          "added_record_count",
+          "removed_record_count",
+          "changed_record_count"
+        ],
+        "title": "SourceSnapshotSummary",
+        "type": "object"
+      },
       "SourceStatus": {
         "additionalProperties": false,
         "properties": {
@@ -3266,6 +3839,24 @@
         ],
         "title": "Uncertainty",
         "type": "object"
+      },
+      "ValidationReasonCode": {
+        "enum": [
+          "SNAPSHOT_HASH_MISMATCH",
+          "SCHEMA_MISMATCH",
+          "DECLARED_COUNT_MISMATCH",
+          "EMPTY_SNAPSHOT",
+          "EMPTY_RECORD_ASSERTIONS",
+          "MISSING_RECORD_ID",
+          "INVALID_RECORD_ID",
+          "DUPLICATE_RECORD_ID",
+          "DUPLICATE_LOCATOR",
+          "INVALID_EFFECTIVE_DATE",
+          "INVALID_EFFECTIVE_RANGE",
+          "UNEXPECTED_DELETION"
+        ],
+        "title": "ValidationReasonCode",
+        "type": "string"
       },
       "VersionReference": {
         "additionalProperties": false,
@@ -4152,7 +4743,21 @@
   },
   "x-tradesieve-canonical-source": {
     "model": "tradesieve.application.contracts",
+    "additional_models": [
+      "tradesieve.application.source_snapshot_contracts"
+    ],
     "generator": "scripts/generate_contract.py",
     "drift_check": "uv run --locked python scripts/generate_contract.py --check"
+  },
+  "x-tradesieve-schema-entrypoints": {
+    "SourceSnapshotListing": {
+      "$ref": "#/components/schemas/SourceSnapshotListing"
+    },
+    "SourceSnapshotDetail": {
+      "$ref": "#/components/schemas/SourceSnapshotDetail"
+    },
+    "SourceSnapshotHistory": {
+      "$ref": "#/components/schemas/SourceSnapshotHistory"
+    }
   }
 }

@@ -50,16 +50,18 @@ from tradesieve.application.source_snapshot import (
     source_authorization_target_id,
     source_snapshot_authorization_target_id,
 )
-from tradesieve.application.source_snapshot_query import (
+from tradesieve.application.source_snapshot_contracts import (
     ChangedSourceRecordView,
     SourceSnapshotDiffView,
     SourceSnapshotHistory,
     SourceSnapshotHistoryRecord,
     SourceSnapshotListing,
-    SourceSnapshotOfficialCitationResolver,
-    SourceSnapshotQueryService,
     SourceSnapshotReferenceView,
     SourceSnapshotSummary,
+)
+from tradesieve.application.source_snapshot_query import (
+    SourceSnapshotOfficialCitationResolver,
+    SourceSnapshotQueryService,
 )
 from tradesieve.domain import rule_bundle as rule_domain
 from tradesieve.domain.rule_bundle import (

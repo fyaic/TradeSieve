@@ -2,7 +2,7 @@
 
 **Planning window:** 2026-08-10 through 2026-09-18 (three two-week sprints)
 **Planning assumption:** dates are a baseline until team capacity and source access are confirmed.
-**Current repository state:** design baseline only; the commands in the target-experience document are acceptance targets until implementation issues are complete.
+**Current repository state:** implementation foundation, not a screening MVP. The source registry, synthetic immutable snapshot lifecycle/durable demo, rule bundle, health stack, and generated safe snapshot DTO schemas are implemented. The transaction/reviewer REST, public CLI, and MCP commands in the target-experience document remain acceptance targets.
 
 ## Phase 1 outcome
 
@@ -28,7 +28,7 @@ The Phase 1 demo must show all of the following in one repeatable script:
 | Capability | Phase 1 depth |
 | --- | --- |
 | Distribution | One documented container image/Compose stack, CLI package, MCP endpoint, examples, and release notes |
-| Sources | Registry plus synthetic fixtures; working proof for EU and OFAC snapshot/hash/diff lifecycle subject to access/licence review |
+| Sources | Implemented governed synthetic registry and durable snapshot/hash/diff/rollback proof; EU and OFAC connectors remain subject to access/licence review |
 | Matching | Exact identifiers, deterministic normalization, configurable candidate matcher behind an adapter, benchmark report |
 | Goods/route/payment | Structured intake, completeness/consistency checks, sensitive/restricted candidates; no definitive classification |
 | Rules | Small cited versioned rule/policy bundle sufficient for synthetic vertical slice |

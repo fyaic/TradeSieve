@@ -1,0 +1,5 @@
+api/openapi/tradesieve.v1.json:
+  no-unused-components:
+    - '#/components/schemas/SourceSnapshotDetail'
+    - '#/components/schemas/SourceSnapshotHistory'
+    - '#/components/schemas/SourceSnapshotListing'

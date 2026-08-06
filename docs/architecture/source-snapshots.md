@@ -1,10 +1,10 @@
 # Immutable source snapshot boundary
 
-**Status:** TS-202 Slice B implements the immutable domain, one finite synthetic
-JSON parser, the complete authorized in-memory application workflow, bounded safe
-queries, and exact official-citation resolution. Private local-volume storage,
-PostgreSQL adapters/migrations, runtime and demo wiring, CLI/REST/MCP surfaces, and
-real source integrations remain explicitly deferred to Slices C and D.
+**Status:** TS-202 implements the synthetic immutable domain and parser, authorized
+application workflow, private local-volume bytes, PostgreSQL 18.4 migration/repository,
+runtime/demo wiring, bounded safe queries, rollback, exact citation resolution, a
+narrow demo CLI listing, and generated canonical safe DTO schemas. It adds no source
+snapshot REST route, MCP tool, raw export, or real source integration.
 
 ## Implemented boundary
 
@@ -46,11 +46,14 @@ parser, command workflow, and read boundary are separate application concerns:
 | `tradesieve.adapters.in_memory_source_snapshot` | Locking copy-on-write reference object store/repository used to prove idempotence, conflicts, corruption detection, and atomic projections |
 | `tradesieve.adapters.synthetic_source_parser` | Strict UTF-8, duplicate-key-safe, no-float, bounded JSON parser for the one registered synthetic schema |
 | `tradesieve.application.source_snapshot` | Exact authorization binding and ingest, parse, validate, approve, activate, and rollback orchestration |
-| `tradesieve.application.source_snapshot_query` | Bounded redacted list/detail/history DTOs plus exact accepted-snapshot citation verification for TS-205 |
+| `tradesieve.application.source_snapshot_contracts` | Canonical redacted listing/detail/history DTO roots shared one-way by generation and query consumers |
+| `tradesieve.application.source_snapshot_query` | Authorized verified reads that materialize the canonical DTOs plus exact accepted-snapshot citation verification for TS-205 |
+| `tradesieve.adapters.local_raw_object_store` | Private content-addressed `0700`/`0600` immutable bytes with verified reads |
+| `tradesieve.adapters.postgres_source_snapshot` | PostgreSQL immutable artifacts, lifecycle/state/observation projection, audit linkage, and fail-closed replay |
 
-There is no caller-selected parser/plugin seam. There is also no filesystem adapter,
-PostgreSQL table or migration, runtime registration, CLI/REST/MCP endpoint, raw export,
-real data, or network retrieval in Slice B.
+There is no caller-selected parser/plugin seam. The only source-snapshot interface is
+the private demo CLI metadata listing; canonical schema registration is not an endpoint.
+There is no source-snapshot REST/MCP/raw-export surface, real data, or network retrieval.
 
 ## Finite parser and application workflow
 
@@ -150,19 +153,19 @@ the exact authorized ingest/parse/validate/approve/activate/rollback operation a
 applied lifecycle event of the corresponding type and artifact target.
 
 Raw bytes use a separate immutable object-store port with exact put outcomes and
-verified reads. A future retrieve command may write bytes before the database metadata
+verified reads. A retrieve command may write bytes before the database metadata
 transaction. Database failure can therefore leave a safe immutable unreferenced blob,
 never a falsely active snapshot. Bounded orphan reconciliation/retention is deferred
 to the durable-adapter/operations slices and must not delete a referenced object.
 
 The object-store port intentionally exposes no delete or raw-export method. Missing or
-hash-mismatched bytes fail unavailable. The reference adapter is in-memory only; the
-accepted later demo design uses a private local volume and no public raw-object surface.
+hash-mismatched bytes fail unavailable. The demo uses a private named local volume:
+bootstrap has write access, app/worker have read-only access, and migrations do not
+mount it. No public raw-object surface exists.
 
 ## Deferred acceptance work
 
-TS-202 Slices C and D own PostgreSQL migration/repository constraints, private
-local-volume storage, runtime/demo registration, CLI commands, and Compose evidence.
-No Slice B code is wired into REST, MCP, or a public raw-object surface. Production
-source selection, network retrieval, licences, role assignments, legal authority, and
-legal/data coverage remain outside this synthetic proof.
+Production source selection, network retrieval, licences, role assignments, legal
+authority, legal/data coverage, authenticated administration adapters, and bounded
+orphan retention remain outside this synthetic proof. Future REST or MCP work must use
+the same canonical safe DTOs and application authorization; D3 itself wires neither.

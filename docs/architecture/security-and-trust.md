@@ -49,6 +49,13 @@ The exhaustive scope/role/state rules and non-leaking denial mapping are in the
 | Tool-result forgery/replay | TLS, opaque IDs, event/result hashes, timestamps, protocol/schema version, audit correlation |
 | Clearance delegation | No general clearance tool; human decision API rejects agent/service identities |
 
+The registered source-snapshot listing/detail/history schemas are operations-safe
+metadata contracts, not new REST or MCP capabilities. Their schema closure excludes raw
+bytes and values, record/assertion locators, registration governance/admin fields,
+free-form reasons, actor identities, client/audit IDs, paths, and exception bodies.
+Lifecycle `actor_type` remains a finite non-identifying category. Query authorization
+and any future adapter remain separate application boundaries.
+
 ## Data classification
 
 | Class | Examples | Default handling |
@@ -78,7 +85,7 @@ The exhaustive scope/role/state rules and non-leaking denial mapping are in the
 ## Supply-chain and runtime baseline
 
 - Pin dependencies and base images; produce lockfiles and SBOM.
-- Run static, dependency, secret, container, contract, and test checks in CI with least-privilege GitHub Actions permissions.
+- Run static, dependency, secret, container, contract, and test checks in CI with least-privilege GitHub Actions permissions. Keep the isolated PostgreSQL 18.4 source-snapshot gate separate from the full Compose lifecycle so both failure boundaries remain visible.
 - Keep source/evidence parsers isolated from credentials and unnecessary network access.
 - Apply request/body/file limits, timeouts, concurrency limits, rate limits, and safe archive extraction.
 - Redact tokens, names, identifiers, document bodies, payment details, and raw match queries from default logs/traces.

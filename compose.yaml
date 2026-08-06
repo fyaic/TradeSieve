@@ -10,6 +10,7 @@ x-tradesieve-environment: &tradesieve-environment
   TRADESIEVE_REQUIRED_SOURCE_SET: ${TRADESIEVE_REQUIRED_SOURCE_SET:-synthetic-demo-sources-v1}
   TRADESIEVE_REQUIRED_RULE_SET: ${TRADESIEVE_REQUIRED_RULE_SET:-synthetic-demo-rules-v1}
   TRADESIEVE_MIGRATION_ROOT: ${TRADESIEVE_MIGRATION_ROOT:-/app}
+  TRADESIEVE_RAW_OBJECT_ROOT: ${TRADESIEVE_RAW_OBJECT_ROOT:-/var/lib/tradesieve/raw}
   TRADESIEVE_HTTP_HOST: ${TRADESIEVE_HTTP_HOST:-0.0.0.0}
   TRADESIEVE_HTTP_PORT: ${TRADESIEVE_HTTP_PORT:-8080}
   TRADESIEVE_DATABASE_CONNECT_TIMEOUT_SECONDS: ${TRADESIEVE_DATABASE_CONNECT_TIMEOUT_SECONDS:-2}
@@ -65,6 +66,8 @@ services:
     <<: *tradesieve-service
     command: ["python", "-m", "tradesieve.manage", "bootstrap-demo"]
     restart: "no"
+    volumes:
+      - raw-source-objects:/var/lib/tradesieve/raw
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -77,6 +80,8 @@ services:
         condition: service_completed_successfully
     ports:
       - 127.0.0.1:${TRADESIEVE_HOST_PORT:-8080}:${TRADESIEVE_HTTP_PORT:-8080}
+    volumes:
+      - raw-source-objects:/var/lib/tradesieve/raw:ro
     networks:
       edge:
         gw_priority: 1
@@ -94,6 +99,8 @@ services:
     depends_on:
       bootstrap-demo:
         condition: service_completed_successfully
+    volumes:
+      - raw-source-objects:/var/lib/tradesieve/raw:ro
     healthcheck:
       test: ["CMD", "python", "-m", "tradesieve.healthcheck", "worker"]
       interval: 3s
@@ -103,6 +110,7 @@ services:
 
 volumes:
   postgres-data:
+  raw-source-objects:
 
 networks:
   internal:

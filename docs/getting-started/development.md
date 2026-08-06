@@ -1,6 +1,6 @@
 # Development setup
 
-**Status:** TS-201 source-registry and TS-205 rule-bundle runtime foundations. This workflow validates the development package and contracts; it does not start a screening service or imply production readiness.
+**Status:** TS-201 source-registry, TS-202 immutable snapshot, and TS-205 rule-bundle runtime foundations. This workflow validates the development package and canonical schemas; it does not start a screening service or imply production readiness.
 
 ## Prerequisites
 
@@ -18,7 +18,7 @@ From a clean checkout:
 ./scripts/check.sh
 ```
 
-The script verifies the lockfile, installs all locked dependency groups, checks formatting/lint/types, runs unit and architecture-boundary tests with coverage, builds the wheel/source distribution, validates documentation/OpenAPI, scans tracked files for secrets, and audits Python dependencies. It covers non-container gates; run `./scripts/test_compose.sh` for the complete reference-deployment lifecycle.
+The script verifies the lockfile, installs all locked dependency groups, checks formatting/lint/types, runs unit and architecture-boundary tests with coverage, builds the wheel/source distribution, validates documentation/OpenAPI, scans tracked files for secrets, and audits Python dependencies. It covers non-container gates; run `./scripts/test_source_snapshot_postgres.sh` for the isolated PostgreSQL 18.4 persistence gate and `./scripts/test_compose.sh` for the complete two-project reference-deployment lifecycle.
 
 For a faster edit/test loop:
 
@@ -43,7 +43,8 @@ Every pull request runs:
 - pinned Python/`uv` lock verification, format, lint, strict type checks, unit/architecture tests, coverage, and package build;
 - the existing documentation/OpenAPI contract workflow;
 - tracked-file secret detection and dependency vulnerability audit.
-- the Docker Compose reference deployment test when implementation changes are proposed.
+- a separate PostgreSQL 18.4 source-snapshot persistence/concurrency/constraint job;
+- the separate Docker Compose reference deployment lifecycle.
 
 GitHub Actions are pinned to immutable commit SHAs, run on the explicit `ubuntu-24.04` image, use read-only repository permissions, and do not persist checkout credentials. A failed required check must be diagnosed; repeated reruns are not acceptance evidence.
 

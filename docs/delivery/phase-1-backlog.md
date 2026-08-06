@@ -6,7 +6,7 @@
 
 | Story | Sprint | User outcome | Acceptance summary | Depends on |
 | --- | --- | --- | --- | --- |
-| [TS-101](https://github.com/fyaic/TradeSieve/issues/17) Project skeleton and CI | S1 | Developer can build/test consistently | Locked Python project, format/lint/type/test/contract CI, pinned Actions, no secret/production data | ADR-0004 proposed |
+| [TS-101](https://github.com/fyaic/TradeSieve/issues/17) Project skeleton and CI | S1 | Developer can build/test consistently | Locked Python project, format/lint/type/test/contract CI, pinned Actions, separate PostgreSQL/Compose gates, no secret/production data | ADR-0004 proposed |
 | [TS-102](https://github.com/fyaic/TradeSieve/issues/18) Docker reference deployment | S1 | Evaluator can start service locally | Compose starts app/worker/PostgreSQL, health/readiness distinguish runtime from source coverage, clean teardown | TS-101 |
 | TS-103 Configuration and secret boundary | S1 | Deployer understands every setting | Typed config, environment template, safe defaults, secret validation/redaction | TS-101 |
 | TS-104 Database migrations and restore smoke test | S1/S3 | Operator can evolve and recover state | Fresh migrate, upgrade fixture DB, backup/isolated restore evidence | TS-102 |
@@ -17,7 +17,7 @@
 | Story | Sprint | User outcome | Acceptance summary | Depends on |
 | --- | --- | --- | --- | --- |
 | [TS-201](https://github.com/fyaic/TradeSieve/issues/19) Runtime source registry | S1 | Source operator knows scope/owner/licence/freshness | Governance fields required; read API/CLI redacts credentials | TS-101/103 |
-| [TS-202](https://github.com/fyaic/TradeSieve/issues/20) Immutable snapshot lifecycle | S1/S2 | Operator can retrieve/quarantine/hash/validate/diff/activate/rollback | Two versions preserved; unexpected schema/count/deletion cannot activate | TS-201/104 |
+| [TS-202](https://github.com/fyaic/TradeSieve/issues/20) Immutable snapshot lifecycle | S1/S2 | Operator can retrieve/quarantine/hash/validate/diff/activate/rollback | Durable synthetic lifecycle/rollback, private bytes, safe canonical DTOs, and corruption refusal; no REST/MCP/raw export | TS-201/104 |
 | [TS-203](https://github.com/fyaic/TradeSieve/issues/3) EU source connector proof | S2 | Team proves EU data lifecycle | Approved official endpoint, raw/hash/parser/diff/locator, access/licence record | TS-202 |
 | [TS-204](https://github.com/fyaic/TradeSieve/issues/4) OFAC SLS connector proof | S2 | Team proves delta-capable source lifecycle | Snapshot/delta, stable IDs, program fields, history boundary documented | TS-202 |
 | [TS-205](https://github.com/fyaic/TradeSieve/issues/27) Versioned rule bundle | S1/S2 | Result identifies cited rule/policy version | Source/scope/effective/owner/tests/activation/rollback stored | Issue #2, TS-202 |

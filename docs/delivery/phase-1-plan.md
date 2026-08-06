@@ -9,6 +9,11 @@
 
 Deliver a runnable, private, evidence-oriented service MVP that proves one transaction from intake through conservative screening, case/human review, downstream notification, source-change rescreening, and replay—with equivalent REST, CLI, and MCP results.
 
+Current progress proves the synthetic governed-source foundation: immutable private
+bytes, PostgreSQL lifecycle/audit persistence, activation/rollback and readiness,
+operations-safe CLI metadata, and canonical listing/detail/history schemas. Schema
+registration does not implement the Sprint 1 REST slice or the later MCP interface.
+
 ## Sprint plan
 
 ### Sprint 1 — Walking skeleton and contract (2026-08-10 to 2026-08-21)
@@ -22,7 +27,7 @@ Expected outcomes:
 - identity/tenant/role context and deny-by-default authorization foundation;
 - input/screening/case/finding persistence and state-machine unit tests;
 - deterministic completeness/exact-identifier checks;
-- source registry/synthetic immutable snapshot foundation;
+- source registry/synthetic immutable snapshot foundation (implemented, including durable demo and safe canonical DTO schemas);
 - REST create/read vertical slice and interactive docs.
 
 Sprint review: run Docker Compose from a clean checkout, submit the golden REST request twice with the same key, and show one persisted case, audit stream, outbox record, and `HOLD` result.

@@ -10,7 +10,7 @@ TradeSieve is designed as an independently deployable service beside CRM, order,
 
 ## Project status
 
-**Phase 1 implementation has started; no runnable screening MVP exists yet.** The repository includes a locked Python project, CI quality gates, and a Docker reference stack that proves app/worker/PostgreSQL health, governed source freshness, one versioned and cited synthetic rule bundle, and fail-closed readiness. TS-202 Slice B now provides the immutable source-snapshot domain, one finite synthetic parser, the complete authorized in-memory ingest/parse/validate/approve/activate/rollback workflow, bounded redacted queries, and exact official-citation verification. Durable local/PostgreSQL storage, migrations, runtime/demo wiring, CLI/REST/MCP surfaces, and real source integrations remain unimplemented. The private demo CLI can inspect the active safe rule projection; it does not submit screenings or grant clearance. Screening and review behavior remain acceptance targets. The [target MVP user experience](docs/getting-started/mvp-user-experience.md) is not a working screening quickstart until implementation and release gates pass.
+**Phase 1 implementation has started; no runnable screening MVP exists yet.** The repository includes a locked Python project, CI quality gates, and a Docker reference stack that proves app/worker/PostgreSQL health, governed source freshness, one versioned and cited synthetic rule bundle, and fail-closed readiness. TS-202 now provides the immutable source-snapshot domain, finite synthetic parser, authorized lifecycle and rollback services, append-only PostgreSQL persistence, private verified local-volume bytes, runtime/demo wiring, bounded redacted queries, a safe demo CLI listing, and generated canonical listing/detail/history schemas. Registering those schemas adds no REST route, MCP tool, or raw-object export. Real source integrations, transaction screening, case review, and the public Phase 1 interfaces remain unimplemented acceptance targets. The [target MVP user experience](docs/getting-started/mvp-user-experience.md) is not a working screening quickstart until implementation and release gates pass.
 
 Nothing in this repository is legal advice or an automatic legal-clearance mechanism.
 
@@ -82,7 +82,8 @@ The [Docker reference deployment](docs/getting-started/docker-reference.md) star
 - [Expected review-required response](examples/responses/transaction-screening.review-required.json)
 - [Minimal case-state webhook](examples/events/case.state-changed.json)
 
-These artifacts are generated from `tradesieve.application.contracts`. Run
+These artifacts are generated from `tradesieve.application.contracts` and the
+one-way safe snapshot roots in `tradesieve.application.source_snapshot_contracts`. Run
 `uv run --locked python scripts/generate_contract.py --check` to detect drift; edit the
 models and executable examples, not generated JSON.
 
