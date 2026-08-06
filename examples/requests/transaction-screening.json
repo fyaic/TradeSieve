@@ -1,0 +1,82 @@
+{
+  "schema_version": "1.0.0",
+  "data_classification": "SYNTHETIC",
+  "external_object": {
+    "system": "demo-crm",
+    "object_type": "QUOTE",
+    "object_id": "demo-quote-001",
+    "object_version": "1"
+  },
+  "proposed_action": "QUOTE_RELEASE",
+  "action_due_at": "2026-08-07T08:00:00Z",
+  "legal_nexus": [
+    "EU_UNKNOWN_MEMBER_STATE",
+    "BANK_POLICY_UNKNOWN"
+  ],
+  "parties": [
+    {
+      "party_ref": "seller-1",
+      "role": "SELLER",
+      "entity_type": "ORGANIZATION",
+      "legal_name": "Northern Bridge Logistics Demo Ltd",
+      "aliases": [],
+      "country": "CN",
+      "identifiers": [
+        {
+          "type": "DEMO_REGISTRATION_ID",
+          "value": "CN-DEMO-0001",
+          "issuer": "CN"
+        }
+      ],
+      "address": "Synthetic address, Shanghai"
+    },
+    {
+      "party_ref": "buyer-1",
+      "role": "BUYER",
+      "entity_type": "ORGANIZATION",
+      "legal_name": "Волга Компонентс Демо ООО",
+      "aliases": [
+        "Volga Components Demo LLC"
+      ],
+      "country": "RU",
+      "identifiers": [],
+      "address": "Synthetic address, Moscow"
+    }
+  ],
+  "goods": [
+    {
+      "line_ref": "line-1",
+      "description": "Synthetic industrial control module for compliance testing",
+      "manufacturer": "Demo Controls Laboratory",
+      "model_or_part_number": null,
+      "technical_specification_ref": null,
+      "hs_or_cn_code": "853710",
+      "quantity": 10,
+      "origin_country": "CN",
+      "end_use": "Industrial automation; final installation details not provided",
+      "end_user_ref": null
+    }
+  ],
+  "route": {
+    "origin_country": "CN",
+    "transit_countries": [
+      "KZ"
+    ],
+    "destination_country": "RU",
+    "final_use_country": "RU",
+    "carrier_ref": null
+  },
+  "payment_parties": [
+    {
+      "party_ref": "bank-1",
+      "role": "BENEFICIARY_BANK",
+      "entity_type": "BANK",
+      "legal_name": "Synthetic Settlement Bank",
+      "aliases": [],
+      "country": "KZ",
+      "identifiers": [],
+      "address": null
+    }
+  ],
+  "evidence_refs": []
+}

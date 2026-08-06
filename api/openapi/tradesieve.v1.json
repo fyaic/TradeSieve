@@ -1,0 +1,1317 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "TradeSieve API",
+    "version": "0.1.0-draft",
+    "summary": "Canonical contract for evidence-oriented trade-compliance screening and human review",
+    "description": "Draft Phase 1 contract. A successful API response is not legal clearance. Only an authorized human decision can create HUMAN_CLEARED for a named action, scope, and expiry.",
+    "license": {
+      "name": "Proprietary; see repository LICENSE",
+      "url": "https://github.com/fyaic/TradeSieve/blob/main/LICENSE"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://{host}",
+      "description": "Deployment-specific TradeSieve endpoint",
+      "variables": {
+        "host": {
+          "default": "tradesieve.local",
+          "description": "Configured private deployment host"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/health/live": {
+      "get": {
+        "operationId": "getLiveness",
+        "summary": "Check process liveness",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Process is live",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "getReadiness",
+        "summary": "Check service and required coverage readiness",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Runtime and required configured coverage are ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/v1/screenings": {
+      "post": {
+        "operationId": "createScreening",
+        "summary": "Screen a proposed business action",
+        "description": "Creates a reproducible screening result and, when findings/workflow exist, a case. HTTP success does not mean clearance.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScreeningRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Screening result created; inspect business_action and state",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreeningResult"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Idempotent replay of the original committed result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreeningResult"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/v1/screenings/{screening_id}": {
+      "get": {
+        "operationId": "getScreening",
+        "summary": "Get an authorized screening result",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ScreeningId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Screening result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreeningResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/cases/{case_id}": {
+      "get": {
+        "operationId": "getCase",
+        "summary": "Get the current authorized case projection",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CaseId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current case projection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Case"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/cases/{case_id}/evidence": {
+      "post": {
+        "operationId": "submitCaseEvidence",
+        "summary": "Submit an approved evidence reference",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CaseId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvidenceSubmission"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Evidence accepted for validation/review; current action remains authoritative",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Case"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      }
+    },
+    "/v1/cases/{case_id}/review-requests": {
+      "post": {
+        "operationId": "requestHumanReview",
+        "summary": "Request authorized human review",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CaseId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Review request queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Case"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/cases/{case_id}/human-decisions": {
+      "post": {
+        "operationId": "recordHumanDecision",
+        "summary": "Record a scoped authorized human decision",
+        "description": "Requires a named human identity with the applicable final-decision role and configured state/completeness/four-eyes checks. Service and agent identities are denied.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CaseId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HumanDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Human decision event recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Case"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/sources": {
+      "get": {
+        "operationId": "listSources",
+        "summary": "List authorized source status and freshness",
+        "parameters": [
+          {
+            "name": "stale",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Source status list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SourceStatus"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "OIDC/OAuth access token with audience and operation scopes"
+      }
+    },
+    "parameters": {
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 128
+        }
+      },
+      "CorrelationId": {
+        "name": "X-Correlation-ID",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 128
+        }
+      },
+      "ScreeningId": {
+        "name": "screening_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^scr_[A-Za-z0-9]+$"
+        }
+      },
+      "CaseId": {
+        "name": "case_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^case_[A-Za-z0-9]+$"
+        }
+      }
+    },
+    "headers": {
+      "CorrelationId": {
+        "description": "Request/result correlation ID",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "schemas": {
+      "Health": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "OK",
+              "DEGRADED",
+              "UNAVAILABLE"
+            ]
+          },
+          "checks": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ScreeningRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema_version",
+          "data_classification",
+          "external_object",
+          "proposed_action",
+          "legal_nexus",
+          "parties",
+          "goods",
+          "route"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": "1.0.0"
+          },
+          "data_classification": {
+            "type": "string",
+            "enum": [
+              "SYNTHETIC",
+              "APPROVED_PILOT",
+              "PRODUCTION"
+            ]
+          },
+          "external_object": {
+            "$ref": "#/components/schemas/ExternalObject"
+          },
+          "proposed_action": {
+            "$ref": "#/components/schemas/ProposedAction"
+          },
+          "action_due_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "legal_nexus": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "parties": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/Party"
+            }
+          },
+          "goods": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/GoodsLine"
+            }
+          },
+          "route": {
+            "$ref": "#/components/schemas/Route"
+          },
+          "payment_parties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Party"
+            }
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ExternalObject": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "system",
+          "object_type",
+          "object_id",
+          "object_version"
+        ],
+        "properties": {
+          "system": {
+            "type": "string"
+          },
+          "object_type": {
+            "type": "string"
+          },
+          "object_id": {
+            "type": "string"
+          },
+          "object_version": {
+            "type": "string"
+          }
+        }
+      },
+      "Party": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "party_ref",
+          "role",
+          "entity_type",
+          "legal_name",
+          "country"
+        ],
+        "properties": {
+          "party_ref": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "entity_type": {
+            "type": "string",
+            "enum": [
+              "ORGANIZATION",
+              "PERSON",
+              "VESSEL",
+              "BANK"
+            ]
+          },
+          "legal_name": {
+            "type": "string"
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "country": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "identifiers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Identifier"
+            }
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "Identifier": {
+        "type": "object",
+        "required": [
+          "type",
+          "value"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "issuer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "GoodsLine": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "line_ref",
+          "description",
+          "quantity",
+          "origin_country",
+          "end_use"
+        ],
+        "properties": {
+          "line_ref": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "manufacturer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "model_or_part_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "technical_specification_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hs_or_cn_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "origin_country": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "end_use": {
+            "type": "string"
+          },
+          "end_user_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "Route": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "origin_country",
+          "destination_country",
+          "final_use_country"
+        ],
+        "properties": {
+          "origin_country": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "transit_countries": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$"
+            }
+          },
+          "destination_country": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "final_use_country": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "carrier_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ScreeningResult": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "screening_id",
+          "case_id",
+          "state",
+          "signal",
+          "highest_priority",
+          "business_action",
+          "summary",
+          "findings",
+          "required_evidence",
+          "version_set",
+          "created_at"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": "1.0.0"
+          },
+          "screening_id": {
+            "type": "string"
+          },
+          "case_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/CaseState"
+          },
+          "signal": {
+            "$ref": "#/components/schemas/Signal"
+          },
+          "highest_priority": {
+            "$ref": "#/components/schemas/Priority"
+          },
+          "business_action": {
+            "$ref": "#/components/schemas/BusinessAction"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            }
+          },
+          "required_evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "version_set": {
+            "$ref": "#/components/schemas/VersionSet"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Finding": {
+        "type": "object",
+        "required": [
+          "finding_id",
+          "kind",
+          "priority",
+          "status",
+          "fact_class",
+          "summary",
+          "required_action",
+          "owner_role"
+        ],
+        "properties": {
+          "finding_id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Priority"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "RESOLVED",
+              "SUPERSEDED"
+            ]
+          },
+          "fact_class": {
+            "type": "string",
+            "enum": [
+              "VERIFIED_FACT",
+              "SOURCE_ASSERTION",
+              "INFERENCE",
+              "UNKNOWN"
+            ]
+          },
+          "summary": {
+            "type": "string"
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "source_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "uncertainty": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "required_action": {
+            "type": "string"
+          },
+          "owner_role": {
+            "type": "string"
+          },
+          "due_before": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "Case": {
+        "type": "object",
+        "required": [
+          "case_id",
+          "state",
+          "signal",
+          "highest_priority",
+          "business_action",
+          "findings",
+          "updated_at"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/CaseState"
+          },
+          "signal": {
+            "$ref": "#/components/schemas/Signal"
+          },
+          "highest_priority": {
+            "$ref": "#/components/schemas/Priority"
+          },
+          "business_action": {
+            "$ref": "#/components/schemas/BusinessAction"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            }
+          },
+          "effective_human_decision": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HumanDecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "EvidenceSubmission": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evidence_type",
+          "content_hash",
+          "media_type",
+          "storage_handle",
+          "supports_finding_ids"
+        ],
+        "properties": {
+          "evidence_type": {
+            "type": "string"
+          },
+          "content_hash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "media_type": {
+            "type": "string"
+          },
+          "storage_handle": {
+            "type": "string"
+          },
+          "supports_finding_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          }
+        }
+      },
+      "ReviewRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "requested_reviewer_group": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "HumanDecisionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "decision",
+          "scope",
+          "rationale",
+          "resolved_finding_ids",
+          "evidence_refs",
+          "expires_at"
+        ],
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/HumanDecisionType"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/DecisionScope"
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 5000
+          },
+          "resolved_finding_ids": {
+            "type": "array",
+            "description": "Findings resolved by this decision. May be empty for HUMAN_BLOCKED or CLOSED_NO_ACTION; application policy requires HUMAN_CLEARED to resolve every open P0/P1 finding.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidence_refs": {
+            "type": "array",
+            "description": "Evidence considered for the disposition. May be empty for CLOSED_NO_ACTION; application policy enforces sufficient evidence for HUMAN_CLEARED and any configured block policy.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Required and non-null for HUMAN_CLEARED; policy validation enforces this condition"
+          }
+        }
+      },
+      "HumanDecision": {
+        "type": "object",
+        "required": [
+          "decision_id",
+          "decision",
+          "scope",
+          "rationale",
+          "resolved_finding_ids",
+          "evidence_refs",
+          "version_set",
+          "reviewer_id",
+          "reviewer_role",
+          "recorded_at",
+          "expires_at"
+        ],
+        "properties": {
+          "decision_id": {
+            "type": "string"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/HumanDecisionType"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/DecisionScope"
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "resolved_finding_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "version_set": {
+            "$ref": "#/components/schemas/VersionSet"
+          },
+          "reviewer_id": {
+            "type": "string"
+          },
+          "reviewer_role": {
+            "type": "string"
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "DecisionScope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "proposed_action",
+          "external_object"
+        ],
+        "properties": {
+          "proposed_action": {
+            "$ref": "#/components/schemas/ProposedAction"
+          },
+          "external_object": {
+            "$ref": "#/components/schemas/ExternalObject"
+          }
+        }
+      },
+      "VersionSet": {
+        "type": "object",
+        "required": [
+          "schema",
+          "sources",
+          "rules",
+          "matcher"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "matcher": {
+            "type": "string"
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "SourceStatus": {
+        "type": "object",
+        "required": [
+          "source_id",
+          "active_snapshot_id",
+          "status",
+          "retrieved_at"
+        ],
+        "properties": {
+          "source_id": {
+            "type": "string"
+          },
+          "active_snapshot_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "CURRENT",
+              "STALE",
+              "UNAVAILABLE",
+              "QUARANTINED"
+            ]
+          },
+          "retrieved_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "effective_from": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "CaseState": {
+        "type": "string",
+        "enum": [
+          "INCOMPLETE",
+          "REVIEW_REQUIRED",
+          "ESCALATE",
+          "HUMAN_CLEARED",
+          "HUMAN_BLOCKED",
+          "CLOSED_NO_ACTION"
+        ]
+      },
+      "ProposedAction": {
+        "type": "string",
+        "enum": [
+          "CUSTOMER_ONBOARDING",
+          "QUOTE_RELEASE",
+          "ORDER_ACCEPTANCE",
+          "BOOKING",
+          "SHIPMENT_RELEASE",
+          "PAYMENT"
+        ]
+      },
+      "HumanDecisionType": {
+        "type": "string",
+        "enum": [
+          "HUMAN_CLEARED",
+          "HUMAN_BLOCKED",
+          "CLOSED_NO_ACTION"
+        ]
+      },
+      "Signal": {
+        "type": "string",
+        "description": "Decision-support presentation signal. NOT_APPLICABLE is used when the proposal is CLOSED_NO_ACTION; it is not a clearance signal.",
+        "enum": [
+          "RED",
+          "YELLOW",
+          "GREEN_CANDIDATE",
+          "GREEN_HUMAN",
+          "NOT_APPLICABLE"
+        ]
+      },
+      "Priority": {
+        "type": "string",
+        "enum": [
+          "P0",
+          "P1",
+          "P2",
+          "NONE"
+        ]
+      },
+      "BusinessAction": {
+        "type": "string",
+        "enum": [
+          "HOLD",
+          "REQUEST_EVIDENCE",
+          "ESCALATE",
+          "BLOCK",
+          "MONITOR",
+          "NO_ACTION",
+          "ALLOW_WITHIN_HUMAN_DECISION"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "correlation_id",
+          "retryable"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      }
+    },
+    "responses": {
+      "ValidationError": {
+        "description": "Request validation failed",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Idempotency or state/version conflict",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Caller is not authorized for the requested action",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Object not found or not visible to caller",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Caller exceeded a configured rate limit; follow Retry-After and keep the business action held",
+        "headers": {
+          "Retry-After": {
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "ServiceUnavailable": {
+        "description": "Runtime or required screening coverage unavailable; callers must fail closed",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  }
+}

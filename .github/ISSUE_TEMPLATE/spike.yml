@@ -1,0 +1,49 @@
+name: Time-boxed spike
+description: Reduce a bounded technical, source, legal, security, or product uncertainty.
+title: "spike: "
+labels: ["type/spike", "phase/1-mvp"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Decision question
+      description: State the decision that cannot responsibly be made with current evidence.
+    validations:
+      required: true
+  - type: input
+    id: timebox
+    attributes:
+      label: Time box
+      placeholder: "For example: 2 engineer-days"
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence method and primary sources
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Required output
+      description: ADR, benchmark, connector proof, contract change, recommendation, or explicit no-decision.
+    validations:
+      required: true
+  - type: textarea
+    id: exit
+    attributes:
+      label: Exit criteria and decision owner
+    validations:
+      required: true
+  - type: checkboxes
+    id: safeguards
+    attributes:
+      label: Safeguards
+      options:
+        - label: Facts, inference, and recommendation will be separated.
+          required: true
+        - label: Durable sources will be recorded with access/licence notes.
+          required: true
+        - label: The spike will not be treated as production implementation.
+          required: true

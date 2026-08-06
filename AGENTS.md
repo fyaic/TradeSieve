@@ -30,10 +30,12 @@ This repository is designed for collaboration with coding and research agents. A
 
 ## Change discipline
 
-1. Read the relevant requirement, research note, and ADR before changing it.
+1. Read the relevant requirement, product baseline, research note, and ADR before changing it.
 2. Update documentation and machine-readable registries together.
 3. Add or update tests/checks in proportion to the change.
 4. Run `./scripts/check_docs.sh` before committing.
 5. Explain uncertainty, open questions, and evidence gaps in the pull request.
 
-Do not claim production readiness while the repository status remains Discovery.
+For implementation work, link a Phase 1 story/requirement and follow `docs/delivery/agile-operating-model.md`. Do not present target quickstart commands as implemented until the clean-environment golden path passes.
+
+Do not claim production readiness while the repository status remains Phase 1/MVP.

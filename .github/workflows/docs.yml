@@ -1,4 +1,4 @@
-name: Documentation checks
+name: Repository checks
 
 on:
   push:
@@ -14,5 +14,7 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - name: Validate repository documentation
+      - name: Validate documentation and contracts
         run: ./scripts/check_docs.sh
+      - name: Lint OpenAPI contract
+        run: npx --yes @redocly/cli@2.44.2 lint api/openapi/tradesieve.v1.json

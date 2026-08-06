@@ -1,0 +1,45 @@
+name: Phase epic
+description: Define an end-to-end Phase outcome spanning multiple stories.
+title: "epic: "
+labels: ["type/epic", "phase/1-mvp"]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: User or operational outcome
+      description: Describe the demonstrable outcome, not a component list.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Included and excluded scope
+    validations:
+      required: true
+  - type: textarea
+    id: requirements
+    attributes:
+      label: Requirement and decision links
+      description: Link product requirement IDs, ADRs, research, and parent milestone.
+    validations:
+      required: true
+  - type: textarea
+    id: stories
+    attributes:
+      label: Child stories and spikes
+      description: Maintain a checklist of linked issues.
+    validations:
+      required: true
+  - type: textarea
+    id: exit
+    attributes:
+      label: Epic exit evidence
+      description: State the working demo, metrics, tests, approvals, and documentation required.
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks, decisions, and dependencies
+    validations:
+      required: true
