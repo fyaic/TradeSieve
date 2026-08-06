@@ -10,7 +10,7 @@ TradeSieve is designed as an independently deployable service beside CRM, order,
 
 ## Project status
 
-**Phase 1 is planned; no runnable MVP exists yet.** The current repository is a reviewed product, research, architecture, contract, and delivery baseline. The [target MVP user experience](docs/getting-started/mvp-user-experience.md) is an acceptance contract, not a working quickstart until implementation and release gates pass.
+**Phase 1 implementation has started; no runnable service MVP exists yet.** The repository includes a locked Python project skeleton and CI quality gates in addition to the reviewed product, research, architecture, contract, and delivery baseline. The [target MVP user experience](docs/getting-started/mvp-user-experience.md) is an acceptance contract, not a working service quickstart until implementation and release gates pass.
 
 Nothing in this repository is legal advice or an automatic legal-clearance mechanism.
 
@@ -61,9 +61,13 @@ See [Phase 1 service MVP](docs/product/mvp-scope.md), [delivery plan](docs/deliv
 | `api/openapi/` | Versioned canonical HTTP contract |
 | `examples/` | Synthetic requests and safe expected responses |
 | `research/sources.yaml` | Machine-readable source registry |
+| `src/tradesieve/` | Python domain/application/port package skeleton |
+| `tests/` | Unit and architecture-boundary tests |
 | `scripts/` | Repository and contract checks |
 
 Start with the [documentation index](docs/README.md).
+
+Developers can reproduce all current local gates from a clean checkout with `./scripts/check.sh`; see the [development setup](docs/getting-started/development.md) for pinned prerequisites and scope.
 
 ## Current contract artifacts
 

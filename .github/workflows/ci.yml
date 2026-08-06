@@ -1,0 +1,73 @@
+name: Python CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: python-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_NO_PROGRESS: "1"
+
+jobs:
+  quality-and-tests:
+    name: Format, lint, type, unit, architecture, build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned uv and Python
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.1"
+          python-version: "3.13.14"
+          enable-cache: true
+      - name: Verify lock and install dependencies
+        run: |
+          uv lock --check
+          uv sync --locked --all-groups
+      - name: Check formatting
+        run: uv run --locked ruff format --check .
+      - name: Lint
+        run: uv run --locked ruff check .
+      - name: Type check
+        run: uv run --locked mypy
+      - name: Run unit and architecture tests
+        run: uv run --locked pytest
+      - name: Build package
+        run: uv build
+
+  security:
+    name: Secret and dependency checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install pinned uv and Python
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.1"
+          python-version: "3.13.14"
+          enable-cache: true
+      - name: Install locked dependencies
+        run: uv sync --locked --all-groups
+      - name: Scan tracked files for secrets
+        run: git ls-files -z | xargs -0 uv run --locked detect-secrets-hook --baseline .secrets.baseline
+      - name: Audit Python dependencies
+        run: |
+          set -o pipefail
+          uv export --locked --all-groups --no-emit-project --format requirements-txt \
+            | uv run --locked pip-audit --requirement /dev/stdin --strict --progress-spinner off

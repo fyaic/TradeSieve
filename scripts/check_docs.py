@@ -9,8 +9,16 @@ import sys
 from pathlib import Path
 from urllib.parse import unquote
 
-
 ROOT = Path(__file__).resolve().parents[1]
+IGNORED_PARTS = {
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "build",
+    "dist",
+}
 REQUIRED = (
     "AGENTS.md",
     "README.md",
@@ -68,7 +76,9 @@ def check_local_links(path: Path, text: str) -> list[str]:
         try:
             resolved.relative_to(ROOT)
         except ValueError:
-            errors.append(f"{path.relative_to(ROOT)}: link escapes repository: {target}")
+            errors.append(
+                f"{path.relative_to(ROOT)}: link escapes repository: {target}"
+            )
             continue
         if not resolved.exists():
             errors.append(f"{path.relative_to(ROOT)}: broken local link: {target}")
@@ -166,7 +176,9 @@ def validate_instance(
         if "items" in schema:
             for index, item in enumerate(instance):
                 errors.extend(
-                    validate_instance(item, schema["items"], document, f"{path}[{index}]")
+                    validate_instance(
+                        item, schema["items"], document, f"{path}[{index}]"
+                    )
                 )
     elif isinstance(instance, str):
         if len(instance) < schema.get("minLength", 0):
@@ -184,7 +196,9 @@ def check_openapi() -> list[str]:
     errors: list[str] = []
     spec_path = ROOT / "api/openapi/tradesieve.v1.json"
     request_path = ROOT / "examples/requests/transaction-screening.json"
-    response_path = ROOT / "examples/responses/transaction-screening.review-required.json"
+    response_path = (
+        ROOT / "examples/responses/transaction-screening.review-required.json"
+    )
     try:
         spec = load_json_text(spec_path.read_text(encoding="utf-8"))
         request = load_json_text(request_path.read_text(encoding="utf-8"))
@@ -201,7 +215,9 @@ def check_openapi() -> list[str]:
         for operation in path_item.values():
             if isinstance(operation, dict) and "operationId" in operation:
                 operation_ids.append(operation["operationId"])
-    duplicates = sorted({item for item in operation_ids if operation_ids.count(item) > 1})
+    duplicates = sorted(
+        {item for item in operation_ids if operation_ids.count(item) > 1}
+    )
     if duplicates:
         errors.append(f"OpenAPI duplicate operationId values: {duplicates}")
 
@@ -214,7 +230,9 @@ def check_openapi() -> list[str]:
     request_schema = spec["components"]["schemas"]["ScreeningRequest"]
     response_schema = spec["components"]["schemas"]["ScreeningResult"]
     errors.extend(validate_instance(request, request_schema, spec, "request example"))
-    errors.extend(validate_instance(response, response_schema, spec, "response example"))
+    errors.extend(
+        validate_instance(response, response_schema, spec, "response example")
+    )
 
     for numeric_type in ("number", "integer"):
         if not validate_instance(True, {"type": numeric_type}, spec, "boolean fixture"):
@@ -275,7 +293,10 @@ def check_openapi() -> list[str]:
     decision_action = spec["components"]["schemas"]["DecisionScope"]["properties"][
         "proposed_action"
     ]
-    if screening_action != proposed_action_ref or decision_action != proposed_action_ref:
+    if (
+        screening_action != proposed_action_ref
+        or decision_action != proposed_action_ref
+    ):
         errors.append("OpenAPI intake and decision scopes do not share ProposedAction")
     return errors
 
@@ -288,7 +309,7 @@ def main() -> int:
 
     checked = 0
     for path in sorted(ROOT.rglob("*")):
-        if not path.is_file() or ".git" in path.parts:
+        if not path.is_file() or any(part in IGNORED_PARTS for part in path.parts):
             continue
         if path.suffix.lower() not in {".md", ".yaml", ".yml", ".json", ".py", ".sh"}:
             continue
@@ -326,13 +347,15 @@ def main() -> int:
 
     old_repository_url = "github.com/" + "veil-chow-fyaic" + "/TradeSieve"
     for path in sorted(ROOT.rglob("*")):
-        if path.is_file() and ".git" not in path.parts:
+        if path.is_file() and not any(part in IGNORED_PARTS for part in path.parts):
             try:
                 text = path.read_text(encoding="utf-8")
             except UnicodeDecodeError:
                 continue
             if old_repository_url in text:
-                errors.append(f"{path.relative_to(ROOT)}: stale pre-transfer repository URL")
+                errors.append(
+                    f"{path.relative_to(ROOT)}: stale pre-transfer repository URL"
+                )
 
     if errors:
         print("Documentation checks failed:")
@@ -340,7 +363,9 @@ def main() -> int:
             print(f"- {error}")
         return 1
 
-    print(f"Documentation checks passed ({checked} files, {source_count} registered sources).")
+    print(
+        f"Documentation checks passed ({checked} files, {source_count} registered sources)."
+    )
     return 0
 
 
