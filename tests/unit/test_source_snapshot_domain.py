@@ -822,6 +822,29 @@ def test_parse_or_validation_success_never_activates_without_human_steps() -> No
     assert lifecycle.activated_snapshots == ()
 
 
+def test_fold_rejects_validation_against_stale_active_predecessor() -> None:
+    first_raw = raw_metadata(b"first")
+    first = snapshot(raw=first_raw)
+    first_events = accepted_events(first_raw, first)
+    second_raw = raw_metadata(b"second")
+    second = snapshot(raw=second_raw)
+    stale_report = validation_report_for(second, None)
+    stale_events = first_events + (
+        lifecycle_event(7, SourceSnapshotEventType.RETRIEVED, second_raw, None),
+        lifecycle_event(8, SourceSnapshotEventType.QUARANTINED, second_raw, None),
+        lifecycle_event(9, SourceSnapshotEventType.PARSED, second_raw, second),
+        lifecycle_event(
+            10,
+            SourceSnapshotEventType.VALIDATED,
+            second_raw,
+            second,
+            report=stale_report,
+        ),
+    )
+    with pytest.raises(InvalidSourceSnapshotTransition):
+        fold_source_snapshot_events(stale_events)
+
+
 def test_validation_failure_stays_quarantined_and_blocks_approval() -> None:
     raw = raw_metadata()
     parsed = snapshot(raw=raw, schema_id="wrong-schema")

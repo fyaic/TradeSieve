@@ -336,6 +336,35 @@ class InMemorySourceSnapshotRepository:
                 self._raise_if_atomic_failure()
                 self._audits[scope] = audits
                 return LifecycleWriteOutcome.IDEMPOTENT
+            if event.event_type is SourceSnapshotEventType.ACTIVATED:
+                validation_events = tuple(
+                    candidate
+                    for candidate in current_events
+                    if candidate.event_type is SourceSnapshotEventType.VALIDATED
+                    and candidate.snapshot == event.snapshot
+                )
+                if len(validation_events) != 1:
+                    raise SourceSnapshotPersistenceError
+                validation = validation_events[0]
+                report = validation.validation_report
+                if report is None:
+                    raise SourceSnapshotPersistenceError
+                try:
+                    valid_report = (
+                        report.passed
+                        and validation.raw_object == event.raw_object
+                        and report.snapshot == event.snapshot
+                        and report.diff.new_snapshot == event.snapshot
+                        and report.recomputed_content_hash() == report.content_hash
+                        and report.diff.recomputed_content_hash()
+                        == report.diff.content_hash
+                    )
+                except (AttributeError, TypeError, ValueError):
+                    valid_report = False
+                if not valid_report:
+                    raise SourceSnapshotPersistenceError
+                if report.diff.previous_snapshot != lifecycle.active_snapshot:
+                    return LifecycleWriteOutcome.CONFLICT
             events = current_events + (event,)
             try:
                 fold_source_snapshot_events(events)
@@ -443,6 +472,16 @@ class InMemorySourceSnapshotRepository:
     ) -> LifecycleWriteOutcome:
         self._require_unused_event_id(scope, event.event_id)
         current_events, lifecycle = self._verified_lifecycle(scope)
+        if event.event_type in {
+            SourceSnapshotEventType.VALIDATION_FAILED,
+            SourceSnapshotEventType.VALIDATED,
+        }:
+            report = event.validation_report
+            if (
+                report is None
+                or report.diff.previous_snapshot != lifecycle.active_snapshot
+            ):
+                return LifecycleWriteOutcome.CONFLICT
         responsible = semantically_applied_lifecycle_transition(
             event, lifecycle, current_events
         )
@@ -467,8 +506,15 @@ class InMemorySourceSnapshotRepository:
     ) -> tuple[tuple[SourceSnapshotLifecycleEvent, ...], SourceSnapshotLifecycle]:
         events = self._events.get(scope, ())
         try:
+            for event in events:
+                self._verify_lifecycle_event(event)
             lifecycle = fold_source_snapshot_events(events)
-        except (InvalidSourceSnapshotTransition, ValueError) as exc:
+        except (
+            AttributeError,
+            InvalidSourceSnapshotTransition,
+            TypeError,
+            ValueError,
+        ) as exc:
             raise SourceSnapshotPersistenceError from exc
         self._verify_all_scope_artifacts(scope)
         self._verified_audits(scope)
@@ -599,9 +645,12 @@ class InMemorySourceSnapshotRepository:
         events = self._events.get(scope, ())
         event_ids = {event.event_id for event in events}
         for audit in audits:
+            try:
+                self._verify_command_audit(audit)
+            except (AttributeError, TypeError, ValueError) as exc:
+                raise SourceSnapshotPersistenceError from exc
             if (
-                not isinstance(audit, SnapshotCommandAuditRecord)
-                or (audit.deployment_id, audit.source_id) != scope
+                (audit.deployment_id, audit.source_id) != scope
                 or audit.command_event_id in command_ids
                 or (
                     audit.lifecycle_event_id is not None
@@ -651,6 +700,52 @@ class InMemorySourceSnapshotRepository:
                     raise SourceSnapshotPersistenceError from exc
             command_ids.add(audit.command_event_id)
         return audits
+
+    @staticmethod
+    def _verify_lifecycle_event(event: SourceSnapshotLifecycleEvent) -> None:
+        if not isinstance(event, SourceSnapshotLifecycleEvent):
+            raise TypeError("lifecycle event must be typed")
+        rebuilt = SourceSnapshotLifecycleEvent(
+            sequence=event.sequence,
+            event_id=event.event_id,
+            deployment_id=event.deployment_id,
+            source_id=event.source_id,
+            event_type=event.event_type,
+            raw_object=event.raw_object,
+            snapshot=event.snapshot,
+            previous_active_snapshot=event.previous_active_snapshot,
+            actor_id=event.actor_id,
+            actor_type=event.actor_type,
+            reason=event.reason,
+            occurred_at=event.occurred_at,
+            validation_report=event.validation_report,
+        )
+        if rebuilt != event:
+            raise ValueError("lifecycle event failed reconstruction")
+
+    @staticmethod
+    def _verify_command_audit(audit: SnapshotCommandAuditRecord) -> None:
+        if not isinstance(audit, SnapshotCommandAuditRecord):
+            raise TypeError("command audit must be typed")
+        rebuilt = SnapshotCommandAuditRecord(
+            command_event_id=audit.command_event_id,
+            authorization_event_id=audit.authorization_event_id,
+            lifecycle_event_id=audit.lifecycle_event_id,
+            tenant_id=audit.tenant_id,
+            deployment_id=audit.deployment_id,
+            source_id=audit.source_id,
+            raw_object_id=audit.raw_object_id,
+            snapshot_id=audit.snapshot_id,
+            snapshot_content_hash=audit.snapshot_content_hash,
+            actor_id=audit.actor_id,
+            actor_type=audit.actor_type,
+            operation=audit.operation,
+            outcome=audit.outcome,
+            reason=audit.reason,
+            occurred_at=audit.occurred_at,
+        )
+        if rebuilt != audit:
+            raise ValueError("command audit failed reconstruction")
 
     def _scope_has_repository_state(self, scope: SourceKey) -> bool:
         return (

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -312,6 +312,57 @@ def persist_active(
         repository.activate_or_rollback_atomic(
             events[5], observation_for(events[5], raw), *audit_pair(events[5])
         )
+        is LifecycleWriteOutcome.APPLIED
+    )
+    return events
+
+
+def persist_approved(
+    repository: InMemorySourceSnapshotRepository,
+    raw: RawObjectMetadata,
+    snapshot: ParsedSourceSnapshot,
+) -> tuple[SourceSnapshotLifecycleEvent, ...]:
+    validation = report_for(snapshot)
+    events = (
+        event(1, SourceSnapshotEventType.RETRIEVED, raw, None),
+        event(2, SourceSnapshotEventType.QUARANTINED, raw, None),
+        event(3, SourceSnapshotEventType.PARSED, raw, snapshot),
+        event(
+            4,
+            SourceSnapshotEventType.VALIDATED,
+            raw,
+            snapshot,
+            report=validation,
+        ),
+        event(
+            5,
+            SourceSnapshotEventType.APPROVED,
+            raw,
+            snapshot,
+            actor_id="source-approver-1",
+            actor_type=LifecycleActorType.HUMAN,
+        ),
+    )
+    assert (
+        repository.save_retrieval_atomic(raw, events[0], *audit_pair(events[0]))
+        is ArtifactWriteOutcome.APPLIED
+    )
+    assert (
+        repository.append_lifecycle_atomic(events[1], *audit_pair(events[1]))
+        is LifecycleWriteOutcome.APPLIED
+    )
+    assert (
+        repository.save_parsed_snapshot_atomic(
+            snapshot, events[2], *audit_pair(events[2])
+        )
+        is ArtifactWriteOutcome.APPLIED
+    )
+    assert (
+        repository.append_lifecycle_atomic(events[3], *audit_pair(events[3]))
+        is LifecycleWriteOutcome.APPLIED
+    )
+    assert (
+        repository.append_lifecycle_atomic(events[4], *audit_pair(events[4]))
         is LifecycleWriteOutcome.APPLIED
     )
     return events
@@ -1087,6 +1138,244 @@ def test_activation_observation_must_be_typed_and_strictly_monotonic() -> None:
         )
         is LifecycleWriteOutcome.CONFLICT
     )
+
+
+def test_validation_atomic_write_rejects_stale_active_predecessor() -> None:
+    repository = InMemorySourceSnapshotRepository()
+    first_raw, _ = raw_object(b"first")
+    first = parsed_snapshot(first_raw, value="FIRST")
+    persist_active(repository, first_raw, first)
+
+    second_raw, _ = raw_object(b"second", retrieved_at=NOW + timedelta(minutes=1))
+    second = parsed_snapshot(second_raw, value="SECOND")
+    retrieved = event(7, SourceSnapshotEventType.RETRIEVED, second_raw, None)
+    quarantined = event(8, SourceSnapshotEventType.QUARANTINED, second_raw, None)
+    parsed = event(9, SourceSnapshotEventType.PARSED, second_raw, second)
+    repository.save_retrieval_atomic(second_raw, retrieved, *audit_pair(retrieved))
+    repository.append_lifecycle_atomic(quarantined, *audit_pair(quarantined))
+    repository.save_parsed_snapshot_atomic(second, parsed, *audit_pair(parsed))
+
+    stale_report = report_for(second, None)
+    stale_validation = event(
+        10,
+        SourceSnapshotEventType.VALIDATED,
+        second_raw,
+        second,
+        report=stale_report,
+    )
+    before_events = repository.list_lifecycle_events(
+        first_raw.deployment_id, first_raw.source_id, limit=32
+    )
+    before_audits = repository.list_command_audits(
+        first_raw.deployment_id, first_raw.source_id, limit=32
+    )
+    assert (
+        repository.append_lifecycle_atomic(
+            stale_validation, *audit_pair(stale_validation)
+        )
+        is LifecycleWriteOutcome.CONFLICT
+    )
+    assert (
+        repository.list_lifecycle_events(
+            first_raw.deployment_id, first_raw.source_id, limit=32
+        )
+        == before_events
+    )
+    assert (
+        repository.list_command_audits(
+            first_raw.deployment_id, first_raw.source_id, limit=32
+        )
+        == before_audits
+    )
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    ["missing_validation", "missing_report", "raising_report", "invalid_report"],
+)
+def test_activation_atomic_write_rejects_corrupt_validation_evidence(
+    monkeypatch: pytest.MonkeyPatch, corruption: str
+) -> None:
+    repository = InMemorySourceSnapshotRepository()
+    raw, _ = raw_object()
+    snapshot = parsed_snapshot(raw)
+    events = persist_approved(repository, raw, snapshot)
+    _, lifecycle = repository.get_lifecycle_snapshot(raw.deployment_id, raw.source_id)
+    current_events = events
+    if corruption == "missing_validation":
+        current_events = events[:3] + events[4:]
+    elif corruption == "missing_report":
+        object.__setattr__(events[3], "validation_report", None)
+    elif corruption == "raising_report":
+
+        class RaisingReport:
+            @property
+            def passed(self) -> bool:
+                raise ValueError("corrupt report")
+
+        object.__setattr__(events[3], "validation_report", RaisingReport())
+    else:
+        report = events[3].validation_report
+        assert report is not None
+        object.__setattr__(report, "reasons", (object(),))
+    monkeypatch.setattr(
+        repository,
+        "_verified_lifecycle",
+        lambda _scope: (current_events, lifecycle),
+    )
+    activation = event(
+        6,
+        SourceSnapshotEventType.ACTIVATED,
+        raw,
+        snapshot,
+        actor_id="source-approver-1",
+        actor_type=LifecycleActorType.HUMAN,
+    )
+    with pytest.raises(SourceSnapshotPersistenceError):
+        repository.activate_or_rollback_atomic(
+            activation,
+            observation_for(activation, raw),
+            *audit_pair(activation, suffix=f"-{corruption}"),
+        )
+
+
+def test_activation_atomic_write_maps_invalid_transition_to_conflict() -> None:
+    repository = InMemorySourceSnapshotRepository()
+    raw, _ = raw_object()
+    snapshot = parsed_snapshot(raw)
+    persist_approved(repository, raw, snapshot)
+    creator_activation = event(
+        6,
+        SourceSnapshotEventType.ACTIVATED,
+        raw,
+        snapshot,
+        actor_id="source-operator-1",
+        actor_type=LifecycleActorType.HUMAN,
+    )
+    assert (
+        repository.activate_or_rollback_atomic(
+            creator_activation,
+            observation_for(creator_activation, raw),
+            *audit_pair(creator_activation, suffix="-creator"),
+        )
+        is LifecycleWriteOutcome.CONFLICT
+    )
+
+
+def test_verified_reads_and_pointer_write_reject_mutated_validation_report() -> None:
+    repository = InMemorySourceSnapshotRepository()
+    raw, _ = raw_object()
+    snapshot = parsed_snapshot(raw)
+    events = persist_approved(repository, raw, snapshot)
+    report = events[3].validation_report
+    assert report is not None
+    scope = (raw.deployment_id, raw.source_id)
+    stored_events = repository._events[scope]  # noqa: SLF001
+    stored_audits = repository._audits[scope]  # noqa: SLF001
+    object.__setattr__(report, "content_hash", f"sha256:{'f' * 64}")
+
+    with pytest.raises(SourceSnapshotPersistenceError):
+        repository.get_lifecycle_snapshot(*scope)
+    with pytest.raises(SourceSnapshotPersistenceError):
+        repository.list_lifecycle_events(*scope, limit=16)
+    with pytest.raises(SourceSnapshotPersistenceError):
+        repository.list_command_audits(*scope, limit=16)
+
+    activation = event(
+        6,
+        SourceSnapshotEventType.ACTIVATED,
+        raw,
+        snapshot,
+        actor_id="source-approver-1",
+        actor_type=LifecycleActorType.HUMAN,
+    )
+    with pytest.raises(SourceSnapshotPersistenceError):
+        repository.activate_or_rollback_atomic(
+            activation,
+            observation_for(activation, raw),
+            *audit_pair(activation, suffix="-corrupt-report"),
+        )
+    assert repository._events[scope] == stored_events  # noqa: SLF001
+    assert repository._audits[scope] == stored_audits  # noqa: SLF001
+    assert scope not in repository._observations  # noqa: SLF001
+
+
+def test_verified_reads_reject_mutated_standalone_failure_audit() -> None:
+    repository = InMemorySourceSnapshotRepository()
+    raw, _ = raw_object()
+    snapshot = parsed_snapshot(raw)
+    events = persist_approved(repository, raw, snapshot)
+    standalone = failure_audit(events[-1], suffix="-standalone")
+    repository.append_command_audit(standalone)
+    object.__setattr__(standalone, "reason", SnapshotCommandReason.APPROVED)
+    with pytest.raises(SourceSnapshotPersistenceError):
+        repository.list_command_audits(raw.deployment_id, raw.source_id, limit=16)
+    with pytest.raises(SourceSnapshotPersistenceError):
+        repository.get_lifecycle_snapshot(raw.deployment_id, raw.source_id)
+
+
+def test_integrity_reconstruction_rejects_untyped_and_unequal_records() -> None:
+    with pytest.raises(TypeError, match="event must be typed"):
+        InMemorySourceSnapshotRepository._verify_lifecycle_event(  # noqa: SLF001
+            cast(Any, object())
+        )
+    with pytest.raises(TypeError, match="audit must be typed"):
+        InMemorySourceSnapshotRepository._verify_command_audit(  # noqa: SLF001
+            cast(Any, object())
+        )
+
+    raw, _ = raw_object()
+
+    class UnequalEvent(SourceSnapshotLifecycleEvent):
+        def __eq__(self, other: object) -> bool:
+            del other
+            return False
+
+    base_event = event(1, SourceSnapshotEventType.RETRIEVED, raw, None)
+    unequal_event = UnequalEvent(
+        sequence=base_event.sequence,
+        event_id=base_event.event_id,
+        deployment_id=base_event.deployment_id,
+        source_id=base_event.source_id,
+        event_type=base_event.event_type,
+        raw_object=base_event.raw_object,
+        snapshot=base_event.snapshot,
+        previous_active_snapshot=base_event.previous_active_snapshot,
+        actor_id=base_event.actor_id,
+        actor_type=base_event.actor_type,
+        reason=base_event.reason,
+        occurred_at=base_event.occurred_at,
+        validation_report=base_event.validation_report,
+    )
+    with pytest.raises(ValueError, match="event failed reconstruction"):
+        InMemorySourceSnapshotRepository._verify_lifecycle_event(unequal_event)  # noqa: SLF001
+
+    base_audit = audit(base_event, SnapshotCommandReason.RETRIEVED, applied=True)
+
+    class UnequalAudit(SnapshotCommandAuditRecord):
+        def __eq__(self, other: object) -> bool:
+            del other
+            return False
+
+    unequal_audit = UnequalAudit(
+        command_event_id=base_audit.command_event_id,
+        authorization_event_id=base_audit.authorization_event_id,
+        lifecycle_event_id=base_audit.lifecycle_event_id,
+        tenant_id=base_audit.tenant_id,
+        deployment_id=base_audit.deployment_id,
+        source_id=base_audit.source_id,
+        raw_object_id=base_audit.raw_object_id,
+        snapshot_id=base_audit.snapshot_id,
+        snapshot_content_hash=base_audit.snapshot_content_hash,
+        actor_id=base_audit.actor_id,
+        actor_type=base_audit.actor_type,
+        operation=base_audit.operation,
+        outcome=base_audit.outcome,
+        reason=base_audit.reason,
+        occurred_at=base_audit.occurred_at,
+    )
+    with pytest.raises(ValueError, match="audit failed reconstruction"):
+        InMemorySourceSnapshotRepository._verify_command_audit(unequal_audit)  # noqa: SLF001
 
 
 def test_artifact_reads_reject_scope_swaps_and_unreferenced_metadata_rows() -> None:

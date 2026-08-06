@@ -124,6 +124,8 @@ class SnapshotCommandReason(StrEnum):
     CREATOR_SEPARATION_DENIED = "CREATOR_SEPARATION_DENIED"
     VALIDATION_BLOCKED = "VALIDATION_BLOCKED"
     INVALID_LIFECYCLE = "INVALID_LIFECYCLE"
+    PARSER_REJECTED = "PARSER_REJECTED"
+    MEDIA_BINDING_DENIED = "MEDIA_BINDING_DENIED"
     PERSISTENCE_FAILURE = "PERSISTENCE_FAILURE"
 
 
@@ -1512,9 +1514,12 @@ def fold_source_snapshot_events(
             SourceSnapshotEventType.VALIDATED,
         }:
             assert snapshot is not None
+            report = event.validation_report
             if (
-                snapshot_states.get(snapshot) is not SourceSnapshotState.PARSED
+                report is None
+                or snapshot_states.get(snapshot) is not SourceSnapshotState.PARSED
                 or snapshot_raw.get(snapshot) != raw
+                or report.diff.previous_snapshot != active
             ):
                 raise InvalidSourceSnapshotTransition
             if event_type is SourceSnapshotEventType.VALIDATION_FAILED:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from types import MappingProxyType
 from typing import Protocol
 
 from tradesieve.domain.source_registry import SourceRuntimeObservation
@@ -25,6 +26,61 @@ class FiniteParserId(StrEnum):
     """Closed Phase 1 parser inventory; callers cannot select executable code."""
 
     SYNTHETIC_JSON_V1 = "synthetic-json-v1"
+
+
+SYNTHETIC_SCHEMA_ID = "tradesieve-synthetic-source-v1"
+SYNTHETIC_PARSER_VERSION = "1.0.0"
+SYNTHETIC_MEDIA_TYPE = "application/json"
+SYNTHETIC_CHARSET = "utf-8"
+
+
+class FiniteParserErrorCode(StrEnum):
+    INVALID_INPUT = "INVALID_INPUT"
+    CONTENT_TOO_LARGE = "CONTENT_TOO_LARGE"
+    BOM_NOT_ALLOWED = "BOM_NOT_ALLOWED"
+    INVALID_ENCODING = "INVALID_ENCODING"
+    INVALID_JSON = "INVALID_JSON"
+    DUPLICATE_KEY = "DUPLICATE_KEY"
+    FLOAT_NOT_ALLOWED = "FLOAT_NOT_ALLOWED"
+    NON_FINITE_NUMBER = "NON_FINITE_NUMBER"
+    UNSAFE_NESTING = "UNSAFE_NESTING"
+    UNKNOWN_FIELD = "UNKNOWN_FIELD"
+    INVALID_SHAPE = "INVALID_SHAPE"
+    SCHEMA_MISMATCH = "SCHEMA_MISMATCH"
+    VALUE_OUT_OF_BOUNDS = "VALUE_OUT_OF_BOUNDS"
+
+
+FINITE_PARSER_ERROR_MESSAGES = MappingProxyType(
+    {
+        FiniteParserErrorCode.INVALID_INPUT: "synthetic source input is invalid",
+        FiniteParserErrorCode.CONTENT_TOO_LARGE: "synthetic source exceeds byte limit",
+        FiniteParserErrorCode.BOM_NOT_ALLOWED: "synthetic source must not contain a BOM",
+        FiniteParserErrorCode.INVALID_ENCODING: "synthetic source must be strict UTF-8",
+        FiniteParserErrorCode.INVALID_JSON: "synthetic source is not one JSON document",
+        FiniteParserErrorCode.DUPLICATE_KEY: "synthetic source contains a duplicate key",
+        FiniteParserErrorCode.FLOAT_NOT_ALLOWED: "synthetic source floats are not allowed",
+        FiniteParserErrorCode.NON_FINITE_NUMBER: (
+            "synthetic source non-finite numbers are not allowed"
+        ),
+        FiniteParserErrorCode.UNSAFE_NESTING: "synthetic source nesting is unsafe",
+        FiniteParserErrorCode.UNKNOWN_FIELD: "synthetic source contains an unknown field",
+        FiniteParserErrorCode.INVALID_SHAPE: "synthetic source shape is invalid",
+        FiniteParserErrorCode.SCHEMA_MISMATCH: "synthetic source schema is unsupported",
+        FiniteParserErrorCode.VALUE_OUT_OF_BOUNDS: (
+            "synthetic source value exceeds a safe bound"
+        ),
+    }
+)
+
+
+class FiniteParserError(Exception):
+    """Stable, bounded parse failure that never includes source content."""
+
+    def __init__(self, code: FiniteParserErrorCode) -> None:
+        if not isinstance(code, FiniteParserErrorCode):
+            raise ValueError("finite parser error code must be typed")
+        self.code = code
+        super().__init__(FINITE_PARSER_ERROR_MESSAGES[code])
 
 
 @dataclass(frozen=True, slots=True)

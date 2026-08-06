@@ -1,13 +1,14 @@
 # Immutable source snapshot boundary
 
-**Status:** TS-202 Slice A implements domain invariants, authorization policy,
-ports, and in-memory reference adapters only. The finite synthetic parser,
-application commands, PostgreSQL/object-volume adapters, migration, runtime wiring,
-and demo commands remain later TS-202 slices.
+**Status:** TS-202 Slice B implements the immutable domain, one finite synthetic
+JSON parser, the complete authorized in-memory application workflow, bounded safe
+queries, and exact official-citation resolution. Private local-volume storage,
+PostgreSQL adapters/migrations, runtime and demo wiring, CLI/REST/MCP surfaces, and
+real source integrations remain explicitly deferred to Slices C and D.
 
 ## Implemented boundary
 
-The Slice A domain keeps four concerns distinct:
+The domain keeps four concerns distinct:
 
 | Concern | Authority and invariant |
 | --- | --- |
@@ -34,8 +35,8 @@ a parser-version change is material and inspectable.
 
 ## Module map
 
-Slice A remains in one cohesive domain module to keep the hash/content helpers and
-cross-object invariants non-circular:
+The hash/content helpers and cross-object invariants remain cohesive while the
+parser, command workflow, and read boundary are separate application concerns:
 
 | Module | Responsibility |
 | --- | --- |
@@ -43,16 +44,75 @@ cross-object invariants non-circular:
 | `tradesieve.application.auth` | Explicit retrieve/parse/validate/approve/activate/rollback deny-default policies |
 | `tradesieve.ports.source_snapshot` | Closed synthetic parser inventory, immutable object-store port, and named repository/UoW transaction boundaries |
 | `tradesieve.adapters.in_memory_source_snapshot` | Locking copy-on-write reference object store/repository used to prove idempotence, conflicts, corruption detection, and atomic projections |
+| `tradesieve.adapters.synthetic_source_parser` | Strict UTF-8, duplicate-key-safe, no-float, bounded JSON parser for the one registered synthetic schema |
+| `tradesieve.application.source_snapshot` | Exact authorization binding and ingest, parse, validate, approve, activate, and rollback orchestration |
+| `tradesieve.application.source_snapshot_query` | Bounded redacted list/detail/history DTOs plus exact accepted-snapshot citation verification for TS-205 |
 
-No application workflow or parser implementation lives in these modules. There is
-no caller-selected parser/plugin seam, filesystem adapter, PostgreSQL table, migration,
-REST/MCP raw export, real data, or network retrieval in Slice A.
+There is no caller-selected parser/plugin seam. There is also no filesystem adapter,
+PostgreSQL table or migration, runtime registration, CLI/REST/MCP endpoint, raw export,
+real data, or network retrieval in Slice B.
+
+## Finite parser and application workflow
+
+The built-in parser accepts exactly `application/json`, strict UTF-8, parser
+`synthetic-json-v1` version `1.0.0`, and schema
+`tradesieve-synthetic-source-v1`. It rejects BOMs, duplicate keys, floats and
+non-finite numbers, unknown fields, unsafe nesting, malformed shapes, and values or
+collections outside the shared domain bounds. Source bytes never select code or a
+plugin.
+
+`SourceSnapshotService` implements the complete Slice B state path:
+
+1. ingest verifies exact source registration, media binding, byte bounds, immutable
+   raw identity, quarantine, and linked command-audit persistence;
+2. parse reads verified immutable bytes through the object-store port and persists
+   the content-addressed parsed snapshot;
+3. validate computes the schema/count/record/diff report against the active accepted
+   predecessor and records either `VALIDATED` or `VALIDATION_FAILED`;
+4. approve and activate require exact immutable identity, a distinct authorized human,
+   and retry-safe lifecycle evidence; and
+5. rollback can select only a previously activated, still accepted snapshot and moves
+   the active pointer atomically.
+
+All command retries prove semantic idempotence against the stored event and audit.
+Conflicting retries, forged authorization objects, moved/missing registrations, parser
+failures, and repository or integrity failures return bounded application errors and
+cannot create accepted state.
+
+## Safe queries and citation verification
+
+`SourceSnapshotQueryService` authorizes `SOURCE_READ` against the exact configured
+tenant/deployment/source-set/source target. Human, service, and agent identities may
+read with `source:read`; no mutation role is inferred. Exact registration membership
+is required, but an inactive registration remains inspectable for historical evidence.
+
+List, detail, and latest-history results are deterministic and bounded by the shared
+512-item query limit. They expose only artifact IDs/hashes, byte length, media/charset,
+finite parser/schema versions, counts, UTC times, lifecycle state, validation codes and
+hash summaries, and exact deterministic diff identifiers/hashes. They do **not** expose
+raw bytes, original filenames, native or normalized values, record/assertion locators,
+credentials, licence or contractual text, free-form lifecycle reasons, actor IDs,
+command/authorization audit identifiers, or exception bodies. Public queries use only
+verified repository metadata; they never read the raw object store and never mutate or
+append an audit.
+
+`SourceSnapshotOfficialCitationResolver` is the fail-closed TS-205 bridge. It returns
+`True` only when the citation has the exact control tenant and deployment, exact
+source-set registration, derived snapshot ID/hash, finite parser/raw bindings, verified
+repository and lifecycle integrity, a passing validation report, proof the snapshot was
+actually activated, an accepted state (`ACTIVE`, `SUPERSEDED`, or `ROLLED_BACK`), and a
+locator matching exactly one record or assertion in that snapshot. Zero or multiple
+matches, never-activated `PARSED`/`VALIDATED`/`APPROVED` snapshots, scope mismatches,
+malformed values, and dependency/integrity failures return exactly `False`. Historical
+activated snapshots remain verifiable after supersession or rollback. This verifies
+identity and provenance only; it makes no claim about legal authority, licence,
+completeness, or current source readiness.
 
 ## Authorization
 
-Read access continues to use `SOURCE_READ`. `SOURCE_SNAPSHOT_INGEST` names the future
-application workflow that retrieves immutable bytes/metadata and immediately records
-quarantine on normal success; parse and validate are separate operations. All three
+Read access uses `SOURCE_READ`. `SOURCE_SNAPSHOT_INGEST` retrieves immutable
+bytes/metadata and immediately records quarantine on normal success; parse and
+validate are separate operations. All three mutation operations
 require `source:operate`, a source-operator role, and a named human or service identity.
 Approve, activate, and rollback require a human identity, `source:approve`, a
 source-approver or compliance-owner role, an exact object grant, and a trusted creator
@@ -101,7 +161,8 @@ accepted later demo design uses a private local volume and no public raw-object 
 
 ## Deferred acceptance work
 
-Later TS-202 slices own the one finite built-in synthetic JSON parser and application
-commands, PostgreSQL migration/repository constraints, private local-volume storage,
-runtime/demo/CLI wiring, and Compose evidence. Production source choices, licences,
-role assignments, and legal/data coverage remain outside this synthetic proof.
+TS-202 Slices C and D own PostgreSQL migration/repository constraints, private
+local-volume storage, runtime/demo registration, CLI commands, and Compose evidence.
+No Slice B code is wired into REST, MCP, or a public raw-object surface. Production
+source selection, network retrieval, licences, role assignments, legal authority, and
+legal/data coverage remain outside this synthetic proof.
