@@ -9,7 +9,7 @@ TradeSieve is in Phase 1 planning and delivery. Contributions should deliver a l
 3. Link the change to an issue/requirement and state observable acceptance criteria in the pull request.
 4. Separate factual research from project recommendations; add primary-source links, access dates, and licence notes.
 5. Update OpenAPI/examples/CLI/MCP parity and migrations when the contract/data changes.
-6. Run `./scripts/check_docs.sh` and all implementation checks before marking the PR ready.
+6. Run `./scripts/check.sh` before marking an implementation PR ready; documentation-only changes may run `./scripts/check_docs.sh` plus the pinned OpenAPI lint command.
 7. Meet the [Definition of Done](docs/delivery/agile-operating-model.md); use a pull request rather than direct main pushes.
 
 ## Content safety

@@ -1,0 +1,69 @@
+[build-system]
+requires = ["hatchling==1.31.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tradesieve"
+version = "0.1.0.dev0"
+description = "Independent trade-compliance decision-support service"
+readme = "README.md"
+requires-python = ">=3.13,<3.15"
+license = { file = "LICENSE" }
+authors = [{ name = "fyaic" }]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "License :: Other/Proprietary License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Typing :: Typed",
+]
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "detect-secrets==1.5.0",
+    "hatchling==1.31.0",
+    "mypy==2.3.0",
+    "pip-audit==2.10.1",
+    "pytest==9.1.1",
+    "pytest-cov==7.1.0",
+    "ruff==0.16.1",
+]
+
+[tool.uv]
+required-version = "==0.12.1"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tradesieve"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["B", "E4", "E7", "E9", "F", "I", "SIM", "UP"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+addopts = [
+  "--strict-config",
+  "--strict-markers",
+  "--cov=tradesieve",
+  "--cov-report=term-missing",
+  "--cov-fail-under=100",
+]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["tradesieve"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
