@@ -10,12 +10,15 @@ from pydantic import ValidationError
 
 from tradesieve.application.contracts import (
     Case,
+    CaseStateChangedEventData,
     ClassificationCandidate,
     ClassificationScheme,
     DecisionScope,
     EventEnvelope,
     ExternalObject,
     GoodsLine,
+    HumanDecision,
+    HumanDecisionRecordedEventData,
     HumanDecisionRequest,
     HumanDecisionType,
     OwnershipControlRelationship,
@@ -25,6 +28,7 @@ from tradesieve.application.contracts import (
     RelationshipType,
     ScreeningRequest,
     ScreeningResult,
+    SourceStatus,
     VersionReference,
     VersionSet,
 )
@@ -90,6 +94,32 @@ def test_semantic_input_hash_excludes_trace_but_includes_business_scope() -> Non
     assert other_tenant.canonical_input_hash() != original.canonical_input_hash()
 
 
+def test_datetime_offsets_normalize_to_utc_for_json_and_semantic_hashes() -> None:
+    utc_payload = incomplete_request()
+    utc_payload["action_due_at"] = "2026-08-07T08:00:00Z"
+    offset_payload = copy.deepcopy(utc_payload)
+    offset_payload["action_due_at"] = "2026-08-07T16:00:00+08:00"
+
+    utc_request = ScreeningRequest.model_validate(utc_payload)
+    offset_request = ScreeningRequest.model_validate(offset_payload)
+    assert utc_request.model_dump(mode="json")["action_due_at"] == (
+        "2026-08-07T08:00:00Z"
+    )
+    assert offset_request.model_dump(mode="json") == utc_request.model_dump(mode="json")
+    assert offset_request.canonical_input_hash() == utc_request.canonical_input_hash()
+
+    utc_result_payload = minimal_result()
+    utc_result_payload["created_at"] = "2026-08-07T08:00:00Z"
+    offset_result_payload = copy.deepcopy(utc_result_payload)
+    offset_result_payload["created_at"] = "2026-08-07T16:00:00+08:00"
+    utc_result = ScreeningResult.model_validate(utc_result_payload)
+    offset_result = ScreeningResult.model_validate(offset_result_payload)
+    assert offset_result.model_dump(mode="json")["created_at"] == (
+        "2026-08-07T08:00:00Z"
+    )
+    assert offset_result.canonical_result_hash() == utc_result.canonical_result_hash()
+
+
 def test_structural_constraints_remain_fail_closed() -> None:
     payload = incomplete_request()
     payload["unexpected"] = "ignored only by an unsafe adapter"
@@ -100,6 +130,11 @@ def test_structural_constraints_remain_fail_closed() -> None:
     payload = incomplete_request()
     payload["action_due_at"] = "2026-08-07T08:00:00"
     with pytest.raises(ValidationError, match="timezone"):
+        ScreeningRequest.model_validate(payload)
+
+    payload = incomplete_request()
+    del payload["schema_version"]
+    with pytest.raises(ValidationError, match="Field required"):
         ScreeningRequest.model_validate(payload)
 
 
@@ -299,6 +334,14 @@ def test_valid_reference_graph_covers_all_typed_fact_groups() -> None:
 
 
 def test_relationship_windows_and_other_classification_names_are_structural() -> None:
+    with pytest.raises(ValidationError, match="cannot be self-referential"):
+        OwnershipControlRelationship(
+            relationship_ref="relationship-self",
+            from_party_ref="party-1",
+            to_party_ref="party-1",
+            relationship_type=RelationshipType.OWNERSHIP,
+        )
+
     with pytest.raises(
         ValidationError, match="valid_to must be on or after valid_from"
     ):
@@ -348,7 +391,7 @@ def test_relationship_windows_and_other_classification_names_are_structural() ->
 def test_money_rejects_json_numbers_before_float_rounding(payload: bytes) -> None:
     model = PaymentPath if b"payment_ref" in payload else GoodsLine
     with pytest.raises(
-        ValidationError, match="money amounts must be canonical decimal strings"
+        ValidationError, match="money amount must be a canonical decimal string"
     ):
         model.model_validate_json(payload)
 
@@ -362,16 +405,127 @@ def test_money_accepts_and_preserves_bounded_decimal_strings() -> None:
     )
 
     assert payment.model_dump(mode="json")["amount"] == "0.100001"
-    assert goods.model_dump(mode="json")["unit_value"] == "10.20"
-    assert goods.model_dump(mode="json")["total_value"] == "20.40"
+    assert goods.model_dump(mode="json")["unit_value"] == "10.2"
+    assert goods.model_dump(mode="json")["total_value"] == "20.4"
 
-    with pytest.raises(ValidationError, match="canonical decimal strings"):
+    equivalent = GoodsLine.model_validate_json(
+        b'{"line_ref":"line-1","unit_value":"10.200"}'
+    )
+    assert equivalent.model_dump(mode="json")["unit_value"] == "10.2"
+
+    integer = GoodsLine.model_validate_json(
+        b'{"line_ref":"line-1","unit_value":"100","total_value":"100.00"}'
+    )
+    assert integer.model_dump(mode="json")["unit_value"] == "100"
+    assert integer.model_dump(mode="json")["total_value"] == "100"
+    ten = GoodsLine.model_validate_json(b'{"line_ref":"line-1","unit_value":"10"}')
+    assert ten.model_dump(mode="json")["unit_value"] == "10"
+
+    first_payload = incomplete_request()
+    first_payload["goods"] = [{"line_ref": "line-1", "unit_value": "100"}]
+    second_payload = copy.deepcopy(first_payload)
+    second_payload["goods"] = [{"line_ref": "line-1", "unit_value": "100.00"}]
+    first = ScreeningRequest.model_validate(first_payload)
+    second = ScreeningRequest.model_validate(second_payload)
+    assert first.canonical_input_hash() == second.canonical_input_hash()
+
+    with pytest.raises(ValidationError, match="canonical decimal string"):
         PaymentPath.model_validate_json(b'{"payment_ref":"payment-1","amount":"01.00"}')
 
     for invalid in (b'"1e2"', b'"0"', b'"0.000000"'):
         payload = b'{"payment_ref":"payment-1","amount":' + invalid + b"}"
-        with pytest.raises(ValidationError, match="canonical decimal strings"):
+        with pytest.raises(ValidationError, match="canonical decimal string"):
             PaymentPath.model_validate_json(payload)
+
+
+def test_all_decimal_facts_reject_json_numbers_before_float_coercion() -> None:
+    with pytest.raises(ValidationError, match="quantity must be a canonical"):
+        GoodsLine.model_validate_json(
+            b'{"line_ref":"line-1","quantity":0.100000000000000001}'
+        )
+    with pytest.raises(ValidationError, match="percentage must be a canonical"):
+        OwnershipControlRelationship.model_validate_json(
+            b'{"relationship_ref":"r-1","from_party_ref":"p-1",'
+            b'"to_party_ref":"p-2","relationship_type":"OWNERSHIP",'
+            b'"ownership_percentage":25.000000000000001}'
+        )
+    with pytest.raises(ValidationError, match="confidence must be a canonical"):
+        ClassificationCandidate.model_validate_json(
+            b'{"candidate_ref":"c-1","scheme":"HS","code":"853710",'
+            b'"confidence":0.500000000000001}'
+        )
+
+
+def test_all_decimal_fact_lexical_forms_hash_identically() -> None:
+    first_payload = incomplete_request()
+    first_payload.update(
+        {
+            "parties": [
+                {
+                    "party_ref": "party-1",
+                    "roles": ["BENEFICIAL_OWNER"],
+                    "entity_type": "PERSON",
+                },
+                {
+                    "party_ref": "party-2",
+                    "roles": ["CUSTOMER"],
+                    "entity_type": "ORGANIZATION",
+                },
+            ],
+            "ownership_and_control": [
+                {
+                    "relationship_ref": "relationship-1",
+                    "from_party_ref": "party-1",
+                    "to_party_ref": "party-2",
+                    "relationship_type": "OWNERSHIP",
+                    "ownership_percentage": "25.5",
+                }
+            ],
+            "goods": [
+                {
+                    "line_ref": "line-1",
+                    "quantity": "10",
+                    "classification_candidates": [
+                        {
+                            "candidate_ref": "candidate-1",
+                            "scheme": "HS",
+                            "code": "853710",
+                            "confidence": "0.5",
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+    second_payload = copy.deepcopy(first_payload)
+    second_payload["ownership_and_control"] = [
+        {
+            "relationship_ref": "relationship-1",
+            "from_party_ref": "party-1",
+            "to_party_ref": "party-2",
+            "relationship_type": "OWNERSHIP",
+            "ownership_percentage": "25.5000",
+        }
+    ]
+    second_payload["goods"] = [
+        {
+            "line_ref": "line-1",
+            "quantity": "10.000000",
+            "classification_candidates": [
+                {
+                    "candidate_ref": "candidate-1",
+                    "scheme": "HS",
+                    "code": "853710",
+                    "confidence": "0.50000",
+                }
+            ],
+        }
+    ]
+
+    first = ScreeningRequest.model_validate(first_payload)
+    second = ScreeningRequest.model_validate(second_payload)
+    assert first.canonical_input_hash() == second.canonical_input_hash()
+    assert first.model_dump(mode="json") == second.model_dump(mode="json")
 
 
 def minimal_result() -> dict[str, object]:
@@ -452,6 +606,17 @@ def test_result_ids_and_required_evidence_references_are_unambiguous() -> None:
         ValidationError, match="unknown required evidence refs: missing-requirement"
     ):
         ScreeningResult.model_validate(dangling_payload)
+
+
+def test_semantic_result_hash_excludes_trace_and_itself() -> None:
+    result = ScreeningResult.model_validate(minimal_result())
+    retried = result.model_copy(update={"correlation_id": "correlation-retry-2"})
+    rehashed = result.model_copy(update={"result_hash": "sha256:" + "c" * 64})
+    changed = result.model_copy(update={"summary": "A materially changed result."})
+
+    assert retried.canonical_result_hash() == result.canonical_result_hash()
+    assert rehashed.canonical_result_hash() == result.canonical_result_hash()
+    assert changed.canonical_result_hash() != result.canonical_result_hash()
 
 
 def test_case_projection_keeps_evidence_and_version_provenance() -> None:
@@ -543,6 +708,102 @@ def test_human_clearance_requires_a_timezone_aware_expiry() -> None:
     assert closed.expires_at is None
 
 
+def test_clearance_expiry_invariants_apply_to_records_and_events() -> None:
+    decision_payload = {
+        "decision": "HUMAN_CLEARED",
+        "scope": {
+            "proposed_action": "QUOTE_RELEASE",
+            "activities": ["SALE"],
+            "external_object": {
+                "system": "synthetic-crm",
+                "object_type": "QUOTE",
+                "object_id": "quote-1",
+                "object_version": "1",
+            },
+        },
+        "rationale": "Reviewed against the cited evidence and versions.",
+        "resolved_finding_ids": ["finding-1"],
+        "evidence_refs": ["document-1"],
+        "expires_at": "2026-08-07T00:00:00Z",
+        "tenant_id": "tenant-1",
+        "correlation_id": "correlation-1",
+        "decision_id": "decision-1",
+        "version_set": minimal_result()["version_set"],
+        "reviewer_id": "reviewer-1",
+        "reviewer_role": "COMPLIANCE_REVIEWER",
+        "recorded_at": "2026-08-06T00:00:00Z",
+        "effective_from": "2026-08-08T00:00:00Z",
+    }
+    with pytest.raises(
+        ValidationError, match="expires_at must be on or after effective_from"
+    ):
+        HumanDecision.model_validate(decision_payload)
+
+    decision_payload["effective_from"] = "2026-08-06T00:00:00Z"
+    assert HumanDecision.model_validate(decision_payload).expires_at is not None
+
+    case_event = {
+        "kind": "case.state_changed",
+        "case_id": "case-1",
+        "previous_state": "REVIEW_REQUIRED",
+        "case_state": "HUMAN_CLEARED",
+        "business_action": "ALLOW_WITHIN_HUMAN_DECISION",
+        "decision_expires_at": None,
+    }
+    with pytest.raises(ValidationError, match="expires_at is required"):
+        CaseStateChangedEventData.model_validate(case_event)
+    case_event["decision_expires_at"] = "2026-08-07T00:00:00Z"
+    assert (
+        CaseStateChangedEventData.model_validate(case_event).decision_expires_at
+        is not None
+    )
+
+    decision_event = {
+        "kind": "human_decision.recorded",
+        "case_id": "case-1",
+        "decision_id": "decision-1",
+        "decision": "HUMAN_CLEARED",
+        "decision_effective_from": "2026-08-08T00:00:00Z",
+        "decision_expires_at": None,
+    }
+    with pytest.raises(ValidationError, match="expires_at is required"):
+        HumanDecisionRecordedEventData.model_validate(decision_event)
+    decision_event["decision_expires_at"] = "2026-08-07T00:00:00Z"
+    with pytest.raises(
+        ValidationError,
+        match="decision_expires_at must be on or after decision_effective_from",
+    ):
+        HumanDecisionRecordedEventData.model_validate(decision_event)
+    decision_event["decision_expires_at"] = "2026-08-09T00:00:00Z"
+    assert (
+        HumanDecisionRecordedEventData.model_validate(
+            decision_event
+        ).decision_expires_at
+        is not None
+    )
+
+
+def test_source_status_represents_never_activated_and_current_sources() -> None:
+    unavailable = SourceStatus.model_validate(
+        {"source_id": "source-1", "status": "UNAVAILABLE"}
+    )
+    assert unavailable.active_snapshot_id is None
+    assert unavailable.retrieved_at is None
+
+    with pytest.raises(ValidationError, match="CURRENT source requires"):
+        SourceStatus.model_validate({"source_id": "source-1", "status": "CURRENT"})
+
+    current = SourceStatus.model_validate(
+        {
+            "source_id": "source-1",
+            "status": "CURRENT",
+            "active_snapshot_id": "snapshot-1",
+            "retrieved_at": "2026-08-06T00:00:00Z",
+        }
+    )
+    assert current.active_snapshot_id == "snapshot-1"
+
+
 def test_event_envelope_is_minimal_discriminated_and_type_consistent() -> None:
     payload = {
         "event_id": "evt-01",
@@ -570,6 +831,30 @@ def test_event_envelope_is_minimal_discriminated_and_type_consistent() -> None:
     event = EventEnvelope.model_validate(payload)
     assert event.data.kind == "case.state_changed"
     assert "findings" not in event.model_dump(mode="json")["data"]
+
+    case_mismatch = copy.deepcopy(payload)
+    case_mismatch["subject"] = {
+        "screening_id": "screening-1",
+        "case_id": "case-2",
+        "external_object_type": "QUOTE",
+        "external_object_id": "quote-1",
+    }
+    with pytest.raises(ValidationError, match="subject.case_id must match"):
+        EventEnvelope.model_validate(case_mismatch)
+
+    screening_mismatch = copy.deepcopy(payload)
+    screening_mismatch["event_type"] = "screening.completed"
+    screening_mismatch["data"] = {
+        "kind": "screening.completed",
+        "screening_id": "screening-2",
+        "case_id": "case-1",
+        "case_state": "REVIEW_REQUIRED",
+        "business_action": "HOLD",
+        "signal": "YELLOW",
+        "result_hash": HASH,
+    }
+    with pytest.raises(ValidationError, match="subject.screening_id must match"):
+        EventEnvelope.model_validate(screening_mismatch)
 
     payload["event_type"] = "screening.completed"
     with pytest.raises(ValidationError, match="event_type must match data.kind"):

@@ -52,6 +52,12 @@ REQUIRED = (
     "docs/getting-started/mvp-user-experience.md",
     "docs/getting-started/docker-reference.md",
     "api/openapi/tradesieve.v1.json",
+    "api/schemas/tradesieve.contracts.v1.json",
+    "examples/events/case.state-changed.json",
+    "examples/events/human-decision.recorded.json",
+    "examples/events/screening.completed.json",
+    "examples/requests/customer-onboarding.incomplete.json",
+    "examples/requests/invalid/transaction-screening.structural-error.json",
     "examples/requests/transaction-screening.json",
     "examples/responses/transaction-screening.review-required.json",
     "research/sources.yaml",
@@ -136,6 +142,14 @@ def validate_instance(
         if not any(not result for result in alternatives):
             return [f"{path}: does not match any oneOf alternative"]
         return []
+    if "anyOf" in schema:
+        alternatives = [
+            validate_instance(instance, candidate, document, path)
+            for candidate in schema["anyOf"]
+        ]
+        if not any(not result for result in alternatives):
+            return [f"{path}: does not match any anyOf alternative"]
+        return []
 
     errors: list[str] = []
     if "const" in schema and instance != schema["const"]:
@@ -206,10 +220,24 @@ def check_openapi() -> list[str]:
     response_path = (
         ROOT / "examples/responses/transaction-screening.review-required.json"
     )
+    incomplete_path = ROOT / "examples/requests/customer-onboarding.incomplete.json"
+    invalid_path = (
+        ROOT / "examples/requests/invalid/transaction-screening.structural-error.json"
+    )
+    event_paths = (
+        ROOT / "examples/events/screening.completed.json",
+        ROOT / "examples/events/case.state-changed.json",
+        ROOT / "examples/events/human-decision.recorded.json",
+    )
     try:
         spec = load_json_text(spec_path.read_text(encoding="utf-8"))
         request = load_json_text(request_path.read_text(encoding="utf-8"))
+        incomplete = load_json_text(incomplete_path.read_text(encoding="utf-8"))
+        invalid = load_json_text(invalid_path.read_text(encoding="utf-8"))
         response = load_json_text(response_path.read_text(encoding="utf-8"))
+        events = [
+            load_json_text(path.read_text(encoding="utf-8")) for path in event_paths
+        ]
     except (OSError, json.JSONDecodeError, ValueError) as exc:
         return [f"OpenAPI/example load failed: {exc}"]
 
@@ -238,8 +266,43 @@ def check_openapi() -> list[str]:
     response_schema = spec["components"]["schemas"]["ScreeningResult"]
     errors.extend(validate_instance(request, request_schema, spec, "request example"))
     errors.extend(
+        validate_instance(
+            incomplete, request_schema, spec, "incomplete request example"
+        )
+    )
+    errors.extend(
         validate_instance(response, response_schema, spec, "response example")
     )
+    event_schema = spec["components"]["schemas"]["EventEnvelope"]
+    for index, event in enumerate(events):
+        errors.extend(
+            validate_instance(event, event_schema, spec, f"event example {index}")
+        )
+    if not validate_instance(invalid, request_schema, spec, "negative request fixture"):
+        errors.append("OpenAPI negative request fixture unexpectedly validates")
+
+    canonical_source = spec.get("x-tradesieve-canonical-source", {})
+    if canonical_source.get("model") != "tradesieve.application.contracts":
+        errors.append("OpenAPI does not name the canonical Pydantic application source")
+    required_contract_schemas = {
+        "ClassificationCandidate",
+        "DocumentReference",
+        "EventEnvelope",
+        "LegalNexus",
+        "OwnershipControlRelationship",
+        "PartyRole",
+        "PaymentPath",
+        "ScreeningRequest",
+        "ScreeningResult",
+        "VersionSet",
+    }
+    missing_contract_schemas = sorted(
+        required_contract_schemas - set(spec["components"]["schemas"])
+    )
+    if missing_contract_schemas:
+        errors.append(
+            f"OpenAPI lacks canonical contract schemas: {missing_contract_schemas}"
+        )
 
     for numeric_type in ("number", "integer"):
         if not validate_instance(True, {"type": numeric_type}, spec, "boolean fixture"):

@@ -1,5 +1,7 @@
 {
   "schema_version": "1.0.0",
+  "tenant_id": "tenant-demo",
+  "correlation_id": "crm-quote-001",
   "data_classification": "SYNTHETIC",
   "external_object": {
     "system": "demo-crm",
@@ -8,15 +10,48 @@
     "object_version": "1"
   },
   "proposed_action": "QUOTE_RELEASE",
+  "activities": [
+    "SALE",
+    "SUPPLY",
+    "EXPORT",
+    "TRANSPORT"
+  ],
   "action_due_at": "2026-08-07T08:00:00Z",
   "legal_nexus": [
-    "EU_UNKNOWN_MEMBER_STATE",
-    "BANK_POLICY_UNKNOWN"
+    {
+      "nexus_ref": "nexus-eu",
+      "nexus_type": "REGULATORY_REGIME",
+      "jurisdiction": null,
+      "regime_code": "EU",
+      "basis": "Potential EU scope; applicable Member State remains unknown.",
+      "fact_class": "UNKNOWN",
+      "evidence_refs": [
+        "doc-invoice"
+      ],
+      "source_refs": [
+        "demo-policy-scope:1"
+      ]
+    },
+    {
+      "nexus_ref": "nexus-bank",
+      "nexus_type": "BANK_POLICY",
+      "jurisdiction": null,
+      "regime_code": "BANK_POLICY_UNKNOWN",
+      "basis": null,
+      "fact_class": "UNKNOWN",
+      "evidence_refs": [
+        "doc-invoice"
+      ],
+      "source_refs": []
+    }
   ],
   "parties": [
     {
       "party_ref": "seller-1",
-      "role": "SELLER",
+      "roles": [
+        "SELLER",
+        "PAYEE"
+      ],
       "entity_type": "ORGANIZATION",
       "legal_name": "Northern Bridge Logistics Demo Ltd",
       "aliases": [],
@@ -32,7 +67,11 @@
     },
     {
       "party_ref": "buyer-1",
-      "role": "BUYER",
+      "roles": [
+        "BUYER",
+        "END_USER",
+        "PAYER"
+      ],
       "entity_type": "ORGANIZATION",
       "legal_name": "Волга Компонентс Демо ООО",
       "aliases": [
@@ -41,35 +80,72 @@
       "country": "RU",
       "identifiers": [],
       "address": "Synthetic address, Moscow"
-    }
-  ],
-  "goods": [
+    },
     {
-      "line_ref": "line-1",
-      "description": "Synthetic industrial control module for compliance testing",
-      "manufacturer": "Demo Controls Laboratory",
-      "model_or_part_number": null,
-      "technical_specification_ref": null,
-      "hs_or_cn_code": "853710",
-      "quantity": 10,
-      "origin_country": "CN",
-      "end_use": "Industrial automation; final installation details not provided",
-      "end_user_ref": null
-    }
-  ],
-  "route": {
-    "origin_country": "CN",
-    "transit_countries": [
-      "KZ"
-    ],
-    "destination_country": "RU",
-    "final_use_country": "RU",
-    "carrier_ref": null
-  },
-  "payment_parties": [
+      "party_ref": "owner-1",
+      "roles": [
+        "BENEFICIAL_OWNER"
+      ],
+      "entity_type": "PERSON",
+      "legal_name": "Synthetic Owner Person",
+      "aliases": [],
+      "country": "KZ",
+      "identifiers": [],
+      "address": null
+    },
     {
-      "party_ref": "bank-1",
-      "role": "BENEFICIARY_BANK",
+      "party_ref": "manufacturer-1",
+      "roles": [
+        "SUPPLIER"
+      ],
+      "entity_type": "ORGANIZATION",
+      "legal_name": "Demo Controls Laboratory",
+      "aliases": [],
+      "country": "CN",
+      "identifiers": [],
+      "address": null
+    },
+    {
+      "party_ref": "carrier-1",
+      "roles": [
+        "CARRIER"
+      ],
+      "entity_type": "ORGANIZATION",
+      "legal_name": "Synthetic Carrier Co",
+      "aliases": [],
+      "country": "KZ",
+      "identifiers": [],
+      "address": null
+    },
+    {
+      "party_ref": "vessel-1",
+      "roles": [
+        "VESSEL"
+      ],
+      "entity_type": "VESSEL",
+      "legal_name": "MV Synthetic Route",
+      "aliases": [],
+      "country": "KZ",
+      "identifiers": [],
+      "address": null
+    },
+    {
+      "party_ref": "origin-bank-1",
+      "roles": [
+        "ORIGINATING_BANK"
+      ],
+      "entity_type": "BANK",
+      "legal_name": "Synthetic Origin Bank",
+      "aliases": [],
+      "country": "CN",
+      "identifiers": [],
+      "address": null
+    },
+    {
+      "party_ref": "beneficiary-bank-1",
+      "roles": [
+        "BENEFICIARY_BANK"
+      ],
       "entity_type": "BANK",
       "legal_name": "Synthetic Settlement Bank",
       "aliases": [],
@@ -78,5 +154,154 @@
       "address": null
     }
   ],
-  "evidence_refs": []
+  "ownership_and_control": [
+    {
+      "relationship_ref": "ownership-1",
+      "from_party_ref": "owner-1",
+      "to_party_ref": "buyer-1",
+      "relationship_type": "OWNERSHIP",
+      "ownership_percentage": "25.5",
+      "control_basis": null,
+      "fact_class": "SOURCE_ASSERTION",
+      "evidence_refs": [
+        "doc-ownership"
+      ],
+      "source_refs": [
+        "demo-company-registry:2026-08-06"
+      ],
+      "valid_from": "2026-01-01T00:00:00Z",
+      "valid_to": null,
+      "reviewer_status": "UNREVIEWED"
+    }
+  ],
+  "goods": [
+    {
+      "line_ref": "line-1",
+      "description": "Synthetic industrial control module for compliance testing",
+      "manufacturer": "Demo Controls Laboratory",
+      "manufacturer_ref": "manufacturer-1",
+      "model_or_part_number": null,
+      "technical_specification": "Synthetic specifications; performance details incomplete.",
+      "software_version": null,
+      "firmware_version": null,
+      "classification_candidates": [
+        {
+          "candidate_ref": "classification-hs-1",
+          "scheme": "HS",
+          "scheme_name": null,
+          "code": "853710",
+          "candidate_only": true,
+          "rationale": "Supplier-provided candidate code; not reviewed.",
+          "confidence": null,
+          "fact_class": "SOURCE_ASSERTION",
+          "evidence_refs": [
+            "doc-tech"
+          ],
+          "source_refs": [],
+          "reviewer_status": "UNREVIEWED"
+        },
+        {
+          "candidate_ref": "classification-dual-use-1",
+          "scheme": "EU_DUAL_USE_ANNEX_I",
+          "scheme_name": null,
+          "code": "3A999-SYNTHETIC-CANDIDATE",
+          "candidate_only": true,
+          "rationale": "Synthetic candidate retained for human classification.",
+          "confidence": null,
+          "fact_class": "INFERENCE",
+          "evidence_refs": [
+            "doc-tech"
+          ],
+          "source_refs": [
+            "demo-eu-dual-use:1"
+          ],
+          "reviewer_status": "UNREVIEWED"
+        }
+      ],
+      "quantity": "10",
+      "quantity_unit": "each",
+      "unit_value": "1250",
+      "total_value": "12500",
+      "currency": "EUR",
+      "origin_country": "CN",
+      "end_use": {
+        "description": "Industrial automation; installation detail not provided.",
+        "end_user_ref": "buyer-1",
+        "installation_site": null,
+        "country": "RU"
+      }
+    }
+  ],
+  "route": {
+    "origin_country": "CN",
+    "loading_location": "Shanghai",
+    "transit_countries": [
+      "KZ"
+    ],
+    "discharge_location": "Synthetic inland terminal",
+    "destination_country": "RU",
+    "final_use_country": "RU",
+    "carrier_ref": "carrier-1",
+    "vessel_ref": "vessel-1"
+  },
+  "documents": [
+    {
+      "document_ref": "doc-tech",
+      "document_type": "TECHNICAL_SPECIFICATION",
+      "external_reference": "DEMO-DATASHEET-1",
+      "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "media_type": "application/pdf",
+      "issued_at": null,
+      "related_party_refs": [
+        "manufacturer-1"
+      ],
+      "related_goods_refs": [
+        "line-1"
+      ]
+    },
+    {
+      "document_ref": "doc-ownership",
+      "document_type": "OWNERSHIP_RECORD",
+      "external_reference": null,
+      "content_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "media_type": "application/json",
+      "issued_at": null,
+      "related_party_refs": [
+        "owner-1",
+        "buyer-1"
+      ],
+      "related_goods_refs": []
+    },
+    {
+      "document_ref": "doc-invoice",
+      "document_type": "INVOICE",
+      "external_reference": "DEMO-INVOICE-1",
+      "content_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "media_type": "application/pdf",
+      "issued_at": null,
+      "related_party_refs": [
+        "seller-1",
+        "buyer-1"
+      ],
+      "related_goods_refs": [
+        "line-1"
+      ]
+    }
+  ],
+  "payment": {
+    "payment_ref": "payment-1",
+    "payer_ref": "buyer-1",
+    "payee_ref": "seller-1",
+    "originating_bank_ref": "origin-bank-1",
+    "intermediary_bank_refs": [],
+    "beneficiary_bank_ref": "beneficiary-bank-1",
+    "amount": "12500",
+    "currency": "EUR",
+    "origin_country": "RU",
+    "destination_country": "CN",
+    "purpose": "Payment for synthetic industrial control modules.",
+    "evidence_refs": [
+      "doc-invoice"
+    ]
+  }
 }

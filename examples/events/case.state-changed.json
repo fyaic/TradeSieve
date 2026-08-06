@@ -1,0 +1,22 @@
+{
+  "event_id": "evt-case-state-001",
+  "event_type": "case.state_changed",
+  "event_version": "1.0",
+  "occurred_at": "2026-08-06T08:00:01Z",
+  "tenant_id": "tenant-demo",
+  "correlation_id": "crm-quote-001",
+  "subject": {
+    "screening_id": "scr-demo-001",
+    "case_id": "case-demo-001",
+    "external_object_type": "QUOTE",
+    "external_object_id": "demo-quote-001"
+  },
+  "data": {
+    "kind": "case.state_changed",
+    "case_id": "case-demo-001",
+    "previous_state": "INCOMPLETE",
+    "case_state": "REVIEW_REQUIRED",
+    "business_action": "HOLD",
+    "decision_expires_at": null
+  }
+}

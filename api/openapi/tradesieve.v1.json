@@ -94,6 +94,14 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ScreeningRequest"
+              },
+              "examples": {
+                "transaction": {
+                  "$ref": "#/components/examples/TransactionScreeningRequest"
+                },
+                "incomplete_customer_onboarding": {
+                  "$ref": "#/components/examples/IncompleteCustomerOnboardingRequest"
+                }
               }
             }
           }
@@ -110,6 +118,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ScreeningResult"
+                },
+                "examples": {
+                  "review_required": {
+                    "$ref": "#/components/examples/TransactionReviewRequiredResult"
+                  }
                 }
               }
             }
@@ -418,326 +431,43 @@
       }
     },
     "schemas": {
-      "Health": {
-        "type": "object",
-        "required": [
-          "status"
+      "BusinessAction": {
+        "description": "Operational instruction that the calling workflow must enforce.",
+        "enum": [
+          "HOLD",
+          "REQUEST_EVIDENCE",
+          "ESCALATE",
+          "BLOCK",
+          "MONITOR",
+          "NO_ACTION",
+          "ALLOW_WITHIN_HUMAN_DECISION"
         ],
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "OK",
-              "DEGRADED",
-              "UNAVAILABLE"
-            ]
-          },
-          "checks": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
-          }
-        }
+        "title": "BusinessAction",
+        "type": "string"
       },
-      "ScreeningRequest": {
-        "type": "object",
+      "Case": {
         "additionalProperties": false,
-        "required": [
-          "schema_version",
-          "data_classification",
-          "external_object",
-          "proposed_action",
-          "legal_nexus",
-          "parties",
-          "goods",
-          "route"
-        ],
         "properties": {
-          "schema_version": {
-            "const": "1.0.0"
-          },
-          "data_classification": {
-            "type": "string",
-            "enum": [
-              "SYNTHETIC",
-              "APPROVED_PILOT",
-              "PRODUCTION"
-            ]
-          },
-          "external_object": {
-            "$ref": "#/components/schemas/ExternalObject"
-          },
-          "proposed_action": {
-            "$ref": "#/components/schemas/ProposedAction"
-          },
-          "action_due_at": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
-          },
-          "legal_nexus": {
-            "type": "array",
-            "minItems": 1,
-            "items": {
-              "type": "string"
-            }
-          },
-          "parties": {
-            "type": "array",
-            "minItems": 1,
-            "items": {
-              "$ref": "#/components/schemas/Party"
-            }
-          },
-          "goods": {
-            "type": "array",
-            "minItems": 1,
-            "items": {
-              "$ref": "#/components/schemas/GoodsLine"
-            }
-          },
-          "route": {
-            "$ref": "#/components/schemas/Route"
-          },
-          "payment_parties": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Party"
-            }
-          },
-          "evidence_refs": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "ExternalObject": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "system",
-          "object_type",
-          "object_id",
-          "object_version"
-        ],
-        "properties": {
-          "system": {
+          "tenant_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Tenant Id",
             "type": "string"
           },
-          "object_type": {
-            "type": "string"
-          },
-          "object_id": {
-            "type": "string"
-          },
-          "object_version": {
-            "type": "string"
-          }
-        }
-      },
-      "Party": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "party_ref",
-          "role",
-          "entity_type",
-          "legal_name",
-          "country"
-        ],
-        "properties": {
-          "party_ref": {
-            "type": "string"
-          },
-          "role": {
-            "type": "string"
-          },
-          "entity_type": {
-            "type": "string",
-            "enum": [
-              "ORGANIZATION",
-              "PERSON",
-              "VESSEL",
-              "BANK"
-            ]
-          },
-          "legal_name": {
-            "type": "string"
-          },
-          "aliases": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "country": {
-            "type": "string",
-            "pattern": "^[A-Z]{2}$"
-          },
-          "identifiers": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Identifier"
-            }
-          },
-          "address": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        }
-      },
-      "Identifier": {
-        "type": "object",
-        "required": [
-          "type",
-          "value"
-        ],
-        "properties": {
-          "type": {
-            "type": "string"
-          },
-          "value": {
-            "type": "string"
-          },
-          "issuer": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        }
-      },
-      "GoodsLine": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "line_ref",
-          "description",
-          "quantity",
-          "origin_country",
-          "end_use"
-        ],
-        "properties": {
-          "line_ref": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          },
-          "manufacturer": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "model_or_part_number": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "technical_specification_ref": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "hs_or_cn_code": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "quantity": {
-            "type": "number",
-            "exclusiveMinimum": 0
-          },
-          "origin_country": {
-            "type": "string",
-            "pattern": "^[A-Z]{2}$"
-          },
-          "end_use": {
-            "type": "string"
-          },
-          "end_user_ref": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        }
-      },
-      "Route": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "origin_country",
-          "destination_country",
-          "final_use_country"
-        ],
-        "properties": {
-          "origin_country": {
-            "type": "string",
-            "pattern": "^[A-Z]{2}$"
-          },
-          "transit_countries": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "pattern": "^[A-Z]{2}$"
-            }
-          },
-          "destination_country": {
-            "type": "string",
-            "pattern": "^[A-Z]{2}$"
-          },
-          "final_use_country": {
-            "type": "string",
-            "pattern": "^[A-Z]{2}$"
-          },
-          "carrier_ref": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        }
-      },
-      "ScreeningResult": {
-        "type": "object",
-        "required": [
-          "schema_version",
-          "screening_id",
-          "case_id",
-          "state",
-          "signal",
-          "highest_priority",
-          "business_action",
-          "summary",
-          "findings",
-          "required_evidence",
-          "version_set",
-          "created_at"
-        ],
-        "properties": {
-          "schema_version": {
-            "const": "1.0.0"
-          },
-          "screening_id": {
+          "correlation_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Correlation Id",
             "type": "string"
           },
           "case_id": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Case Id",
+            "type": "string"
           },
           "state": {
             "$ref": "#/components/schemas/CaseState"
@@ -751,32 +481,976 @@
           "business_action": {
             "$ref": "#/components/schemas/BusinessAction"
           },
-          "summary": {
-            "type": "string"
-          },
           "findings": {
-            "type": "array",
             "items": {
               "$ref": "#/components/schemas/Finding"
-            }
+            },
+            "maxItems": 512,
+            "title": "Findings",
+            "type": "array"
           },
           "required_evidence": {
-            "type": "array",
             "items": {
-              "type": "string"
-            }
+              "$ref": "#/components/schemas/EvidenceRequirement"
+            },
+            "maxItems": 256,
+            "title": "Required Evidence",
+            "type": "array"
+          },
+          "holds": {
+            "items": {
+              "$ref": "#/components/schemas/Hold"
+            },
+            "maxItems": 64,
+            "title": "Holds",
+            "type": "array"
           },
           "version_set": {
             "$ref": "#/components/schemas/VersionSet"
           },
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
+          "effective_human_decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HumanDecision"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
           }
-        }
+        },
+        "required": [
+          "tenant_id",
+          "correlation_id",
+          "case_id",
+          "state",
+          "signal",
+          "highest_priority",
+          "business_action",
+          "findings",
+          "required_evidence",
+          "holds",
+          "version_set",
+          "updated_at"
+        ],
+        "title": "Case",
+        "type": "object"
+      },
+      "CaseState": {
+        "enum": [
+          "INCOMPLETE",
+          "REVIEW_REQUIRED",
+          "ESCALATE",
+          "HUMAN_CLEARED",
+          "HUMAN_BLOCKED",
+          "CLOSED_NO_ACTION"
+        ],
+        "title": "CaseState",
+        "type": "string"
+      },
+      "CaseStateChangedEventData": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "case.state_changed",
+            "title": "Kind",
+            "type": "string"
+          },
+          "case_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Case Id",
+            "type": "string"
+          },
+          "previous_state": {
+            "$ref": "#/components/schemas/CaseState"
+          },
+          "case_state": {
+            "$ref": "#/components/schemas/CaseState"
+          },
+          "business_action": {
+            "$ref": "#/components/schemas/BusinessAction"
+          },
+          "decision_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Expires At"
+          }
+        },
+        "required": [
+          "kind",
+          "case_id",
+          "previous_state",
+          "case_state",
+          "business_action",
+          "decision_expires_at"
+        ],
+        "title": "CaseStateChangedEventData",
+        "type": "object"
+      },
+      "ClassificationCandidate": {
+        "additionalProperties": false,
+        "description": "Proposed classification only; never an automatic legal determination.",
+        "properties": {
+          "candidate_ref": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Candidate Ref",
+            "type": "string"
+          },
+          "scheme": {
+            "$ref": "#/components/schemas/ClassificationScheme"
+          },
+          "scheme_name": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Scheme Name"
+          },
+          "code": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          },
+          "candidate_only": {
+            "const": true,
+            "default": true,
+            "description": "Always true: the code remains a candidate until an authorized human classification decision is recorded.",
+            "title": "Candidate Only",
+            "type": "boolean"
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Rationale"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "pattern": "^(?:0(?:\\.[0-9]{1,5})?|1(?:\\.0{1,5})?)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Confidence"
+          },
+          "fact_class": {
+            "$ref": "#/components/schemas/FactClass",
+            "default": "UNKNOWN"
+          },
+          "evidence_refs": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "source_refs": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Source Refs",
+            "type": "array"
+          },
+          "reviewer_status": {
+            "$ref": "#/components/schemas/ReviewerStatus",
+            "default": "UNREVIEWED"
+          }
+        },
+        "required": [
+          "candidate_ref",
+          "scheme",
+          "code"
+        ],
+        "title": "ClassificationCandidate",
+        "type": "object"
+      },
+      "ClassificationScheme": {
+        "enum": [
+          "HS",
+          "CN",
+          "TARIC",
+          "ECCN",
+          "EU_DUAL_USE_ANNEX_I",
+          "EU_COMMON_MILITARY_LIST",
+          "OTHER"
+        ],
+        "title": "ClassificationScheme",
+        "type": "string"
+      },
+      "DataClassification": {
+        "enum": [
+          "SYNTHETIC",
+          "APPROVED_PILOT",
+          "PRODUCTION"
+        ],
+        "title": "DataClassification",
+        "type": "string"
+      },
+      "DecisionScope": {
+        "additionalProperties": false,
+        "properties": {
+          "proposed_action": {
+            "$ref": "#/components/schemas/ProposedAction"
+          },
+          "activities": {
+            "items": {
+              "$ref": "#/components/schemas/RegulatedActivity"
+            },
+            "maxItems": 16,
+            "title": "Activities",
+            "type": "array"
+          },
+          "external_object": {
+            "$ref": "#/components/schemas/ExternalObject"
+          },
+          "party_refs": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Party Refs",
+            "type": "array"
+          },
+          "goods_refs": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Goods Refs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "proposed_action",
+          "external_object"
+        ],
+        "title": "DecisionScope",
+        "type": "object"
+      },
+      "DocumentReference": {
+        "additionalProperties": false,
+        "properties": {
+          "document_ref": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Document Ref",
+            "type": "string"
+          },
+          "document_type": {
+            "$ref": "#/components/schemas/DocumentType"
+          },
+          "external_reference": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "External Reference"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "pattern": "^sha256:[a-f0-9]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Content Hash"
+          },
+          "media_type": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Media Type"
+          },
+          "issued_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Issued At"
+          },
+          "related_party_refs": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Related Party Refs",
+            "type": "array"
+          },
+          "related_goods_refs": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Related Goods Refs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "document_ref",
+          "document_type"
+        ],
+        "title": "DocumentReference",
+        "type": "object"
+      },
+      "DocumentType": {
+        "enum": [
+          "ORDER",
+          "INVOICE",
+          "PACKING_LIST",
+          "TRANSPORT",
+          "PAYMENT",
+          "TECHNICAL_SPECIFICATION",
+          "END_USER_STATEMENT",
+          "OWNERSHIP_RECORD",
+          "WEBSITE_CAPTURE",
+          "OTHER"
+        ],
+        "title": "DocumentType",
+        "type": "string"
+      },
+      "EndUse": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "end_user_ref": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "End User Ref"
+          },
+          "installation_site": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Installation Site"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Z]{2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Country"
+          }
+        },
+        "title": "EndUse",
+        "type": "object"
+      },
+      "EntityType": {
+        "enum": [
+          "ORGANIZATION",
+          "PERSON",
+          "VESSEL",
+          "BANK",
+          "OTHER"
+        ],
+        "title": "EntityType",
+        "type": "string"
+      },
+      "Error": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          },
+          "correlation_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Correlation Id",
+            "type": "string"
+          },
+          "retryable": {
+            "title": "Retryable",
+            "type": "boolean"
+          },
+          "details": {
+            "maxProperties": 64,
+            "patternProperties": {
+              "^[A-Za-z0-9][A-Za-z0-9._:-]*$": {
+                "anyOf": [
+                  {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "propertyNames": {
+              "maxLength": 128,
+              "minLength": 1
+            },
+            "title": "Details",
+            "type": "object"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "correlation_id",
+          "retryable"
+        ],
+        "title": "Error",
+        "type": "object"
+      },
+      "EventEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "event_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "event_type": {
+            "$ref": "#/components/schemas/EventType"
+          },
+          "event_version": {
+            "const": "1.0",
+            "title": "Event Version",
+            "type": "string"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "tenant_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Correlation Id",
+            "type": "string"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/EventSubject"
+          },
+          "data": {
+            "discriminator": {
+              "mapping": {
+                "case.state_changed": "#/components/schemas/CaseStateChangedEventData",
+                "human_decision.recorded": "#/components/schemas/HumanDecisionRecordedEventData",
+                "screening.completed": "#/components/schemas/ScreeningCompletedEventData"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ScreeningCompletedEventData"
+              },
+              {
+                "$ref": "#/components/schemas/CaseStateChangedEventData"
+              },
+              {
+                "$ref": "#/components/schemas/HumanDecisionRecordedEventData"
+              }
+            ],
+            "title": "Data"
+          }
+        },
+        "required": [
+          "event_id",
+          "event_type",
+          "event_version",
+          "occurred_at",
+          "tenant_id",
+          "correlation_id",
+          "subject",
+          "data"
+        ],
+        "title": "EventEnvelope",
+        "type": "object"
+      },
+      "EventSubject": {
+        "additionalProperties": false,
+        "properties": {
+          "screening_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Screening Id"
+          },
+          "case_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Case Id"
+          },
+          "external_object_type": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "External Object Type",
+            "type": "string"
+          },
+          "external_object_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "External Object Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "external_object_type",
+          "external_object_id"
+        ],
+        "title": "EventSubject",
+        "type": "object"
+      },
+      "EventType": {
+        "enum": [
+          "screening.completed",
+          "case.state_changed",
+          "human_decision.recorded"
+        ],
+        "title": "EventType",
+        "type": "string"
+      },
+      "EvidenceRequirement": {
+        "additionalProperties": false,
+        "properties": {
+          "requirement_ref": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Requirement Ref",
+            "type": "string"
+          },
+          "evidence_type": {
+            "$ref": "#/components/schemas/DocumentType"
+          },
+          "description": {
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EvidenceRequirementStatus"
+          },
+          "related_party_refs": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Related Party Refs",
+            "type": "array"
+          },
+          "related_goods_refs": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Related Goods Refs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "requirement_ref",
+          "evidence_type",
+          "description",
+          "status"
+        ],
+        "title": "EvidenceRequirement",
+        "type": "object"
+      },
+      "EvidenceRequirementStatus": {
+        "enum": [
+          "REQUIRED",
+          "PROVIDED",
+          "ACCEPTED",
+          "REJECTED"
+        ],
+        "title": "EvidenceRequirementStatus",
+        "type": "string"
+      },
+      "EvidenceSubmission": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence_type": {
+            "$ref": "#/components/schemas/DocumentType"
+          },
+          "content_hash": {
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "media_type": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Media Type",
+            "type": "string"
+          },
+          "storage_handle": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Storage Handle",
+            "type": "string"
+          },
+          "supports_finding_ids": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 512,
+            "title": "Supports Finding Ids",
+            "type": "array"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Note"
+          }
+        },
+        "required": [
+          "evidence_type",
+          "content_hash",
+          "media_type",
+          "storage_handle",
+          "supports_finding_ids"
+        ],
+        "title": "EvidenceSubmission",
+        "type": "object"
+      },
+      "ExternalObject": {
+        "additionalProperties": false,
+        "properties": {
+          "system": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "System",
+            "type": "string"
+          },
+          "object_type": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Object Type",
+            "type": "string"
+          },
+          "object_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Object Id",
+            "type": "string"
+          },
+          "object_version": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Object Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "system",
+          "object_type",
+          "object_id",
+          "object_version"
+        ],
+        "title": "ExternalObject",
+        "type": "object"
+      },
+      "FactClass": {
+        "enum": [
+          "VERIFIED_FACT",
+          "SOURCE_ASSERTION",
+          "INFERENCE",
+          "UNKNOWN"
+        ],
+        "title": "FactClass",
+        "type": "string"
       },
       "Finding": {
-        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "finding_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Finding Id",
+            "type": "string"
+          },
+          "kind": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Kind",
+            "type": "string"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Priority"
+          },
+          "status": {
+            "$ref": "#/components/schemas/FindingStatus"
+          },
+          "fact_class": {
+            "$ref": "#/components/schemas/FactClass"
+          },
+          "summary": {
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Summary",
+            "type": "string"
+          },
+          "evidence_refs": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "source_refs": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Source Refs",
+            "type": "array"
+          },
+          "rule_evaluation_refs": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Rule Evaluation Refs",
+            "type": "array"
+          },
+          "uncertainty": {
+            "items": {
+              "$ref": "#/components/schemas/Uncertainty"
+            },
+            "maxItems": 64,
+            "title": "Uncertainty",
+            "type": "array"
+          },
+          "required_evidence_refs": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Required Evidence Refs",
+            "type": "array"
+          },
+          "required_action": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Required Action",
+            "type": "string"
+          },
+          "owner_role": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Owner Role",
+            "type": "string"
+          },
+          "due_before": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposedAction"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
         "required": [
           "finding_id",
           "kind",
@@ -787,82 +1461,1515 @@
           "required_action",
           "owner_role"
         ],
+        "title": "Finding",
+        "type": "object"
+      },
+      "FindingStatus": {
+        "enum": [
+          "OPEN",
+          "RESOLVED",
+          "SUPERSEDED"
+        ],
+        "title": "FindingStatus",
+        "type": "string"
+      },
+      "GoodsLine": {
+        "additionalProperties": false,
         "properties": {
-          "finding_id": {
+          "line_ref": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Line Ref",
             "type": "string"
           },
-          "kind": {
-            "type": "string"
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
           },
-          "priority": {
-            "$ref": "#/components/schemas/Priority"
+          "manufacturer": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Manufacturer"
           },
+          "manufacturer_ref": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Manufacturer Ref"
+          },
+          "model_or_part_number": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Model Or Part Number"
+          },
+          "technical_specification": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Technical Specification"
+          },
+          "software_version": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Software Version"
+          },
+          "firmware_version": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Firmware Version"
+          },
+          "classification_candidates": {
+            "items": {
+              "$ref": "#/components/schemas/ClassificationCandidate"
+            },
+            "maxItems": 32,
+            "title": "Classification Candidates",
+            "type": "array"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "pattern": "^(?:[1-9][0-9]{0,17}(?:\\.[0-9]{1,6})?|0\\.(?!0{1,6}$)[0-9]{1,6})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Quantity"
+          },
+          "quantity_unit": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Quantity Unit"
+          },
+          "unit_value": {
+            "anyOf": [
+              {
+                "pattern": "^(?:[1-9][0-9]{0,17}(?:\\.[0-9]{1,6})?|0\\.(?!0{1,6}$)[0-9]{1,6})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Unit Value"
+          },
+          "total_value": {
+            "anyOf": [
+              {
+                "pattern": "^(?:[1-9][0-9]{0,17}(?:\\.[0-9]{1,6})?|0\\.(?!0{1,6}$)[0-9]{1,6})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total Value"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Z]{3}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Currency"
+          },
+          "origin_country": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Z]{2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Origin Country"
+          },
+          "end_use": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EndUse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "line_ref"
+        ],
+        "title": "GoodsLine",
+        "type": "object"
+      },
+      "Health": {
+        "additionalProperties": false,
+        "properties": {
           "status": {
-            "type": "string",
-            "enum": [
-              "OPEN",
-              "RESOLVED",
-              "SUPERSEDED"
-            ]
+            "$ref": "#/components/schemas/HealthStatus"
           },
-          "fact_class": {
-            "type": "string",
-            "enum": [
-              "VERIFIED_FACT",
-              "SOURCE_ASSERTION",
-              "INFERENCE",
-              "UNKNOWN"
-            ]
-          },
-          "summary": {
+          "checks": {
+            "additionalProperties": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxProperties": 64,
+            "title": "Checks",
+            "type": "object"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "Health",
+        "type": "object"
+      },
+      "HealthStatus": {
+        "enum": [
+          "OK",
+          "DEGRADED",
+          "UNAVAILABLE"
+        ],
+        "title": "HealthStatus",
+        "type": "string"
+      },
+      "Hold": {
+        "additionalProperties": false,
+        "properties": {
+          "hold_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Hold Id",
             "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ProposedAction"
+          },
+          "reason": {
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "release_condition": {
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Release Condition",
+            "type": "string"
+          },
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "hold_id",
+          "scope",
+          "reason",
+          "release_condition",
+          "active"
+        ],
+        "title": "Hold",
+        "type": "object"
+      },
+      "HumanDecision": {
+        "additionalProperties": false,
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/HumanDecisionType"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/DecisionScope"
+          },
+          "rationale": {
+            "maxLength": 5000,
+            "minLength": 10,
+            "title": "Rationale",
+            "type": "string"
+          },
+          "resolved_finding_ids": {
+            "description": "Findings resolved by this disposition. It may be empty for HUMAN_BLOCKED or CLOSED_NO_ACTION; application policy requires HUMAN_CLEARED to resolve every open P0/P1 finding.",
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 512,
+            "title": "Resolved Finding Ids",
+            "type": "array"
           },
           "evidence_refs": {
-            "type": "array",
+            "description": "Evidence considered for the disposition. Application policy enforces sufficient evidence for HUMAN_CLEARED and configured block policy.",
             "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
               "type": "string"
-            }
+            },
+            "maxItems": 256,
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required and non-null for HUMAN_CLEARED; application policy validates that condition.",
+            "title": "Expires At"
+          },
+          "tenant_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Correlation Id",
+            "type": "string"
+          },
+          "decision_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Decision Id",
+            "type": "string"
+          },
+          "version_set": {
+            "$ref": "#/components/schemas/VersionSet"
+          },
+          "reviewer_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Reviewer Id",
+            "type": "string"
+          },
+          "reviewer_role": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Reviewer Role",
+            "type": "string"
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "effective_from": {
+            "format": "date-time",
+            "title": "Effective From",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision",
+          "scope",
+          "rationale",
+          "resolved_finding_ids",
+          "evidence_refs",
+          "expires_at",
+          "tenant_id",
+          "correlation_id",
+          "decision_id",
+          "version_set",
+          "reviewer_id",
+          "reviewer_role",
+          "recorded_at",
+          "effective_from"
+        ],
+        "title": "HumanDecision",
+        "type": "object"
+      },
+      "HumanDecisionRecordedEventData": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "human_decision.recorded",
+            "title": "Kind",
+            "type": "string"
+          },
+          "case_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Case Id",
+            "type": "string"
+          },
+          "decision_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Decision Id",
+            "type": "string"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/HumanDecisionType"
+          },
+          "decision_effective_from": {
+            "format": "date-time",
+            "title": "Decision Effective From",
+            "type": "string"
+          },
+          "decision_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Expires At"
+          }
+        },
+        "required": [
+          "kind",
+          "case_id",
+          "decision_id",
+          "decision",
+          "decision_effective_from",
+          "decision_expires_at"
+        ],
+        "title": "HumanDecisionRecordedEventData",
+        "type": "object"
+      },
+      "HumanDecisionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/HumanDecisionType"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/DecisionScope"
+          },
+          "rationale": {
+            "maxLength": 5000,
+            "minLength": 10,
+            "title": "Rationale",
+            "type": "string"
+          },
+          "resolved_finding_ids": {
+            "description": "Findings resolved by this disposition. It may be empty for HUMAN_BLOCKED or CLOSED_NO_ACTION; application policy requires HUMAN_CLEARED to resolve every open P0/P1 finding.",
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 512,
+            "title": "Resolved Finding Ids",
+            "type": "array"
+          },
+          "evidence_refs": {
+            "description": "Evidence considered for the disposition. Application policy enforces sufficient evidence for HUMAN_CLEARED and configured block policy.",
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required and non-null for HUMAN_CLEARED; application policy validates that condition.",
+            "title": "Expires At"
+          }
+        },
+        "required": [
+          "decision",
+          "scope",
+          "rationale",
+          "resolved_finding_ids",
+          "evidence_refs",
+          "expires_at"
+        ],
+        "title": "HumanDecisionRequest",
+        "type": "object"
+      },
+      "HumanDecisionType": {
+        "enum": [
+          "HUMAN_CLEARED",
+          "HUMAN_BLOCKED",
+          "CLOSED_NO_ACTION"
+        ],
+        "title": "HumanDecisionType",
+        "type": "string"
+      },
+      "Identifier": {
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Type",
+            "type": "string"
+          },
+          "value": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Value",
+            "type": "string"
+          },
+          "issuer": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Issuer"
+          }
+        },
+        "required": [
+          "type",
+          "value"
+        ],
+        "title": "Identifier",
+        "type": "object"
+      },
+      "LegalNexus": {
+        "additionalProperties": false,
+        "properties": {
+          "nexus_ref": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Nexus Ref",
+            "type": "string"
+          },
+          "nexus_type": {
+            "$ref": "#/components/schemas/LegalNexusType"
+          },
+          "jurisdiction": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Z]{2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Jurisdiction"
+          },
+          "regime_code": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Regime Code"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Basis"
+          },
+          "fact_class": {
+            "$ref": "#/components/schemas/FactClass",
+            "default": "UNKNOWN"
+          },
+          "evidence_refs": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Evidence Refs",
+            "type": "array"
           },
           "source_refs": {
-            "type": "array",
             "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
               "type": "string"
-            }
-          },
-          "uncertainty": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "required_action": {
-            "type": "string"
-          },
-          "owner_role": {
-            "type": "string"
-          },
-          "due_before": {
-            "type": [
-              "string",
-              "null"
-            ]
+            },
+            "maxItems": 64,
+            "title": "Source Refs",
+            "type": "array"
           }
-        }
-      },
-      "Case": {
-        "type": "object",
+        },
         "required": [
-          "case_id",
-          "state",
-          "signal",
-          "highest_priority",
-          "business_action",
-          "findings",
-          "updated_at"
+          "nexus_ref",
+          "nexus_type"
         ],
+        "title": "LegalNexus",
+        "type": "object"
+      },
+      "LegalNexusType": {
+        "enum": [
+          "JURISDICTION",
+          "REGULATORY_REGIME",
+          "BANK_POLICY",
+          "CONTRACT_POLICY",
+          "OTHER"
+        ],
+        "title": "LegalNexusType",
+        "type": "string"
+      },
+      "OwnershipControlRelationship": {
+        "additionalProperties": false,
         "properties": {
-          "case_id": {
+          "relationship_ref": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Relationship Ref",
             "type": "string"
+          },
+          "from_party_ref": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "From Party Ref",
+            "type": "string"
+          },
+          "to_party_ref": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "To Party Ref",
+            "type": "string"
+          },
+          "relationship_type": {
+            "$ref": "#/components/schemas/RelationshipType"
+          },
+          "ownership_percentage": {
+            "anyOf": [
+              {
+                "pattern": "^(?:100(?:\\.0{1,4})?|(?:[0-9]|[1-9][0-9])(?:\\.[0-9]{1,4})?)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ownership Percentage"
+          },
+          "control_basis": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Control Basis"
+          },
+          "fact_class": {
+            "$ref": "#/components/schemas/FactClass",
+            "default": "UNKNOWN"
+          },
+          "evidence_refs": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "source_refs": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Source Refs",
+            "type": "array"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Valid To"
+          },
+          "reviewer_status": {
+            "$ref": "#/components/schemas/ReviewerStatus",
+            "default": "UNREVIEWED"
+          }
+        },
+        "required": [
+          "relationship_ref",
+          "from_party_ref",
+          "to_party_ref",
+          "relationship_type"
+        ],
+        "title": "OwnershipControlRelationship",
+        "type": "object"
+      },
+      "Party": {
+        "additionalProperties": false,
+        "properties": {
+          "party_ref": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Party Ref",
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/PartyRole"
+            },
+            "maxItems": 16,
+            "minItems": 1,
+            "title": "Roles",
+            "type": "array"
+          },
+          "entity_type": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "legal_name": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Legal Name"
+          },
+          "aliases": {
+            "items": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Aliases",
+            "type": "array"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Z]{2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Country"
+          },
+          "identifiers": {
+            "items": {
+              "$ref": "#/components/schemas/Identifier"
+            },
+            "maxItems": 64,
+            "title": "Identifiers",
+            "type": "array"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Address"
+          }
+        },
+        "required": [
+          "party_ref",
+          "roles",
+          "entity_type"
+        ],
+        "title": "Party",
+        "type": "object"
+      },
+      "PartyRole": {
+        "enum": [
+          "APPLICANT",
+          "CUSTOMER",
+          "SELLER",
+          "BUYER",
+          "SUPPLIER",
+          "CONSIGNEE",
+          "END_USER",
+          "SHIPPER",
+          "CARRIER",
+          "VESSEL",
+          "PAYER",
+          "PAYEE",
+          "ORIGINATING_BANK",
+          "INTERMEDIARY_BANK",
+          "BENEFICIARY_BANK",
+          "BENEFICIAL_OWNER",
+          "CONTROLLER",
+          "OTHER"
+        ],
+        "title": "PartyRole",
+        "type": "string"
+      },
+      "PaymentPath": {
+        "additionalProperties": false,
+        "properties": {
+          "payment_ref": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Payment Ref",
+            "type": "string"
+          },
+          "payer_ref": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Payer Ref"
+          },
+          "payee_ref": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Payee Ref"
+          },
+          "originating_bank_ref": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Originating Bank Ref"
+          },
+          "intermediary_bank_refs": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 16,
+            "title": "Intermediary Bank Refs",
+            "type": "array"
+          },
+          "beneficiary_bank_ref": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Beneficiary Bank Ref"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "pattern": "^(?:[1-9][0-9]{0,17}(?:\\.[0-9]{1,6})?|0\\.(?!0{1,6}$)[0-9]{1,6})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Amount"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Z]{3}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Currency"
+          },
+          "origin_country": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Z]{2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Origin Country"
+          },
+          "destination_country": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Z]{2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Destination Country"
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Purpose"
+          },
+          "evidence_refs": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Evidence Refs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "payment_ref"
+        ],
+        "title": "PaymentPath",
+        "type": "object"
+      },
+      "Priority": {
+        "enum": [
+          "P0",
+          "P1",
+          "P2",
+          "NONE"
+        ],
+        "title": "Priority",
+        "type": "string"
+      },
+      "ProposedAction": {
+        "enum": [
+          "CUSTOMER_ONBOARDING",
+          "QUOTE_RELEASE",
+          "ORDER_ACCEPTANCE",
+          "BOOKING",
+          "SHIPMENT_RELEASE",
+          "PAYMENT"
+        ],
+        "title": "ProposedAction",
+        "type": "string"
+      },
+      "RegulatedActivity": {
+        "enum": [
+          "SALE",
+          "SUPPLY",
+          "EXPORT",
+          "TRANSFER",
+          "BROKERING",
+          "TECHNICAL_ASSISTANCE",
+          "FINANCING",
+          "TRANSPORT",
+          "TRANSIT",
+          "IMPORT",
+          "OTHER"
+        ],
+        "title": "RegulatedActivity",
+        "type": "string"
+      },
+      "RelationshipType": {
+        "enum": [
+          "OWNERSHIP",
+          "CONTROL"
+        ],
+        "title": "RelationshipType",
+        "type": "string"
+      },
+      "ReviewRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "requested_reviewer_group": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Requested Reviewer Group"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ReviewRequest",
+        "type": "object"
+      },
+      "ReviewerStatus": {
+        "enum": [
+          "UNREVIEWED",
+          "REVIEWED",
+          "DISPUTED"
+        ],
+        "title": "ReviewerStatus",
+        "type": "string"
+      },
+      "Route": {
+        "additionalProperties": false,
+        "properties": {
+          "origin_country": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Z]{2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Origin Country"
+          },
+          "loading_location": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Loading Location"
+          },
+          "transit_countries": {
+            "items": {
+              "pattern": "^[A-Z]{2}$",
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Transit Countries",
+            "type": "array"
+          },
+          "discharge_location": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Discharge Location"
+          },
+          "destination_country": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Z]{2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Destination Country"
+          },
+          "final_use_country": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Z]{2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Final Use Country"
+          },
+          "carrier_ref": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Carrier Ref"
+          },
+          "vessel_ref": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Vessel Ref"
+          }
+        },
+        "title": "Route",
+        "type": "object"
+      },
+      "ScreeningCompletedEventData": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "screening.completed",
+            "title": "Kind",
+            "type": "string"
+          },
+          "screening_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Screening Id",
+            "type": "string"
+          },
+          "case_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Id"
+          },
+          "case_state": {
+            "$ref": "#/components/schemas/CaseState"
+          },
+          "business_action": {
+            "$ref": "#/components/schemas/BusinessAction"
+          },
+          "signal": {
+            "$ref": "#/components/schemas/Signal"
+          },
+          "result_hash": {
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Result Hash",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "screening_id",
+          "case_id",
+          "case_state",
+          "business_action",
+          "signal",
+          "result_hash"
+        ],
+        "title": "ScreeningCompletedEventData",
+        "type": "object"
+      },
+      "ScreeningRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "const": "1.0.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "tenant_id": {
+            "description": "Application tenant scope. REST derives the authoritative value from the authenticated principal and rejects a body mismatch.",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "description": "Application trace identifier. When X-Correlation-ID is present, REST treats it as authoritative and rejects a body mismatch.",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Correlation Id",
+            "type": "string"
+          },
+          "data_classification": {
+            "$ref": "#/components/schemas/DataClassification"
+          },
+          "external_object": {
+            "$ref": "#/components/schemas/ExternalObject"
+          },
+          "proposed_action": {
+            "$ref": "#/components/schemas/ProposedAction"
+          },
+          "activities": {
+            "items": {
+              "$ref": "#/components/schemas/RegulatedActivity"
+            },
+            "maxItems": 16,
+            "title": "Activities",
+            "type": "array"
+          },
+          "action_due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Action Due At"
+          },
+          "legal_nexus": {
+            "items": {
+              "$ref": "#/components/schemas/LegalNexus"
+            },
+            "maxItems": 64,
+            "title": "Legal Nexus",
+            "type": "array"
+          },
+          "parties": {
+            "items": {
+              "$ref": "#/components/schemas/Party"
+            },
+            "maxItems": 256,
+            "title": "Parties",
+            "type": "array"
+          },
+          "ownership_and_control": {
+            "items": {
+              "$ref": "#/components/schemas/OwnershipControlRelationship"
+            },
+            "maxItems": 512,
+            "title": "Ownership And Control",
+            "type": "array"
+          },
+          "goods": {
+            "items": {
+              "$ref": "#/components/schemas/GoodsLine"
+            },
+            "maxItems": 256,
+            "title": "Goods",
+            "type": "array"
+          },
+          "route": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Route"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentReference"
+            },
+            "maxItems": 256,
+            "title": "Documents",
+            "type": "array"
+          },
+          "payment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentPath"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "schema_version",
+          "tenant_id",
+          "correlation_id",
+          "data_classification",
+          "external_object",
+          "proposed_action"
+        ],
+        "title": "ScreeningRequest",
+        "type": "object"
+      },
+      "ScreeningResult": {
+        "additionalProperties": false,
+        "description": "Decision-support result; transport/HTTP success never means clearance.",
+        "properties": {
+          "schema_version": {
+            "const": "1.0.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "tenant_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Correlation Id",
+            "type": "string"
+          },
+          "screening_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Screening Id",
+            "type": "string"
+          },
+          "case_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Id"
           },
           "state": {
             "$ref": "#/components/schemas/CaseState"
@@ -876,371 +2983,266 @@
           "business_action": {
             "$ref": "#/components/schemas/BusinessAction"
           },
+          "summary": {
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Summary",
+            "type": "string"
+          },
           "findings": {
-            "type": "array",
             "items": {
               "$ref": "#/components/schemas/Finding"
-            }
+            },
+            "maxItems": 512,
+            "title": "Findings",
+            "type": "array"
           },
-          "effective_human_decision": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/HumanDecision"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "EvidenceSubmission": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "evidence_type",
-          "content_hash",
-          "media_type",
-          "storage_handle",
-          "supports_finding_ids"
-        ],
-        "properties": {
-          "evidence_type": {
-            "type": "string"
-          },
-          "content_hash": {
-            "type": "string",
-            "pattern": "^sha256:[a-f0-9]{64}$"
-          },
-          "media_type": {
-            "type": "string"
-          },
-          "storage_handle": {
-            "type": "string"
-          },
-          "supports_finding_ids": {
-            "type": "array",
+          "required_evidence": {
             "items": {
-              "type": "string"
-            }
+              "$ref": "#/components/schemas/EvidenceRequirement"
+            },
+            "maxItems": 256,
+            "title": "Required Evidence",
+            "type": "array"
           },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 2000
-          }
-        }
-      },
-      "ReviewRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "reason"
-        ],
-        "properties": {
-          "reason": {
-            "type": "string",
-            "maxLength": 2000
-          },
-          "requested_reviewer_group": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        }
-      },
-      "HumanDecisionRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "decision",
-          "scope",
-          "rationale",
-          "resolved_finding_ids",
-          "evidence_refs",
-          "expires_at"
-        ],
-        "properties": {
-          "decision": {
-            "$ref": "#/components/schemas/HumanDecisionType"
-          },
-          "scope": {
-            "$ref": "#/components/schemas/DecisionScope"
-          },
-          "rationale": {
-            "type": "string",
-            "minLength": 10,
-            "maxLength": 5000
-          },
-          "resolved_finding_ids": {
-            "type": "array",
-            "description": "Findings resolved by this decision. May be empty for HUMAN_BLOCKED or CLOSED_NO_ACTION; application policy requires HUMAN_CLEARED to resolve every open P0/P1 finding.",
+          "holds": {
             "items": {
-              "type": "string"
-            }
-          },
-          "evidence_refs": {
-            "type": "array",
-            "description": "Evidence considered for the disposition. May be empty for CLOSED_NO_ACTION; application policy enforces sufficient evidence for HUMAN_CLEARED and any configured block policy.",
-            "items": {
-              "type": "string"
-            }
-          },
-          "expires_at": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time",
-            "description": "Required and non-null for HUMAN_CLEARED; policy validation enforces this condition"
-          }
-        }
-      },
-      "HumanDecision": {
-        "type": "object",
-        "required": [
-          "decision_id",
-          "decision",
-          "scope",
-          "rationale",
-          "resolved_finding_ids",
-          "evidence_refs",
-          "version_set",
-          "reviewer_id",
-          "reviewer_role",
-          "recorded_at",
-          "expires_at"
-        ],
-        "properties": {
-          "decision_id": {
-            "type": "string"
-          },
-          "decision": {
-            "$ref": "#/components/schemas/HumanDecisionType"
-          },
-          "scope": {
-            "$ref": "#/components/schemas/DecisionScope"
-          },
-          "rationale": {
-            "type": "string"
-          },
-          "resolved_finding_ids": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "evidence_refs": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+              "$ref": "#/components/schemas/Hold"
+            },
+            "maxItems": 64,
+            "title": "Holds",
+            "type": "array"
           },
           "version_set": {
             "$ref": "#/components/schemas/VersionSet"
           },
-          "reviewer_id": {
+          "result_hash": {
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Result Hash",
             "type": "string"
           },
-          "reviewer_role": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
             "type": "string"
-          },
-          "recorded_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "expires_at": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
           }
-        }
-      },
-      "DecisionScope": {
-        "type": "object",
-        "additionalProperties": false,
+        },
         "required": [
-          "proposed_action",
-          "external_object"
+          "schema_version",
+          "tenant_id",
+          "correlation_id",
+          "screening_id",
+          "case_id",
+          "state",
+          "signal",
+          "highest_priority",
+          "business_action",
+          "summary",
+          "findings",
+          "required_evidence",
+          "holds",
+          "version_set",
+          "result_hash",
+          "created_at"
         ],
-        "properties": {
-          "proposed_action": {
-            "$ref": "#/components/schemas/ProposedAction"
-          },
-          "external_object": {
-            "$ref": "#/components/schemas/ExternalObject"
-          }
-        }
-      },
-      "VersionSet": {
-        "type": "object",
-        "required": [
-          "schema",
-          "sources",
-          "rules",
-          "matcher"
-        ],
-        "properties": {
-          "schema": {
-            "type": "string"
-          },
-          "sources": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "rules": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "matcher": {
-            "type": "string"
-          },
-          "models": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "SourceStatus": {
-        "type": "object",
-        "required": [
-          "source_id",
-          "active_snapshot_id",
-          "status",
-          "retrieved_at"
-        ],
-        "properties": {
-          "source_id": {
-            "type": "string"
-          },
-          "active_snapshot_id": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "CURRENT",
-              "STALE",
-              "UNAVAILABLE",
-              "QUARANTINED"
-            ]
-          },
-          "retrieved_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "effective_from": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
-          }
-        }
-      },
-      "CaseState": {
-        "type": "string",
-        "enum": [
-          "INCOMPLETE",
-          "REVIEW_REQUIRED",
-          "ESCALATE",
-          "HUMAN_CLEARED",
-          "HUMAN_BLOCKED",
-          "CLOSED_NO_ACTION"
-        ]
-      },
-      "ProposedAction": {
-        "type": "string",
-        "enum": [
-          "CUSTOMER_ONBOARDING",
-          "QUOTE_RELEASE",
-          "ORDER_ACCEPTANCE",
-          "BOOKING",
-          "SHIPMENT_RELEASE",
-          "PAYMENT"
-        ]
-      },
-      "HumanDecisionType": {
-        "type": "string",
-        "enum": [
-          "HUMAN_CLEARED",
-          "HUMAN_BLOCKED",
-          "CLOSED_NO_ACTION"
-        ]
+        "title": "ScreeningResult",
+        "type": "object"
       },
       "Signal": {
-        "type": "string",
-        "description": "Decision-support presentation signal. NOT_APPLICABLE is used when the proposal is CLOSED_NO_ACTION; it is not a clearance signal.",
+        "description": "Presentation signal; GREEN_CANDIDATE is never legal clearance.",
         "enum": [
           "RED",
           "YELLOW",
           "GREEN_CANDIDATE",
           "GREEN_HUMAN",
           "NOT_APPLICABLE"
-        ]
-      },
-      "Priority": {
-        "type": "string",
-        "enum": [
-          "P0",
-          "P1",
-          "P2",
-          "NONE"
-        ]
-      },
-      "BusinessAction": {
-        "type": "string",
-        "enum": [
-          "HOLD",
-          "REQUEST_EVIDENCE",
-          "ESCALATE",
-          "BLOCK",
-          "MONITOR",
-          "NO_ACTION",
-          "ALLOW_WITHIN_HUMAN_DECISION"
-        ]
-      },
-      "Error": {
-        "type": "object",
-        "required": [
-          "code",
-          "message",
-          "correlation_id",
-          "retryable"
         ],
+        "title": "Signal",
+        "type": "string"
+      },
+      "SourceStatus": {
+        "additionalProperties": false,
         "properties": {
-          "code": {
+          "source_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Source Id",
             "type": "string"
           },
-          "message": {
-            "type": "string"
+          "active_snapshot_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Active Snapshot Id"
           },
-          "correlation_id": {
-            "type": "string"
+          "status": {
+            "$ref": "#/components/schemas/SourceStatusValue"
           },
-          "retryable": {
-            "type": "boolean"
+          "retrieved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Retrieved At"
           },
-          "details": {
-            "type": "object",
-            "additionalProperties": true
+          "effective_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Effective From"
           }
-        }
+        },
+        "required": [
+          "source_id",
+          "status"
+        ],
+        "title": "SourceStatus",
+        "type": "object"
+      },
+      "SourceStatusValue": {
+        "enum": [
+          "CURRENT",
+          "STALE",
+          "UNAVAILABLE",
+          "QUARANTINED"
+        ],
+        "title": "SourceStatusValue",
+        "type": "string"
+      },
+      "Uncertainty": {
+        "additionalProperties": false,
+        "properties": {
+          "fact_path": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Fact Path",
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fact_path",
+          "description"
+        ],
+        "title": "Uncertainty",
+        "type": "object"
+      },
+      "VersionReference": {
+        "additionalProperties": false,
+        "properties": {
+          "resource_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+            "title": "Resource Id",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "pattern": "^sha256:[a-f0-9]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Content Hash"
+          }
+        },
+        "required": [
+          "resource_id",
+          "version"
+        ],
+        "title": "VersionReference",
+        "type": "object"
+      },
+      "VersionSet": {
+        "additionalProperties": false,
+        "properties": {
+          "input_schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Input Schema",
+            "type": "string"
+          },
+          "input_hash": {
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Input Hash",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/VersionReference"
+            },
+            "maxItems": 256,
+            "title": "Sources",
+            "type": "array"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/VersionReference"
+            },
+            "maxItems": 256,
+            "title": "Rules",
+            "type": "array"
+          },
+          "matcher": {
+            "$ref": "#/components/schemas/VersionReference"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/VersionReference"
+            },
+            "maxItems": 64,
+            "title": "Models",
+            "type": "array"
+          }
+        },
+        "required": [
+          "input_schema",
+          "input_hash",
+          "sources",
+          "rules",
+          "matcher"
+        ],
+        "title": "VersionSet",
+        "type": "object"
       }
     },
     "responses": {
@@ -1312,6 +3314,665 @@
           }
         }
       }
+    },
+    "examples": {
+      "TransactionScreeningRequest": {
+        "summary": "Complete synthetic transaction intake",
+        "value": {
+          "schema_version": "1.0.0",
+          "tenant_id": "tenant-demo",
+          "correlation_id": "crm-quote-001",
+          "data_classification": "SYNTHETIC",
+          "external_object": {
+            "system": "demo-crm",
+            "object_type": "QUOTE",
+            "object_id": "demo-quote-001",
+            "object_version": "1"
+          },
+          "proposed_action": "QUOTE_RELEASE",
+          "activities": [
+            "SALE",
+            "SUPPLY",
+            "EXPORT",
+            "TRANSPORT"
+          ],
+          "action_due_at": "2026-08-07T08:00:00Z",
+          "legal_nexus": [
+            {
+              "nexus_ref": "nexus-eu",
+              "nexus_type": "REGULATORY_REGIME",
+              "jurisdiction": null,
+              "regime_code": "EU",
+              "basis": "Potential EU scope; applicable Member State remains unknown.",
+              "fact_class": "UNKNOWN",
+              "evidence_refs": [
+                "doc-invoice"
+              ],
+              "source_refs": [
+                "demo-policy-scope:1"
+              ]
+            },
+            {
+              "nexus_ref": "nexus-bank",
+              "nexus_type": "BANK_POLICY",
+              "jurisdiction": null,
+              "regime_code": "BANK_POLICY_UNKNOWN",
+              "basis": null,
+              "fact_class": "UNKNOWN",
+              "evidence_refs": [
+                "doc-invoice"
+              ],
+              "source_refs": []
+            }
+          ],
+          "parties": [
+            {
+              "party_ref": "seller-1",
+              "roles": [
+                "SELLER",
+                "PAYEE"
+              ],
+              "entity_type": "ORGANIZATION",
+              "legal_name": "Northern Bridge Logistics Demo Ltd",
+              "aliases": [],
+              "country": "CN",
+              "identifiers": [
+                {
+                  "type": "DEMO_REGISTRATION_ID",
+                  "value": "CN-DEMO-0001",
+                  "issuer": "CN"
+                }
+              ],
+              "address": "Synthetic address, Shanghai"
+            },
+            {
+              "party_ref": "buyer-1",
+              "roles": [
+                "BUYER",
+                "END_USER",
+                "PAYER"
+              ],
+              "entity_type": "ORGANIZATION",
+              "legal_name": "Волга Компонентс Демо ООО",
+              "aliases": [
+                "Volga Components Demo LLC"
+              ],
+              "country": "RU",
+              "identifiers": [],
+              "address": "Synthetic address, Moscow"
+            },
+            {
+              "party_ref": "owner-1",
+              "roles": [
+                "BENEFICIAL_OWNER"
+              ],
+              "entity_type": "PERSON",
+              "legal_name": "Synthetic Owner Person",
+              "aliases": [],
+              "country": "KZ",
+              "identifiers": [],
+              "address": null
+            },
+            {
+              "party_ref": "manufacturer-1",
+              "roles": [
+                "SUPPLIER"
+              ],
+              "entity_type": "ORGANIZATION",
+              "legal_name": "Demo Controls Laboratory",
+              "aliases": [],
+              "country": "CN",
+              "identifiers": [],
+              "address": null
+            },
+            {
+              "party_ref": "carrier-1",
+              "roles": [
+                "CARRIER"
+              ],
+              "entity_type": "ORGANIZATION",
+              "legal_name": "Synthetic Carrier Co",
+              "aliases": [],
+              "country": "KZ",
+              "identifiers": [],
+              "address": null
+            },
+            {
+              "party_ref": "vessel-1",
+              "roles": [
+                "VESSEL"
+              ],
+              "entity_type": "VESSEL",
+              "legal_name": "MV Synthetic Route",
+              "aliases": [],
+              "country": "KZ",
+              "identifiers": [],
+              "address": null
+            },
+            {
+              "party_ref": "origin-bank-1",
+              "roles": [
+                "ORIGINATING_BANK"
+              ],
+              "entity_type": "BANK",
+              "legal_name": "Synthetic Origin Bank",
+              "aliases": [],
+              "country": "CN",
+              "identifiers": [],
+              "address": null
+            },
+            {
+              "party_ref": "beneficiary-bank-1",
+              "roles": [
+                "BENEFICIARY_BANK"
+              ],
+              "entity_type": "BANK",
+              "legal_name": "Synthetic Settlement Bank",
+              "aliases": [],
+              "country": "KZ",
+              "identifiers": [],
+              "address": null
+            }
+          ],
+          "ownership_and_control": [
+            {
+              "relationship_ref": "ownership-1",
+              "from_party_ref": "owner-1",
+              "to_party_ref": "buyer-1",
+              "relationship_type": "OWNERSHIP",
+              "ownership_percentage": "25.5",
+              "control_basis": null,
+              "fact_class": "SOURCE_ASSERTION",
+              "evidence_refs": [
+                "doc-ownership"
+              ],
+              "source_refs": [
+                "demo-company-registry:2026-08-06"
+              ],
+              "valid_from": "2026-01-01T00:00:00Z",
+              "valid_to": null,
+              "reviewer_status": "UNREVIEWED"
+            }
+          ],
+          "goods": [
+            {
+              "line_ref": "line-1",
+              "description": "Synthetic industrial control module for compliance testing",
+              "manufacturer": "Demo Controls Laboratory",
+              "manufacturer_ref": "manufacturer-1",
+              "model_or_part_number": null,
+              "technical_specification": "Synthetic specifications; performance details incomplete.",
+              "software_version": null,
+              "firmware_version": null,
+              "classification_candidates": [
+                {
+                  "candidate_ref": "classification-hs-1",
+                  "scheme": "HS",
+                  "scheme_name": null,
+                  "code": "853710",
+                  "candidate_only": true,
+                  "rationale": "Supplier-provided candidate code; not reviewed.",
+                  "confidence": null,
+                  "fact_class": "SOURCE_ASSERTION",
+                  "evidence_refs": [
+                    "doc-tech"
+                  ],
+                  "source_refs": [],
+                  "reviewer_status": "UNREVIEWED"
+                },
+                {
+                  "candidate_ref": "classification-dual-use-1",
+                  "scheme": "EU_DUAL_USE_ANNEX_I",
+                  "scheme_name": null,
+                  "code": "3A999-SYNTHETIC-CANDIDATE",
+                  "candidate_only": true,
+                  "rationale": "Synthetic candidate retained for human classification.",
+                  "confidence": null,
+                  "fact_class": "INFERENCE",
+                  "evidence_refs": [
+                    "doc-tech"
+                  ],
+                  "source_refs": [
+                    "demo-eu-dual-use:1"
+                  ],
+                  "reviewer_status": "UNREVIEWED"
+                }
+              ],
+              "quantity": "10",
+              "quantity_unit": "each",
+              "unit_value": "1250",
+              "total_value": "12500",
+              "currency": "EUR",
+              "origin_country": "CN",
+              "end_use": {
+                "description": "Industrial automation; installation detail not provided.",
+                "end_user_ref": "buyer-1",
+                "installation_site": null,
+                "country": "RU"
+              }
+            }
+          ],
+          "route": {
+            "origin_country": "CN",
+            "loading_location": "Shanghai",
+            "transit_countries": [
+              "KZ"
+            ],
+            "discharge_location": "Synthetic inland terminal",
+            "destination_country": "RU",
+            "final_use_country": "RU",
+            "carrier_ref": "carrier-1",
+            "vessel_ref": "vessel-1"
+          },
+          "documents": [
+            {
+              "document_ref": "doc-tech",
+              "document_type": "TECHNICAL_SPECIFICATION",
+              "external_reference": "DEMO-DATASHEET-1",
+              "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "media_type": "application/pdf",
+              "issued_at": null,
+              "related_party_refs": [
+                "manufacturer-1"
+              ],
+              "related_goods_refs": [
+                "line-1"
+              ]
+            },
+            {
+              "document_ref": "doc-ownership",
+              "document_type": "OWNERSHIP_RECORD",
+              "external_reference": null,
+              "content_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "media_type": "application/json",
+              "issued_at": null,
+              "related_party_refs": [
+                "owner-1",
+                "buyer-1"
+              ],
+              "related_goods_refs": []
+            },
+            {
+              "document_ref": "doc-invoice",
+              "document_type": "INVOICE",
+              "external_reference": "DEMO-INVOICE-1",
+              "content_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "media_type": "application/pdf",
+              "issued_at": null,
+              "related_party_refs": [
+                "seller-1",
+                "buyer-1"
+              ],
+              "related_goods_refs": [
+                "line-1"
+              ]
+            }
+          ],
+          "payment": {
+            "payment_ref": "payment-1",
+            "payer_ref": "buyer-1",
+            "payee_ref": "seller-1",
+            "originating_bank_ref": "origin-bank-1",
+            "intermediary_bank_refs": [],
+            "beneficiary_bank_ref": "beneficiary-bank-1",
+            "amount": "12500",
+            "currency": "EUR",
+            "origin_country": "RU",
+            "destination_country": "CN",
+            "purpose": "Payment for synthetic industrial control modules.",
+            "evidence_refs": [
+              "doc-invoice"
+            ]
+          }
+        }
+      },
+      "IncompleteCustomerOnboardingRequest": {
+        "summary": "Structurally valid intake whose missing facts become findings, not 422",
+        "value": {
+          "schema_version": "1.0.0",
+          "tenant_id": "tenant-demo",
+          "correlation_id": "crm-customer-incomplete-001",
+          "data_classification": "SYNTHETIC",
+          "external_object": {
+            "system": "demo-crm",
+            "object_type": "CUSTOMER",
+            "object_id": "demo-customer-incomplete-001",
+            "object_version": "1"
+          },
+          "proposed_action": "CUSTOMER_ONBOARDING",
+          "activities": [],
+          "action_due_at": null,
+          "legal_nexus": [],
+          "parties": [
+            {
+              "party_ref": "customer-1",
+              "roles": [
+                "CUSTOMER"
+              ],
+              "entity_type": "ORGANIZATION",
+              "legal_name": null,
+              "aliases": [],
+              "country": null,
+              "identifiers": [],
+              "address": null
+            }
+          ],
+          "ownership_and_control": [],
+          "goods": [],
+          "route": null,
+          "documents": [],
+          "payment": null
+        }
+      },
+      "TransactionReviewRequiredResult": {
+        "summary": "Conservative hold and review-required result",
+        "value": {
+          "schema_version": "1.0.0",
+          "tenant_id": "tenant-demo",
+          "correlation_id": "crm-quote-001",
+          "screening_id": "scr-demo-001",
+          "case_id": "case-demo-001",
+          "state": "REVIEW_REQUIRED",
+          "signal": "YELLOW",
+          "highest_priority": "P1",
+          "business_action": "HOLD",
+          "summary": "Synthetic transaction has unresolved party identity, goods classification, end-use, and legal-nexus evidence.",
+          "findings": [
+            {
+              "finding_id": "fnd-party-001",
+              "kind": "PARTY_IDENTITY_INCOMPLETE",
+              "priority": "P1",
+              "status": "OPEN",
+              "fact_class": "UNKNOWN",
+              "summary": "Buyer registration identifier is missing; resolution is incomplete.",
+              "evidence_refs": [],
+              "source_refs": [
+                "demo-sanctions:2026-08-06"
+              ],
+              "rule_evaluation_refs": [
+                "eval-party-completeness-001"
+              ],
+              "uncertainty": [
+                {
+                  "fact_path": "parties.buyer-1.identifiers",
+                  "description": "No authoritative registration identifier was supplied."
+                }
+              ],
+              "required_evidence_refs": [
+                "req-buyer-id"
+              ],
+              "required_action": "OBTAIN_REGISTRATION_IDENTIFIER_AND_REVIEW",
+              "owner_role": "COMPLIANCE_REVIEWER",
+              "due_before": "QUOTE_RELEASE"
+            },
+            {
+              "finding_id": "fnd-goods-001",
+              "kind": "GOODS_CLASSIFICATION_UNRESOLVED",
+              "priority": "P1",
+              "status": "OPEN",
+              "fact_class": "UNKNOWN",
+              "summary": "Submitted HS and control codes are candidates, not determinations.",
+              "evidence_refs": [
+                "doc-tech"
+              ],
+              "source_refs": [
+                "demo-eu-dual-use:1"
+              ],
+              "rule_evaluation_refs": [
+                "eval-goods-completeness-001"
+              ],
+              "uncertainty": [
+                {
+                  "fact_path": "goods.line-1.classification_candidates",
+                  "description": "Technical parameters and human classification are incomplete."
+                }
+              ],
+              "required_evidence_refs": [
+                "req-goods-tech",
+                "req-end-use"
+              ],
+              "required_action": "OBTAIN_TECHNICAL_AND_END_USE_EVIDENCE",
+              "owner_role": "EXPORT_CONTROL_REVIEWER",
+              "due_before": "QUOTE_RELEASE"
+            },
+            {
+              "finding_id": "fnd-nexus-001",
+              "kind": "LEGAL_NEXUS_UNRESOLVED",
+              "priority": "P1",
+              "status": "OPEN",
+              "fact_class": "UNKNOWN",
+              "summary": "Applicable EU Member State and bank policy remain unconfirmed.",
+              "evidence_refs": [
+                "doc-invoice"
+              ],
+              "source_refs": [
+                "demo-policy-scope:1"
+              ],
+              "rule_evaluation_refs": [
+                "eval-nexus-completeness-001"
+              ],
+              "uncertainty": [
+                {
+                  "fact_path": "legal_nexus",
+                  "description": "Legal and contractual scope is incomplete."
+                }
+              ],
+              "required_evidence_refs": [
+                "req-legal-nexus"
+              ],
+              "required_action": "CONFIRM_LEGAL_NEXUS_AND_BANK_POLICY",
+              "owner_role": "LEGAL_COMPLIANCE_OWNER",
+              "due_before": "QUOTE_RELEASE"
+            }
+          ],
+          "required_evidence": [
+            {
+              "requirement_ref": "req-buyer-id",
+              "evidence_type": "OTHER",
+              "description": "Buyer authoritative registration identifier.",
+              "status": "REQUIRED",
+              "related_party_refs": [
+                "buyer-1"
+              ],
+              "related_goods_refs": []
+            },
+            {
+              "requirement_ref": "req-goods-tech",
+              "evidence_type": "TECHNICAL_SPECIFICATION",
+              "description": "Manufacturer model, part number, and complete technical data sheet.",
+              "status": "REQUIRED",
+              "related_party_refs": [],
+              "related_goods_refs": [
+                "line-1"
+              ]
+            },
+            {
+              "requirement_ref": "req-end-use",
+              "evidence_type": "END_USER_STATEMENT",
+              "description": "Final installation, use, and end-user statement.",
+              "status": "REQUIRED",
+              "related_party_refs": [
+                "buyer-1"
+              ],
+              "related_goods_refs": [
+                "line-1"
+              ]
+            },
+            {
+              "requirement_ref": "req-legal-nexus",
+              "evidence_type": "OTHER",
+              "description": "Applicable Member State and bank/customer policy scope.",
+              "status": "REQUIRED",
+              "related_party_refs": [],
+              "related_goods_refs": []
+            }
+          ],
+          "holds": [
+            {
+              "hold_id": "hold-quote-001",
+              "scope": "QUOTE_RELEASE",
+              "reason": "Open P1 findings require evidence and human review.",
+              "release_condition": "Resolve all open P1 findings and record a scoped human decision.",
+              "active": true
+            }
+          ],
+          "version_set": {
+            "input_schema": "1.0.0",
+            "input_hash": "sha256:0b2e3ac9855841c766112899e0f23641e27f38e5ca6b06e0cbda41bebf460d58",
+            "sources": [
+              {
+                "resource_id": "demo-sanctions",
+                "version": "2026-08-06",
+                "content_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+              },
+              {
+                "resource_id": "demo-company-registry",
+                "version": "2026-08-06",
+                "content_hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+              }
+            ],
+            "rules": [
+              {
+                "resource_id": "demo-eu-russia",
+                "version": "1",
+                "content_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+              },
+              {
+                "resource_id": "demo-policy-scope",
+                "version": "1",
+                "content_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              }
+            ],
+            "matcher": {
+              "resource_id": "demo-deterministic",
+              "version": "1",
+              "content_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+            },
+            "models": []
+          },
+          "result_hash": "sha256:10db1745d9b6d2bd335ea70d505147a5fbfafed01f70a64f789dec33504a855e",
+          "created_at": "2026-08-06T08:00:00Z"
+        }
+      },
+      "ScreeningCompletedEvent": {
+        "summary": "Minimal screening completion notification",
+        "value": {
+          "event_id": "evt-screening-001",
+          "event_type": "screening.completed",
+          "event_version": "1.0",
+          "occurred_at": "2026-08-06T08:00:01Z",
+          "tenant_id": "tenant-demo",
+          "correlation_id": "crm-quote-001",
+          "subject": {
+            "screening_id": "scr-demo-001",
+            "case_id": "case-demo-001",
+            "external_object_type": "QUOTE",
+            "external_object_id": "demo-quote-001"
+          },
+          "data": {
+            "kind": "screening.completed",
+            "screening_id": "scr-demo-001",
+            "case_id": "case-demo-001",
+            "case_state": "REVIEW_REQUIRED",
+            "business_action": "HOLD",
+            "signal": "YELLOW",
+            "result_hash": "sha256:10db1745d9b6d2bd335ea70d505147a5fbfafed01f70a64f789dec33504a855e"
+          }
+        }
+      },
+      "CaseStateChangedEvent": {
+        "summary": "Minimal case state-change notification",
+        "value": {
+          "event_id": "evt-case-state-001",
+          "event_type": "case.state_changed",
+          "event_version": "1.0",
+          "occurred_at": "2026-08-06T08:00:01Z",
+          "tenant_id": "tenant-demo",
+          "correlation_id": "crm-quote-001",
+          "subject": {
+            "screening_id": "scr-demo-001",
+            "case_id": "case-demo-001",
+            "external_object_type": "QUOTE",
+            "external_object_id": "demo-quote-001"
+          },
+          "data": {
+            "kind": "case.state_changed",
+            "case_id": "case-demo-001",
+            "previous_state": "INCOMPLETE",
+            "case_state": "REVIEW_REQUIRED",
+            "business_action": "HOLD",
+            "decision_expires_at": null
+          }
+        }
+      },
+      "HumanDecisionRecordedEvent": {
+        "summary": "Minimal human-decision notification",
+        "value": {
+          "event_id": "evt-decision-001",
+          "event_type": "human_decision.recorded",
+          "event_version": "1.0",
+          "occurred_at": "2026-08-06T08:00:01Z",
+          "tenant_id": "tenant-demo",
+          "correlation_id": "crm-quote-001",
+          "subject": {
+            "screening_id": "scr-demo-001",
+            "case_id": "case-demo-001",
+            "external_object_type": "QUOTE",
+            "external_object_id": "demo-quote-001"
+          },
+          "data": {
+            "kind": "human_decision.recorded",
+            "case_id": "case-demo-001",
+            "decision_id": "decision-demo-001",
+            "decision": "HUMAN_BLOCKED",
+            "decision_effective_from": "2026-08-06T08:00:01Z",
+            "decision_expires_at": null
+          }
+        }
+      }
     }
+  },
+  "webhooks": {
+    "tradeSieveEvent": {
+      "post": {
+        "operationId": "receiveTradeSieveEvent",
+        "summary": "Receive a signed minimal TradeSieve event",
+        "description": "Consumers verify the delivery signature, deduplicate event_id, and re-read the case before irreversible release.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventEnvelope"
+              },
+              "examples": {
+                "screening_completed": {
+                  "$ref": "#/components/examples/ScreeningCompletedEvent"
+                },
+                "case_state_changed": {
+                  "$ref": "#/components/examples/CaseStateChangedEvent"
+                },
+                "human_decision_recorded": {
+                  "$ref": "#/components/examples/HumanDecisionRecordedEvent"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Event accepted for idempotent processing"
+          },
+          "400": {
+            "description": "Invalid event envelope"
+          }
+        }
+      }
+    }
+  },
+  "x-tradesieve-canonical-source": {
+    "model": "tradesieve.application.contracts",
+    "generator": "scripts/generate_contract.py",
+    "drift_check": "uv run --locked python scripts/generate_contract.py --check"
   }
 }

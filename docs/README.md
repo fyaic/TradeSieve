@@ -20,8 +20,11 @@ TradeSieve documentation is decision-oriented: requirements preserve what is nee
 - [Docker reference deployment](getting-started/docker-reference.md)
 - [Target MVP user experience](getting-started/mvp-user-experience.md)
 - [Draft OpenAPI contract](../api/openapi/tradesieve.v1.json)
+- [Shared JSON Schema registry](../api/schemas/tradesieve.contracts.v1.json)
 - [Synthetic request](../examples/requests/transaction-screening.json)
+- [Incomplete onboarding request](../examples/requests/customer-onboarding.incomplete.json)
 - [Expected review-required response](../examples/responses/transaction-screening.review-required.json)
+- [Minimal case-state webhook](../examples/events/case.state-changed.json)
 
 ## Architecture
 
@@ -39,6 +42,7 @@ TradeSieve documentation is decision-oriented: requirements preserve what is nee
 - [ADR-0002: Human clearance only](decisions/0002-human-clearance-only.md)
 - [ADR-0003: One contract, multiple interfaces](decisions/0003-one-contract-multiple-interfaces.md)
 - [ADR-0004: Phase 1 modular Python service](decisions/0004-phase-1-modular-python-service.md)
+- [ADR-0005: Pydantic canonical contract source](decisions/0005-pydantic-canonical-contract-source.md)
 
 ## Delivery
 

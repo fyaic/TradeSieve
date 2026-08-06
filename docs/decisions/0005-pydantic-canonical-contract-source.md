@@ -37,10 +37,18 @@ imply a green or cleared result.
 
 Application request models carry `tenant_id` and `correlation_id` for persistence and
 audit. In REST, verified identity context is authoritative for tenant and the
-`X-Correlation-ID` header is authoritative for correlation; an adapter must reject a
-body mismatch. TS-601 and TS-501 implement those enforcement points. Semantic input
-hashes include tenant scope but exclude correlation because a retry trace must not
-change the business snapshot.
+`X-Correlation-ID` header, when supplied, is authoritative for correlation; an adapter
+must reject a body mismatch. TS-601 and TS-501 implement those enforcement points.
+Semantic input/result hashes include tenant scope but exclude correlation because a
+retry trace must not change business identity; result hashes also exclude their own
+digest field.
+
+Decimal facts are accepted as bounded canonical strings, never JSON numbers. Money,
+quantity, ownership percentage, and confidence are serialized without insignificant
+fractional zeroes before hashing. This prevents binary-float coercion and makes lexical
+forms such as `100` and `100.00` produce one semantic representation.
+Timezone-aware datetimes are likewise serialized in UTC with a `Z` suffix, so equivalent
+instants submitted with different offsets share one canonical representation.
 
 Event envelopes expose `event_type` at the top level for routing and include a matching
 `data.kind` because Pydantic's generated discriminated union needs a discriminator

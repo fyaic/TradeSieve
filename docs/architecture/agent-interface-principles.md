@@ -6,7 +6,7 @@ Make TradeSieve easy for software and AI agents to use without giving agents aut
 
 ## One application contract
 
-The REST API is the canonical service contract. CLI and MCP are adapters that call the same application layer and emit the same identifiers, finding schema, error taxonomy, and decision states.
+The Pydantic application models are the canonical typed contract. Generated REST/OpenAPI and JSON Schema plus CLI and MCP adapters call the same application layer and emit the same identifiers, finding schema, error taxonomy, and decision states.
 
 ```text
 Business service

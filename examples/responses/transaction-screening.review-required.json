@@ -1,62 +1,96 @@
 {
   "schema_version": "1.0.0",
-  "screening_id": "scr_demo001",
-  "case_id": "case_demo001",
+  "tenant_id": "tenant-demo",
+  "correlation_id": "crm-quote-001",
+  "screening_id": "scr-demo-001",
+  "case_id": "case-demo-001",
   "state": "REVIEW_REQUIRED",
   "signal": "YELLOW",
   "highest_priority": "P1",
   "business_action": "HOLD",
-  "summary": "Synthetic transaction has unresolved party identity, goods specification, end-user, and legal-nexus evidence.",
+  "summary": "Synthetic transaction has unresolved party identity, goods classification, end-use, and legal-nexus evidence.",
   "findings": [
     {
-      "finding_id": "fnd_demo_party_001",
+      "finding_id": "fnd-party-001",
       "kind": "PARTY_IDENTITY_INCOMPLETE",
       "priority": "P1",
       "status": "OPEN",
       "fact_class": "UNKNOWN",
-      "summary": "Buyer registration identifier is missing; candidate resolution is incomplete.",
+      "summary": "Buyer registration identifier is missing; resolution is incomplete.",
       "evidence_refs": [],
       "source_refs": [
-        "demo-sanctions:2026-08-06:synthetic-record-17"
+        "demo-sanctions:2026-08-06"
+      ],
+      "rule_evaluation_refs": [
+        "eval-party-completeness-001"
       ],
       "uncertainty": [
-        "No authoritative registration identifier was supplied"
+        {
+          "fact_path": "parties.buyer-1.identifiers",
+          "description": "No authoritative registration identifier was supplied."
+        }
+      ],
+      "required_evidence_refs": [
+        "req-buyer-id"
       ],
       "required_action": "OBTAIN_REGISTRATION_IDENTIFIER_AND_REVIEW",
       "owner_role": "COMPLIANCE_REVIEWER",
       "due_before": "QUOTE_RELEASE"
     },
     {
-      "finding_id": "fnd_demo_goods_001",
-      "kind": "GOODS_SPECIFICATION_INCOMPLETE",
+      "finding_id": "fnd-goods-001",
+      "kind": "GOODS_CLASSIFICATION_UNRESOLVED",
       "priority": "P1",
       "status": "OPEN",
       "fact_class": "UNKNOWN",
-      "summary": "Model, part number, and technical specification are missing; the HS code is not a definitive control classification.",
-      "evidence_refs": [],
+      "summary": "Submitted HS and control codes are candidates, not determinations.",
+      "evidence_refs": [
+        "doc-tech"
+      ],
       "source_refs": [
-        "demo-eu-russia:1:goods-completeness"
+        "demo-eu-dual-use:1"
+      ],
+      "rule_evaluation_refs": [
+        "eval-goods-completeness-001"
       ],
       "uncertainty": [
-        "Technical parameters cannot be compared with the configured control assertions"
+        {
+          "fact_path": "goods.line-1.classification_candidates",
+          "description": "Technical parameters and human classification are incomplete."
+        }
       ],
-      "required_action": "OBTAIN_MANUFACTURER_MODEL_AND_DATA_SHEET",
-      "owner_role": "SALES_AND_EXPORT_CONTROL_REVIEWER",
+      "required_evidence_refs": [
+        "req-goods-tech",
+        "req-end-use"
+      ],
+      "required_action": "OBTAIN_TECHNICAL_AND_END_USE_EVIDENCE",
+      "owner_role": "EXPORT_CONTROL_REVIEWER",
       "due_before": "QUOTE_RELEASE"
     },
     {
-      "finding_id": "fnd_demo_nexus_001",
+      "finding_id": "fnd-nexus-001",
       "kind": "LEGAL_NEXUS_UNRESOLVED",
       "priority": "P1",
       "status": "OPEN",
       "fact_class": "UNKNOWN",
-      "summary": "Applicable EU Member State and bank policy scope have not been confirmed.",
-      "evidence_refs": [],
+      "summary": "Applicable EU Member State and bank policy remain unconfirmed.",
+      "evidence_refs": [
+        "doc-invoice"
+      ],
       "source_refs": [
         "demo-policy-scope:1"
       ],
+      "rule_evaluation_refs": [
+        "eval-nexus-completeness-001"
+      ],
       "uncertainty": [
-        "Legal and contractual scope is incomplete"
+        {
+          "fact_path": "legal_nexus",
+          "description": "Legal and contractual scope is incomplete."
+        }
+      ],
+      "required_evidence_refs": [
+        "req-legal-nexus"
       ],
       "required_action": "CONFIRM_LEGAL_NEXUS_AND_BANK_POLICY",
       "owner_role": "LEGAL_COMPLIANCE_OWNER",
@@ -64,22 +98,90 @@
     }
   ],
   "required_evidence": [
-    "Buyer authoritative registration identifier",
-    "Manufacturer model or part number and technical data sheet",
-    "Final end-user and installation/use details",
-    "Applicable EU Member State and bank/customer policy scope"
+    {
+      "requirement_ref": "req-buyer-id",
+      "evidence_type": "OTHER",
+      "description": "Buyer authoritative registration identifier.",
+      "status": "REQUIRED",
+      "related_party_refs": [
+        "buyer-1"
+      ],
+      "related_goods_refs": []
+    },
+    {
+      "requirement_ref": "req-goods-tech",
+      "evidence_type": "TECHNICAL_SPECIFICATION",
+      "description": "Manufacturer model, part number, and complete technical data sheet.",
+      "status": "REQUIRED",
+      "related_party_refs": [],
+      "related_goods_refs": [
+        "line-1"
+      ]
+    },
+    {
+      "requirement_ref": "req-end-use",
+      "evidence_type": "END_USER_STATEMENT",
+      "description": "Final installation, use, and end-user statement.",
+      "status": "REQUIRED",
+      "related_party_refs": [
+        "buyer-1"
+      ],
+      "related_goods_refs": [
+        "line-1"
+      ]
+    },
+    {
+      "requirement_ref": "req-legal-nexus",
+      "evidence_type": "OTHER",
+      "description": "Applicable Member State and bank/customer policy scope.",
+      "status": "REQUIRED",
+      "related_party_refs": [],
+      "related_goods_refs": []
+    }
+  ],
+  "holds": [
+    {
+      "hold_id": "hold-quote-001",
+      "scope": "QUOTE_RELEASE",
+      "reason": "Open P1 findings require evidence and human review.",
+      "release_condition": "Resolve all open P1 findings and record a scoped human decision.",
+      "active": true
+    }
   ],
   "version_set": {
-    "schema": "1.0.0",
+    "input_schema": "1.0.0",
+    "input_hash": "sha256:0b2e3ac9855841c766112899e0f23641e27f38e5ca6b06e0cbda41bebf460d58",
     "sources": [
-      "demo-sanctions:2026-08-06"
+      {
+        "resource_id": "demo-sanctions",
+        "version": "2026-08-06",
+        "content_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      {
+        "resource_id": "demo-company-registry",
+        "version": "2026-08-06",
+        "content_hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      }
     ],
     "rules": [
-      "demo-eu-russia:1",
-      "demo-policy-scope:1"
+      {
+        "resource_id": "demo-eu-russia",
+        "version": "1",
+        "content_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      {
+        "resource_id": "demo-policy-scope",
+        "version": "1",
+        "content_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+      }
     ],
-    "matcher": "demo-deterministic:1",
+    "matcher": {
+      "resource_id": "demo-deterministic",
+      "version": "1",
+      "content_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    },
     "models": []
   },
+  "result_hash": "sha256:10db1745d9b6d2bd335ea70d505147a5fbfafed01f70a64f789dec33504a855e",
   "created_at": "2026-08-06T08:00:00Z"
 }

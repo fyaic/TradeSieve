@@ -71,26 +71,13 @@ Every error returns a stable `code`, `message`, `correlation_id`, `retryable`, a
 
 ## Webhook envelope
 
-```json
-{
-  "event_id": "evt_01...",
-  "event_type": "case.state_changed",
-  "event_version": "1.0",
-  "occurred_at": "2026-08-06T08:00:00Z",
-  "tenant_id": "tenant_demo",
-  "correlation_id": "crm-quote-123",
-  "subject": {
-    "case_id": "case_01...",
-    "external_object_type": "QUOTE",
-    "external_object_id": "demo-quote-123"
-  },
-  "data": {
-    "case_state": "REVIEW_REQUIRED",
-    "business_action": "HOLD",
-    "decision_expires_at": null
-  }
-}
-```
+The [generated case-state event](../../examples/events/case.state-changed.json) is the
+canonical executable envelope. `event_type` supports top-level routing and must match
+the nested `data.kind` discriminator; model validation rejects a mismatch. The payload
+contains only subject references, state/action, and expiry—not findings, evidence, or
+PII. Generated examples also cover
+[`screening.completed`](../../examples/events/screening.completed.json) and
+[`human_decision.recorded`](../../examples/events/human-decision.recorded.json).
 
 Delivery requirements:
 

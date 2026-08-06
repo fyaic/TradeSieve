@@ -9,6 +9,7 @@ uv sync --locked --all-groups
 uv run --locked ruff format --check .
 uv run --locked ruff check .
 uv run --locked mypy
+uv run --locked python scripts/generate_contract.py --check
 uv run --locked pytest
 uv build
 ./scripts/check_docs.sh

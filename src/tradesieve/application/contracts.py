@@ -12,7 +12,7 @@ import hashlib
 import json
 import re
 from collections import Counter
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Annotated, Literal
@@ -23,12 +23,11 @@ from pydantic import (
     BeforeValidator,
     ConfigDict,
     Field,
+    PlainSerializer,
     StringConstraints,
     WithJsonSchema,
     model_validator,
 )
-
-SCHEMA_VERSION: Literal["1.0.0"] = "1.0.0"
 
 ShortText = Annotated[str, StringConstraints(min_length=1, max_length=256)]
 LongText = Annotated[str, StringConstraints(min_length=1, max_length=5000)]
@@ -46,36 +45,81 @@ ContentHash = Annotated[
     str,
     StringConstraints(pattern=r"^sha256:[a-f0-9]{64}$"),
 ]
-PositiveQuantity = Annotated[
-    Decimal,
-    Field(gt=0, max_digits=24, decimal_places=6),
-]
-Percentage = Annotated[
-    Decimal,
-    Field(ge=0, le=100, max_digits=7, decimal_places=4),
-]
-Confidence = Annotated[
-    Decimal,
-    Field(ge=0, le=1, max_digits=6, decimal_places=5),
-]
-
-MONEY_PATTERN = (
+POSITIVE_DECIMAL_PATTERN = (
     r"^(?:[1-9][0-9]{0,17}(?:\.[0-9]{1,6})?|"
     r"0\.(?!0{1,6}$)[0-9]{1,6})$"
 )
+PERCENTAGE_PATTERN = r"^(?:100(?:\.0{1,4})?|(?:[0-9]|[1-9][0-9])(?:\.[0-9]{1,4})?)$"
+CONFIDENCE_PATTERN = r"^(?:0(?:\.[0-9]{1,5})?|1(?:\.0{1,5})?)$"
 
 
-def _require_money_string(value: object) -> object:
-    if not isinstance(value, str) or re.fullmatch(MONEY_PATTERN, value) is None:
-        raise ValueError("money amounts must be canonical decimal strings")
+def _require_decimal_string(value: object, pattern: str, label: str) -> object:
+    if not isinstance(value, str) or re.fullmatch(pattern, value) is None:
+        raise ValueError(f"{label} must be a canonical decimal string")
     return value
 
 
+def _require_money_string(value: object) -> object:
+    return _require_decimal_string(value, POSITIVE_DECIMAL_PATTERN, "money amount")
+
+
+def _require_quantity_string(value: object) -> object:
+    return _require_decimal_string(value, POSITIVE_DECIMAL_PATTERN, "quantity")
+
+
+def _require_percentage_string(value: object) -> object:
+    return _require_decimal_string(value, PERCENTAGE_PATTERN, "percentage")
+
+
+def _require_confidence_string(value: object) -> object:
+    return _require_decimal_string(value, CONFIDENCE_PATTERN, "confidence")
+
+
+def _serialize_decimal(value: Decimal) -> str:
+    whole, separator, fraction = format(value, "f").partition(".")
+    if not separator:
+        return whole
+    trimmed_fraction = fraction.rstrip("0")
+    return f"{whole}.{trimmed_fraction}" if trimmed_fraction else whole
+
+
+PositiveQuantity = Annotated[
+    Decimal,
+    BeforeValidator(_require_quantity_string),
+    Field(gt=0, max_digits=24, decimal_places=6),
+    PlainSerializer(_serialize_decimal, return_type=str, when_used="json"),
+    WithJsonSchema({"type": "string", "pattern": POSITIVE_DECIMAL_PATTERN}),
+]
+Percentage = Annotated[
+    Decimal,
+    BeforeValidator(_require_percentage_string),
+    Field(ge=0, le=100, max_digits=7, decimal_places=4),
+    PlainSerializer(_serialize_decimal, return_type=str, when_used="json"),
+    WithJsonSchema({"type": "string", "pattern": PERCENTAGE_PATTERN}),
+]
+Confidence = Annotated[
+    Decimal,
+    BeforeValidator(_require_confidence_string),
+    Field(ge=0, le=1, max_digits=6, decimal_places=5),
+    PlainSerializer(_serialize_decimal, return_type=str, when_used="json"),
+    WithJsonSchema({"type": "string", "pattern": CONFIDENCE_PATTERN}),
+]
 MoneyAmount = Annotated[
     Decimal,
     BeforeValidator(_require_money_string),
     Field(gt=0, max_digits=24, decimal_places=6),
-    WithJsonSchema({"type": "string", "pattern": MONEY_PATTERN}),
+    PlainSerializer(_serialize_decimal, return_type=str, when_used="json"),
+    WithJsonSchema({"type": "string", "pattern": POSITIVE_DECIMAL_PATTERN}),
+]
+
+
+def _serialize_datetime(value: datetime) -> str:
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
+CanonicalDatetime = Annotated[
+    AwareDatetime,
+    PlainSerializer(_serialize_datetime, return_type=str, when_used="json"),
 ]
 
 
@@ -206,6 +250,8 @@ class CaseState(StrEnum):
 
 
 class Signal(StrEnum):
+    """Presentation signal; GREEN_CANDIDATE is never legal clearance."""
+
     RED = "RED"
     YELLOW = "YELLOW"
     GREEN_CANDIDATE = "GREEN_CANDIDATE"
@@ -221,6 +267,8 @@ class Priority(StrEnum):
 
 
 class BusinessAction(StrEnum):
+    """Operational instruction that the calling workflow must enforce."""
+
     HOLD = "HOLD"
     REQUEST_EVIDENCE = "REQUEST_EVIDENCE"
     ESCALATE = "ESCALATE"
@@ -310,12 +358,16 @@ class OwnershipControlRelationship(ContractModel):
     source_refs: Annotated[list[Reference], Field(max_length=64)] = Field(
         default_factory=list
     )
-    valid_from: AwareDatetime | None = None
-    valid_to: AwareDatetime | None = None
+    valid_from: CanonicalDatetime | None = None
+    valid_to: CanonicalDatetime | None = None
     reviewer_status: ReviewerStatus = ReviewerStatus.UNREVIEWED
 
     @model_validator(mode="after")
     def validate_time_window(self) -> OwnershipControlRelationship:
+        if self.from_party_ref == self.to_party_ref:
+            raise ValueError(
+                "ownership/control relationship cannot be self-referential"
+            )
         if (
             self.valid_from is not None
             and self.valid_to is not None
@@ -326,11 +378,19 @@ class OwnershipControlRelationship(ContractModel):
 
 
 class ClassificationCandidate(ContractModel):
+    """Proposed classification only; never an automatic legal determination."""
+
     candidate_ref: Reference
     scheme: ClassificationScheme
     scheme_name: ShortText | None = None
     code: ShortText
-    candidate_only: Literal[True] = True
+    candidate_only: Literal[True] = Field(
+        default=True,
+        description=(
+            "Always true: the code remains a candidate until an authorized human "
+            "classification decision is recorded."
+        ),
+    )
     rationale: LongText | None = None
     confidence: Confidence | None = None
     fact_class: FactClass = FactClass.UNKNOWN
@@ -411,7 +471,7 @@ class DocumentReference(ContractModel):
     external_reference: ShortText | None = None
     content_hash: ContentHash | None = None
     media_type: ShortText | None = None
-    issued_at: AwareDatetime | None = None
+    issued_at: CanonicalDatetime | None = None
     related_party_refs: Annotated[list[Reference], Field(max_length=64)] = Field(
         default_factory=list
     )
@@ -443,8 +503,18 @@ def _duplicates(values: list[str]) -> list[str]:
     return sorted(value for value, count in Counter(values).items() if count > 1)
 
 
+def _canonical_hash(payload: object) -> str:
+    encoded = json.dumps(
+        payload,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode()
+    return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
+
+
 class ScreeningRequest(ContractModel):
-    schema_version: Literal["1.0.0"] = SCHEMA_VERSION
+    schema_version: Literal["1.0.0"]
     tenant_id: Reference = Field(
         description=(
             "Application tenant scope. REST derives the authoritative value from the "
@@ -453,8 +523,8 @@ class ScreeningRequest(ContractModel):
     )
     correlation_id: Reference = Field(
         description=(
-            "Application trace identifier. REST treats X-Correlation-ID as "
-            "authoritative and rejects a body mismatch."
+            "Application trace identifier. When X-Correlation-ID is present, REST "
+            "treats it as authoritative and rejects a body mismatch."
         )
     )
     data_classification: DataClassification
@@ -463,7 +533,7 @@ class ScreeningRequest(ContractModel):
     activities: Annotated[list[RegulatedActivity], Field(max_length=16)] = Field(
         default_factory=list
     )
-    action_due_at: AwareDatetime | None = None
+    action_due_at: CanonicalDatetime | None = None
     legal_nexus: Annotated[list[LegalNexus], Field(max_length=64)] = Field(
         default_factory=list
     )
@@ -590,13 +660,8 @@ class ScreeningRequest(ContractModel):
         or reconciliation trace must not change the semantic business snapshot.
         """
 
-        payload = json.dumps(
-            self.model_dump(mode="json", exclude={"correlation_id"}),
-            ensure_ascii=False,
-            separators=(",", ":"),
-            sort_keys=True,
-        ).encode()
-        return f"sha256:{hashlib.sha256(payload).hexdigest()}"
+        payload = self.model_dump(mode="json", exclude={"correlation_id"})
+        return _canonical_hash(payload)
 
 
 class VersionReference(ContractModel):
@@ -684,6 +749,8 @@ class Hold(ContractModel):
 
 
 class ScreeningResult(ContractModel):
+    """Decision-support result; transport/HTTP success never means clearance."""
+
     schema_version: Literal["1.0.0"]
     tenant_id: Reference
     correlation_id: Reference
@@ -699,12 +766,25 @@ class ScreeningResult(ContractModel):
     holds: Annotated[list[Hold], Field(max_length=64)]
     version_set: VersionSet
     result_hash: ContentHash
-    created_at: AwareDatetime
+    created_at: CanonicalDatetime
 
     @model_validator(mode="after")
     def validate_result_references(self) -> ScreeningResult:
         _validate_result_graph(self.findings, self.required_evidence, self.holds)
         return self
+
+    def canonical_result_hash(self) -> str:
+        """Hash semantic result content, excluding hash and trace metadata.
+
+        Tenant scope remains included. ``correlation_id`` and ``result_hash`` are
+        excluded so retried delivery does not alter the result identity and the digest
+        is not self-referential.
+        """
+
+        payload = self.model_dump(
+            mode="json", exclude={"correlation_id", "result_hash"}
+        )
+        return _canonical_hash(payload)
 
 
 class DecisionScope(ContractModel):
@@ -724,7 +804,11 @@ class DecisionScope(ContractModel):
 def _validate_human_clearance_expiry(
     decision: HumanDecisionType, expires_at: datetime | None
 ) -> None:
-    if decision is HumanDecisionType.HUMAN_CLEARED and expires_at is None:
+    _validate_clearance_expiry(decision is HumanDecisionType.HUMAN_CLEARED, expires_at)
+
+
+def _validate_clearance_expiry(is_cleared: bool, expires_at: datetime | None) -> None:
+    if is_cleared and expires_at is None:
         raise ValueError("expires_at is required for HUMAN_CLEARED")
 
 
@@ -732,9 +816,33 @@ class HumanDecisionRequest(ContractModel):
     decision: HumanDecisionType
     scope: DecisionScope
     rationale: Annotated[str, StringConstraints(min_length=10, max_length=5000)]
-    resolved_finding_ids: Annotated[list[Reference], Field(max_length=512)]
-    evidence_refs: Annotated[list[Reference], Field(max_length=256)]
-    expires_at: AwareDatetime | None
+    resolved_finding_ids: Annotated[
+        list[Reference],
+        Field(
+            max_length=512,
+            description=(
+                "Findings resolved by this disposition. It may be empty for "
+                "HUMAN_BLOCKED or CLOSED_NO_ACTION; application policy requires "
+                "HUMAN_CLEARED to resolve every open P0/P1 finding."
+            ),
+        ),
+    ]
+    evidence_refs: Annotated[
+        list[Reference],
+        Field(
+            max_length=256,
+            description=(
+                "Evidence considered for the disposition. Application policy enforces "
+                "sufficient evidence for HUMAN_CLEARED and configured block policy."
+            ),
+        ),
+    ]
+    expires_at: CanonicalDatetime | None = Field(
+        description=(
+            "Required and non-null for HUMAN_CLEARED; application policy validates "
+            "that condition."
+        )
+    )
 
     @model_validator(mode="after")
     def require_clearance_expiry(self) -> HumanDecisionRequest:
@@ -749,8 +857,18 @@ class HumanDecision(HumanDecisionRequest):
     version_set: VersionSet
     reviewer_id: Reference
     reviewer_role: Reference
-    recorded_at: AwareDatetime
-    effective_from: AwareDatetime
+    recorded_at: CanonicalDatetime
+    effective_from: CanonicalDatetime
+
+    @model_validator(mode="after")
+    def validate_clearance_window(self) -> HumanDecision:
+        if (
+            self.decision is HumanDecisionType.HUMAN_CLEARED
+            and self.expires_at is not None
+            and self.expires_at < self.effective_from
+        ):
+            raise ValueError("expires_at must be on or after effective_from")
+        return self
 
 
 def _validate_result_graph(
@@ -795,7 +913,7 @@ class Case(ContractModel):
     holds: Annotated[list[Hold], Field(max_length=64)]
     version_set: VersionSet
     effective_human_decision: HumanDecision | None = None
-    updated_at: AwareDatetime
+    updated_at: CanonicalDatetime
 
     @model_validator(mode="after")
     def validate_case_references(self) -> Case:
@@ -819,10 +937,20 @@ class ReviewRequest(ContractModel):
 
 class SourceStatus(ContractModel):
     source_id: Reference
-    active_snapshot_id: Reference
+    active_snapshot_id: Reference | None = None
     status: SourceStatusValue
-    retrieved_at: AwareDatetime
-    effective_from: AwareDatetime | None = None
+    retrieved_at: CanonicalDatetime | None = None
+    effective_from: CanonicalDatetime | None = None
+
+    @model_validator(mode="after")
+    def require_current_snapshot(self) -> SourceStatus:
+        if self.status is SourceStatusValue.CURRENT and (
+            self.active_snapshot_id is None or self.retrieved_at is None
+        ):
+            raise ValueError(
+                "CURRENT source requires active_snapshot_id and retrieved_at"
+            )
+        return self
 
 
 class EventSubject(ContractModel):
@@ -848,7 +976,14 @@ class CaseStateChangedEventData(ContractModel):
     previous_state: CaseState
     case_state: CaseState
     business_action: BusinessAction
-    decision_expires_at: AwareDatetime | None
+    decision_expires_at: CanonicalDatetime | None
+
+    @model_validator(mode="after")
+    def require_clearance_expiry(self) -> CaseStateChangedEventData:
+        _validate_clearance_expiry(
+            self.case_state is CaseState.HUMAN_CLEARED, self.decision_expires_at
+        )
+        return self
 
 
 class HumanDecisionRecordedEventData(ContractModel):
@@ -856,8 +991,21 @@ class HumanDecisionRecordedEventData(ContractModel):
     case_id: Reference
     decision_id: Reference
     decision: HumanDecisionType
-    decision_effective_from: AwareDatetime
-    decision_expires_at: AwareDatetime | None
+    decision_effective_from: CanonicalDatetime
+    decision_expires_at: CanonicalDatetime | None
+
+    @model_validator(mode="after")
+    def validate_clearance_window(self) -> HumanDecisionRecordedEventData:
+        _validate_human_clearance_expiry(self.decision, self.decision_expires_at)
+        if (
+            self.decision is HumanDecisionType.HUMAN_CLEARED
+            and self.decision_expires_at is not None
+            and self.decision_expires_at < self.decision_effective_from
+        ):
+            raise ValueError(
+                "decision_expires_at must be on or after decision_effective_from"
+            )
+        return self
 
 
 EventData = Annotated[
@@ -872,7 +1020,7 @@ class EventEnvelope(ContractModel):
     event_id: Reference
     event_type: EventType
     event_version: Literal["1.0"]
-    occurred_at: AwareDatetime
+    occurred_at: CanonicalDatetime
     tenant_id: Reference
     correlation_id: Reference
     subject: EventSubject
@@ -882,6 +1030,13 @@ class EventEnvelope(ContractModel):
     def match_event_type_to_data(self) -> EventEnvelope:
         if self.event_type.value != self.data.kind:
             raise ValueError("event_type must match data.kind")
+        if self.subject.case_id != self.data.case_id:
+            raise ValueError("subject.case_id must match data.case_id")
+        if (
+            isinstance(self.data, ScreeningCompletedEventData)
+            and self.subject.screening_id != self.data.screening_id
+        ):
+            raise ValueError("subject.screening_id must match data.screening_id")
         return self
 
 
@@ -897,9 +1052,9 @@ class Error(ContractModel):
     message: LongText
     correlation_id: Reference
     retryable: bool
-    details: Annotated[dict[str, str | int | bool | None], Field(max_length=64)] = (
-        Field(default_factory=dict)
-    )
+    details: Annotated[
+        dict[Reference, ShortText | int | bool | None], Field(max_length=64)
+    ] = Field(default_factory=dict)
 
 
 CONTRACT_MODELS: tuple[type[ContractModel], ...] = (
