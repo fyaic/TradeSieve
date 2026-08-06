@@ -38,12 +38,17 @@ def imported_modules(path: Path, package_root: Path = PACKAGE_ROOT) -> set[str]:
         elif isinstance(node, ast.ImportFrom):
             if node.level == 0 and node.module:
                 modules.add(node.module)
+                modules.update(f"{node.module}.{alias.name}" for alias in node.names)
                 continue
 
             parent_levels = max(node.level - 1, 0)
             base_parts = package_parts[: len(package_parts) - parent_levels]
             if node.module:
-                modules.add(".".join((*base_parts, *node.module.split("."))))
+                resolved_module = ".".join((*base_parts, *node.module.split(".")))
+                modules.add(resolved_module)
+                modules.update(
+                    f"{resolved_module}.{alias.name}" for alias in node.names
+                )
             else:
                 modules.update(
                     ".".join((*base_parts, alias.name)) for alias in node.names
@@ -82,19 +87,24 @@ def test_layers_do_not_import_outward_dependencies(layer: str) -> None:
     [
         ("from ..application import command", "tradesieve.application"),
         ("from .. import adapters", "tradesieve.adapters"),
+        ("from ..adapters import client", "tradesieve.adapters"),
+        ("from tradesieve import adapters", "tradesieve.adapters"),
+        ("from tradesieve import application", "tradesieve.application"),
+        ("from tradesieve.adapters import client", "tradesieve.adapters"),
     ],
 )
-def test_relative_outward_imports_are_detected(
+def test_outward_import_forms_are_detected(
     tmp_path: Path, statement: str, expected_import: str
 ) -> None:
     package_root = tmp_path / "tradesieve"
     domain_root = package_root / "domain"
     domain_root.mkdir(parents=True)
-    fixture = domain_root / "relative_violation.py"
+    fixture = domain_root / "boundary_violation.py"
     fixture.write_text(f"{statement}\n", encoding="utf-8")
 
-    assert layer_violations(
+    violations = layer_violations(
         package_root,
         "domain",
         FORBIDDEN_IMPORTS["domain"],
-    ) == [f"domain/relative_violation.py imports {expected_import}"]
+    )
+    assert f"domain/boundary_violation.py imports {expected_import}" in violations
