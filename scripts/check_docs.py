@@ -21,7 +21,12 @@ IGNORED_PARTS = {
 }
 REQUIRED = (
     "AGENTS.md",
+    ".dockerignore",
+    ".env.example",
+    "Dockerfile",
     "README.md",
+    "alembic.ini",
+    "compose.yaml",
     "docs/README.md",
     "docs/requirements/original-request.md",
     "docs/requirements/problem-and-scope.md",
@@ -44,6 +49,7 @@ REQUIRED = (
     "docs/delivery/phase-1-plan.md",
     "docs/delivery/phase-1-backlog.md",
     "docs/getting-started/mvp-user-experience.md",
+    "docs/getting-started/docker-reference.md",
     "api/openapi/tradesieve.v1.json",
     "examples/requests/transaction-screening.json",
     "examples/responses/transaction-screening.review-required.json",

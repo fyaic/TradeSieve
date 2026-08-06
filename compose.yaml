@@ -1,0 +1,111 @@
+name: ${COMPOSE_PROJECT_NAME:-tradesieve-demo}
+
+x-tradesieve-environment: &tradesieve-environment
+  TRADESIEVE_MODE: ${TRADESIEVE_MODE:-demo}
+  TRADESIEVE_DATABASE_URL: ${TRADESIEVE_DATABASE_URL:-postgresql://tradesieve:local_demo_only@postgres:5432/tradesieve} # pragma: allowlist secret
+  TRADESIEVE_DEBUG: ${TRADESIEVE_DEBUG:-false}
+  TRADESIEVE_DEMO_BOOTSTRAP_ENABLED: ${TRADESIEVE_DEMO_BOOTSTRAP_ENABLED:-true}
+  TRADESIEVE_REQUIRED_SOURCE_SET: ${TRADESIEVE_REQUIRED_SOURCE_SET:-synthetic-demo-sources-v1}
+  TRADESIEVE_REQUIRED_RULE_SET: ${TRADESIEVE_REQUIRED_RULE_SET:-synthetic-demo-rules-v1}
+  TRADESIEVE_MIGRATION_ROOT: ${TRADESIEVE_MIGRATION_ROOT:-/app}
+  TRADESIEVE_HTTP_HOST: ${TRADESIEVE_HTTP_HOST:-0.0.0.0}
+  TRADESIEVE_HTTP_PORT: ${TRADESIEVE_HTTP_PORT:-8080}
+  TRADESIEVE_DATABASE_CONNECT_TIMEOUT_SECONDS: ${TRADESIEVE_DATABASE_CONNECT_TIMEOUT_SECONDS:-2}
+  TRADESIEVE_WORKER_HEARTBEAT_SECONDS: ${TRADESIEVE_WORKER_HEARTBEAT_SECONDS:-2}
+  TRADESIEVE_WORKER_STALE_AFTER_SECONDS: ${TRADESIEVE_WORKER_STALE_AFTER_SECONDS:-10}
+
+x-tradesieve-service: &tradesieve-service
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: tradesieve:0.1.0-dev
+  environment: *tradesieve-environment
+  init: true
+  read_only: true
+  tmpfs:
+    - /tmp:size=16m,mode=1777
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  networks:
+    - internal
+
+services:
+  postgres:
+    image: mirror.gcr.io/library/postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tradesieve}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_demo_only}
+      POSTGRES_DB: ${POSTGRES_DB:-tradesieve}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 2s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    networks:
+      - internal
+
+  migrate:
+    <<: *tradesieve-service
+    command: ["python", "-m", "tradesieve.manage", "migrate"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  bootstrap-demo:
+    <<: *tradesieve-service
+    command: ["python", "-m", "tradesieve.manage", "bootstrap-demo"]
+    restart: "no"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  app:
+    <<: *tradesieve-service
+    command: ["python", "-m", "tradesieve.http"]
+    depends_on:
+      bootstrap-demo:
+        condition: service_completed_successfully
+    ports:
+      - 127.0.0.1:${TRADESIEVE_HOST_PORT:-8080}:${TRADESIEVE_HTTP_PORT:-8080}
+    networks:
+      edge:
+        gw_priority: 1
+      internal: {}
+    healthcheck:
+      test: ["CMD", "python", "-m", "tradesieve.healthcheck", "app"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  worker:
+    <<: *tradesieve-service
+    command: ["python", "-m", "tradesieve.worker"]
+    depends_on:
+      bootstrap-demo:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "tradesieve.healthcheck", "worker"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+volumes:
+  postgres-data:
+
+networks:
+  internal:
+    internal: true
+  edge:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.host_binding_ipv4: 127.0.0.1

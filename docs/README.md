@@ -17,6 +17,7 @@ TradeSieve documentation is decision-oriented: requirements preserve what is nee
 ## User and integration experience
 
 - [Development setup and checks](getting-started/development.md)
+- [Docker reference deployment](getting-started/docker-reference.md)
 - [Target MVP user experience](getting-started/mvp-user-experience.md)
 - [Draft OpenAPI contract](../api/openapi/tradesieve.v1.json)
 - [Synthetic request](../examples/requests/transaction-screening.json)
