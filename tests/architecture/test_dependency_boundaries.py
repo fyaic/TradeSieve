@@ -108,6 +108,39 @@ def test_source_snapshot_contracts_are_a_one_way_schema_boundary() -> None:
     )
 
 
+def test_screening_intake_is_a_private_one_way_application_boundary() -> None:
+    intake_path = PACKAGE_ROOT / "application" / "screening_intake.py"
+    imports = imported_modules(intake_path)
+    forbidden = (
+        "tradesieve.adapters",
+        "tradesieve.ports",
+        "tradesieve.manage",
+        "tradesieve.runtime",
+        "fastapi",
+        "httpx",
+        "mcp",
+        "os",
+        "pathlib",
+        "psycopg",
+        "requests",
+        "socket",
+        "sqlalchemy",
+        "urllib",
+    )
+    violations = sorted(
+        imported
+        for imported in imports
+        if any(
+            imported == prefix or imported.startswith(f"{prefix}.")
+            for prefix in forbidden
+        )
+    )
+
+    assert not violations
+    assert "tradesieve.application.auth.RequestContext" in imports
+    assert "tradesieve.application.contracts.ScreeningRequest" in imports
+
+
 @pytest.mark.parametrize(
     ("statement", "expected_import"),
     [
