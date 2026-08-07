@@ -19,12 +19,20 @@ from tradesieve.application.auth import (
 )
 from tradesieve.application.rule_bundle import RuleBundleUnavailable
 from tradesieve.application.source_registry import SourceRegistryService
+from tradesieve.application.source_snapshot_contracts import SourceSnapshotListing
 from tradesieve.config import Settings, get_settings
 from tradesieve.demo_rule_bundle import DemoRuleActor, authorize_demo_rule_request
+from tradesieve.demo_source_snapshot import (
+    DEMO_SOURCE_ID,
+    DemoSourceActor,
+    authorize_demo_source_request,
+)
 from tradesieve.runtime import (
     MIGRATION_REVISION,
     bootstrap_demo,
     build_demo_rule_services,
+    build_demo_source_services,
+    build_source_snapshot_readiness_service,
     check_readiness,
     connect,
 )
@@ -148,6 +156,41 @@ def list_rules(settings: Settings) -> int:
     return 0
 
 
+def list_source_snapshots(settings: Settings) -> int:
+    """Print one authorized canonical snapshot listing in explicit demo mode."""
+
+    empty = SourceSnapshotListing(snapshots=[]).model_dump_json()
+    if settings.mode != "demo":
+        print(empty)
+        return 3
+    listing: SourceSnapshotListing | None = None
+    payload = empty
+    try:
+        with connect(settings) as connection:
+            if build_source_snapshot_readiness_service(settings, connection).is_ready():
+                graph = build_demo_source_services(settings, connection)
+                authorized = authorize_demo_source_request(
+                    settings,
+                    graph.authorization,
+                    actor=DemoSourceActor.READER,
+                    operation=Operation.SOURCE_READ,
+                    now=datetime.now(UTC),
+                )
+                listing = graph.query.list_snapshots(
+                    authorized,
+                    source_id=DEMO_SOURCE_ID,
+                )
+                payload = listing.model_dump_json()
+    except Exception:
+        print(empty)
+        return 2
+    if listing is None:
+        print(empty)
+        return 2
+    print(payload)
+    return 0 if listing.snapshots else 2
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -157,6 +200,7 @@ def main() -> None:
             "bootstrap-demo",
             "inspect",
             "list-sources",
+            "list-source-snapshots",
             "list-rules",
         ),
     )
@@ -170,6 +214,8 @@ def main() -> None:
         raise SystemExit(inspect_runtime(settings))
     elif args.command == "list-sources":
         raise SystemExit(list_sources(settings))
+    elif args.command == "list-source-snapshots":
+        raise SystemExit(list_source_snapshots(settings))
     else:
         raise SystemExit(list_rules(settings))
 

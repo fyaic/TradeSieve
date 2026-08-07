@@ -24,11 +24,14 @@ TradeSieve must protect both confidentiality and control integrity. A data leak 
 - API clients use client credentials or workload identity with audience-restricted short-lived tokens.
 - Accept JWT access-token claims only through the signature-verifying provider boundary described by [ADR-0006](../decisions/0006-verified-identity-and-deny-default-authorization.md); application code never decodes an unverified JWT.
 - Authorize every application command/query on tenant, role/scope, action, object, and relevant case state.
-- Application scopes: `screening:submit`, `screening:read`, `case:read`, `case:hold`, `evidence:submit`, `review:request`, `finding:resolve`, `decision:human`, `source:read`, `source:operate`, `policy:approve`, `audit:export`.
+- Application scopes: `screening:submit`, `screening:read`, `case:read`, `case:hold`, `evidence:submit`, `review:request`, `finding:resolve`, `decision:human`, `source:read`, `source:operate`, `source:approve`, `policy:approve`, `audit:export`.
 - Every final disposition under `decision:human` requires a named human identity, reviewer role, trusted case state and eligibility facts, an exact decision match, and four-eyes policy where configured; service-account and agent tokens are denied.
 - Map issuer-local or pairwise subjects through a trusted identity directory; use the stable canonical actor ID for entitlements, audit, and four-eyes comparison while retaining client identity separately.
 - Resolve object visibility, persisted case state, clearance eligibility, and submitting actor from trusted storage. Never accept those authorization facts from a request payload.
-- Source activation separates operator preparation from compliance/data approval for material changes.
+- Source retrieve/parse/validate operations allow only named human/service source
+  operators. Approval, activation, and rollback allow only a named human source
+  approver/compliance owner with `source:approve` and a trusted creator-separation
+  check; agents are denied. These policies do not assign production roles.
 - PostgreSQL roles separate migrations, application read/write, worker, audit export, and backup. Row-level security is defense in depth.
 
 The exhaustive scope/role/state rules and non-leaking denial mapping are in the
@@ -45,6 +48,13 @@ The exhaustive scope/role/state rules and non-leaking denial mapping are in the
 | Unauthorized mutation | Read-only default; mutation-specific scopes, idempotency, confirmation, complete audit |
 | Tool-result forgery/replay | TLS, opaque IDs, event/result hashes, timestamps, protocol/schema version, audit correlation |
 | Clearance delegation | No general clearance tool; human decision API rejects agent/service identities |
+
+The registered source-snapshot listing/detail/history schemas are operations-safe
+metadata contracts, not new REST or MCP capabilities. Their schema closure excludes raw
+bytes and values, record/assertion locators, registration governance/admin fields,
+free-form reasons, actor identities, client/audit IDs, paths, and exception bodies.
+Lifecycle `actor_type` remains a finite non-identifying category. Query authorization
+and any future adapter remain separate application boundaries.
 
 ## Data classification
 
@@ -75,7 +85,7 @@ The exhaustive scope/role/state rules and non-leaking denial mapping are in the
 ## Supply-chain and runtime baseline
 
 - Pin dependencies and base images; produce lockfiles and SBOM.
-- Run static, dependency, secret, container, contract, and test checks in CI with least-privilege GitHub Actions permissions.
+- Run static, dependency, secret, container, contract, and test checks in CI with least-privilege GitHub Actions permissions. Keep the isolated PostgreSQL 18.4 source-snapshot gate separate from the full Compose lifecycle so both failure boundaries remain visible.
 - Keep source/evidence parsers isolated from credentials and unnecessary network access.
 - Apply request/body/file limits, timeouts, concurrency limits, rate limits, and safe archive extraction.
 - Redact tokens, names, identifiers, document bodies, payment details, and raw match queries from default logs/traces.

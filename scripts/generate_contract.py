@@ -19,6 +19,11 @@ from tradesieve.application.contract_examples import (
     transaction_screening_request,
 )
 from tradesieve.application.contracts import CONTRACT_MODELS
+from tradesieve.application.source_snapshot_contracts import (
+    SOURCE_SNAPSHOT_CONTRACT_MODELS,
+)
+
+CANONICAL_CONTRACT_MODELS = (*CONTRACT_MODELS, *SOURCE_SNAPSHOT_CONTRACT_MODELS)
 
 ROOT = Path(
     os.environ.get("TRADESIEVE_CONTRACT_ROOT", Path(__file__).resolve().parents[1])
@@ -44,7 +49,7 @@ def json_bytes(value: object) -> bytes:
 
 def generated_schemas(ref_template: str) -> dict[str, object]:
     _, document = models_json_schema(
-        [(model, "validation") for model in CONTRACT_MODELS],
+        [(model, "validation") for model in CANONICAL_CONTRACT_MODELS],
         ref_template=ref_template,
     )
     definitions = document.get("$defs")
@@ -152,8 +157,13 @@ def render_artifacts() -> dict[Path, bytes]:
     }
     openapi["x-tradesieve-canonical-source"] = {
         "model": "tradesieve.application.contracts",
+        "additional_models": ["tradesieve.application.source_snapshot_contracts"],
         "generator": "scripts/generate_contract.py",
         "drift_check": "uv run --locked python scripts/generate_contract.py --check",
+    }
+    openapi["x-tradesieve-schema-entrypoints"] = {
+        model.__name__: {"$ref": f"#/components/schemas/{model.__name__}"}
+        for model in SOURCE_SNAPSHOT_CONTRACT_MODELS
     }
 
     shared_schema = {
@@ -161,8 +171,9 @@ def render_artifacts() -> dict[Path, bytes]:
         "$id": "https://tradesieve.invalid/schemas/tradesieve.contracts.v1.json",
         "title": "TradeSieve canonical application contract registry",
         "description": (
-            "Generated registry for REST, CLI, MCP, events, and webhooks. Consumers "
-            "select a named schema from $defs; do not edit this artifact."
+            "Generated canonical registry for implemented and planned adapters. "
+            "Schema registration alone creates no endpoint, tool, or raw export. "
+            "Consumers select a named schema from $defs; do not edit this artifact."
         ),
         "$defs": generated_schemas("#/$defs/{model}"),
         "x-tradesieve-entrypoints": [
@@ -171,6 +182,9 @@ def render_artifacts() -> dict[Path, bytes]:
             "Case",
             "HumanDecisionRequest",
             "EventEnvelope",
+            "SourceSnapshotListing",
+            "SourceSnapshotDetail",
+            "SourceSnapshotHistory",
         ],
     }
 

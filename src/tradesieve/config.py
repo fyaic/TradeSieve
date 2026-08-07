@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     required_source_set: RuntimeId = "synthetic-demo-sources-v1"
     required_rule_set: RuntimeId = "synthetic-demo-rules-v1"
     migration_root: Path = Path(".")
+    raw_object_root: Path = Path("/var/lib/tradesieve/raw")
     http_host: str = "0.0.0.0"
     http_port: Port = 8080
     database_connect_timeout_seconds: PositiveSeconds = 2
@@ -50,6 +51,13 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def reject_unsafe_non_demo_configuration(self) -> Self:
+        raw_root = self.raw_object_root
+        if (
+            not raw_root.is_absolute()
+            or raw_root == Path(raw_root.anchor)
+            or any(part in {"", ".", ".."} for part in raw_root.parts[1:])
+        ):
+            raise ValueError("raw object root must be an absolute private path")
         if self.worker_stale_after_seconds <= self.worker_heartbeat_seconds:
             raise ValueError(
                 "worker stale threshold must exceed the heartbeat interval"

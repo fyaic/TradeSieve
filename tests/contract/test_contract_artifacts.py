@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -12,6 +13,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from tradesieve.application import source_snapshot_query
 from tradesieve.application.contract_examples import (
     event_examples,
     incomplete_customer_onboarding_request,
@@ -20,6 +22,12 @@ from tradesieve.application.contract_examples import (
     transaction_screening_request,
 )
 from tradesieve.application.contracts import EventEnvelope, ScreeningRequest
+from tradesieve.application.source_snapshot_contracts import (
+    SOURCE_SNAPSHOT_CONTRACT_MODELS,
+    SourceSnapshotDetail,
+    SourceSnapshotHistory,
+    SourceSnapshotListing,
+)
 
 ROOT = Path(__file__).parents[2]
 GENERATOR = ROOT / "scripts/generate_contract.py"
@@ -92,6 +100,14 @@ def test_openapi_and_shared_registry_have_generated_schema_parity() -> None:
     assert openapi["x-tradesieve-canonical-source"]["model"] == (
         "tradesieve.application.contracts"
     )
+    assert openapi["x-tradesieve-canonical-source"]["additional_models"] == [
+        "tradesieve.application.source_snapshot_contracts"
+    ]
+    assert openapi["x-tradesieve-schema-entrypoints"] == {
+        "SourceSnapshotListing": {"$ref": "#/components/schemas/SourceSnapshotListing"},
+        "SourceSnapshotDetail": {"$ref": "#/components/schemas/SourceSnapshotDetail"},
+        "SourceSnapshotHistory": {"$ref": "#/components/schemas/SourceSnapshotHistory"},
+    }
     for schema in openapi_schemas.values():
         if schema.get("type") == "object":
             assert schema.get("additionalProperties") is False
@@ -124,6 +140,145 @@ def test_openapi_and_shared_registry_have_generated_schema_parity() -> None:
     for schema_name, field_name in decimal_fields:
         schema = openapi_schemas[schema_name]["properties"][field_name]
         assert {item["type"] for item in schema["anyOf"]} == {"string", "null"}
+
+
+def test_source_snapshot_contract_roots_have_parity_and_one_way_identity() -> None:
+    openapi = load_json(ROOT / "api/openapi/tradesieve.v1.json")
+    registry = load_json(ROOT / "api/schemas/tradesieve.contracts.v1.json")
+    assert isinstance(openapi, dict)
+    assert isinstance(registry, dict)
+    roots = (
+        SourceSnapshotListing,
+        SourceSnapshotDetail,
+        SourceSnapshotHistory,
+    )
+    root_names = [model.__name__ for model in roots]
+
+    assert roots == SOURCE_SNAPSHOT_CONTRACT_MODELS
+    assert registry["x-tradesieve-entrypoints"][-3:] == root_names
+    assert list(openapi["x-tradesieve-schema-entrypoints"]) == root_names
+    assert all(name in openapi["components"]["schemas"] for name in root_names)
+    assert all(name in registry["$defs"] for name in root_names)
+    assert source_snapshot_query.SourceSnapshotListing is SourceSnapshotListing
+    assert source_snapshot_query.SourceSnapshotDetail is SourceSnapshotDetail
+    assert source_snapshot_query.SourceSnapshotHistory is SourceSnapshotHistory
+
+
+def test_source_snapshot_schema_closure_is_operations_safe_and_redacted() -> None:
+    registry = load_json(ROOT / "api/schemas/tradesieve.contracts.v1.json")
+    assert isinstance(registry, dict)
+    definitions = registry["$defs"]
+    pending = [
+        "SourceSnapshotListing",
+        "SourceSnapshotDetail",
+        "SourceSnapshotHistory",
+    ]
+    closure: dict[str, object] = {}
+    while pending:
+        name = pending.pop()
+        if name in closure:
+            continue
+        schema = definitions[name]
+        closure[name] = schema
+
+        def collect_refs(value: object) -> None:
+            if isinstance(value, dict):
+                reference = value.get("$ref")
+                if isinstance(reference, str) and reference.startswith("#/$defs/"):
+                    pending.append(reference.removeprefix("#/$defs/"))
+                for nested in value.values():
+                    collect_refs(nested)
+            elif isinstance(value, list):
+                for nested in value:
+                    collect_refs(nested)
+
+        collect_refs(schema)
+
+    serialized = json.dumps(closure, sort_keys=True).lower()
+    for forbidden in (
+        "raw_bytes",
+        "original_name",
+        "native_locator",
+        "native_value",
+        "normalized_value",
+        "record_locator",
+        "assertion_locator",
+        "records",
+        "assertions",
+        "source_locator",
+        "private_payload",
+        "credential_secret_ref",
+        "licence_summary",
+        "contractual_constraints",
+        "legal_scope",
+        "data_scope",
+        "access_method",
+        "owner",
+        "responsible_operator",
+        "jurisdiction",
+        "reason",
+        "actor_id",
+        "actor_subject",
+        "client_id",
+        "command_event_id",
+        "authorization_event_id",
+        "lifecycle_event_id",
+        "path",
+        "error",
+        "message",
+        "traceback",
+        "exception",
+    ):
+        assert f'"{forbidden}"' not in serialized
+    history_schema = closure["SourceSnapshotHistoryRecord"]
+    assert isinstance(history_schema, dict)
+    history_properties = history_schema["properties"]
+    assert isinstance(history_properties, dict)
+    assert "actor_type" in history_properties
+    actor_type_schema = closure["LifecycleActorType"]
+    assert isinstance(actor_type_schema, dict)
+    assert actor_type_schema["enum"] == ["HUMAN", "SERVICE", "AGENT"]
+
+
+def test_snapshot_schema_registration_does_not_change_rest_or_webhook_surfaces() -> (
+    None
+):
+    openapi = load_json(ROOT / "api/openapi/tradesieve.v1.json")
+    assert isinstance(openapi, dict)
+
+    def canonical_hash(value: object) -> str:
+        payload = json.dumps(
+            value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode()
+        return hashlib.sha256(payload).hexdigest()
+
+    assert len(openapi["paths"]) == 9
+    assert (
+        canonical_hash(openapi["paths"])
+        == (
+            "bbba04b18871cb006628a43a49723dad34c790f44d45f350b451c8b5d0c89af9"  # pragma: allowlist secret
+        )
+    )
+    assert (
+        canonical_hash(openapi["webhooks"])
+        == (
+            "5fda7869ed3461c00b413a7a3c375207489a1afaf8802d30e8a983786b5e56f4"  # pragma: allowlist secret
+        )
+    )
+    assert all(
+        "snapshot" not in path.lower() and "raw" not in path.lower()
+        for path in openapi["paths"]
+    )
+
+
+def test_redocly_ignore_is_limited_to_pathless_source_snapshot_roots() -> None:
+    assert (ROOT / ".redocly.lint-ignore.yaml").read_text(encoding="utf-8") == (
+        "api/openapi/tradesieve.v1.json:\n"
+        "  no-unused-components:\n"
+        "    - '#/components/schemas/SourceSnapshotDetail'\n"
+        "    - '#/components/schemas/SourceSnapshotHistory'\n"
+        "    - '#/components/schemas/SourceSnapshotListing'\n"
+    )
 
 
 def test_generator_is_byte_deterministic_and_check_mode_detects_temp_drift(

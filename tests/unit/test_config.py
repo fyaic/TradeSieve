@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
@@ -29,6 +31,16 @@ def test_demo_configuration_is_explicit() -> None:
     assert settings.demo_bootstrap_enabled is True
     assert settings.rule_bundle_tenant_id == "demo-tenant"
     assert settings.required_source_set.startswith("synthetic")
+    assert settings.raw_object_root == Path("/var/lib/tradesieve/raw")
+
+
+@pytest.mark.parametrize(
+    "root",
+    [Path("."), Path("relative/raw"), Path("/"), Path("/private/../raw")],
+)
+def test_raw_object_root_requires_an_absolute_private_path(root: Path) -> None:
+    with pytest.raises(ValidationError, match="absolute private path"):
+        Settings(raw_object_root=root)
 
 
 @pytest.mark.parametrize(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from types import TracebackType
 from typing import Any, Self, cast
 
@@ -10,8 +11,13 @@ import psycopg
 import pytest
 
 from tradesieve import runtime
+from tradesieve.adapters.local_raw_object_store import LocalImmutableRawObjectStore
+from tradesieve.adapters.postgres_demo_source_bootstrap import (
+    DemoSourceBootstrapUnavailable,
+    DemoSourcePreflightState,
+)
 from tradesieve.config import Settings
-from tradesieve.domain.source_registry import ObservationConflict
+from tradesieve.ports.source_snapshot import SourceSnapshotPersistenceError
 
 
 class FakeResult:
@@ -31,6 +37,7 @@ class FakeConnection:
         *,
         revision: str | None = runtime.MIGRATION_REVISION,
         rule_ready: bool = True,
+        snapshot_ready: bool = True,
         source_manifest: list[str] | None = None,
         source_entries: list[tuple[Any, ...]] | None = None,
         observation_insert_rows: list[tuple[Any, ...]] | None = None,
@@ -40,6 +47,7 @@ class FakeConnection:
     ) -> None:
         self.revision = revision
         self.rule_ready = rule_ready
+        self.snapshot_ready = snapshot_ready
         self.source_manifest = (
             ["synthetic-source-v1"] if source_manifest is None else source_manifest
         )
@@ -144,6 +152,39 @@ def source_entry(
 
 def use_connection(monkeypatch: pytest.MonkeyPatch, connection: FakeConnection) -> None:
     monkeypatch.setattr(runtime, "connect", lambda settings: cast(Any, connection))
+    object_store = object()
+    monkeypatch.setattr(
+        runtime,
+        "LocalImmutableRawObjectStore",
+        lambda root: object_store,
+    )
+
+    class FakeSnapshotReadiness:
+        def __init__(
+            self,
+            registry: object,
+            repository: object,
+            store: object,
+            **kwargs: object,
+        ) -> None:
+            assert registry is not None
+            assert repository is not None
+            assert store is object_store
+            clock = kwargs.pop("clock")
+            assert callable(clock)
+            assert kwargs == {
+                "deployment_id": "demo",
+                "source_set_id": "synthetic-demo-sources-v1",
+            }
+
+        def is_ready(self) -> bool:
+            return connection.snapshot_ready
+
+    monkeypatch.setattr(
+        runtime,
+        "SourceSnapshotReadinessService",
+        FakeSnapshotReadiness,
+    )
 
     class FakeRuleReadiness:
         def __init__(self, repository: object, **kwargs: object) -> None:
@@ -250,6 +291,17 @@ def test_readiness_requires_both_coverage_sets(
     assert status.public_checks()["required_rule_coverage"] == "OK"
 
 
+def test_readiness_requires_byte_verified_source_snapshot_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    use_connection(monkeypatch, FakeConnection(snapshot_ready=False))
+    status = runtime.check_readiness(Settings())
+    assert status.ready is False
+    assert status.checks["required_source_coverage"] == "OK"
+    assert status.checks["required_source_snapshot_evidence"] == "UNAVAILABLE"
+    assert status.checks["required_rule_coverage"] == "OK"
+
+
 def test_readiness_rejects_missing_rule_coverage(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -320,8 +372,35 @@ def test_readiness_passes_with_migration_and_required_coverage(
         "database": "OK",
         "migration": "OK",
         "required_source_coverage": "OK",
+        "required_source_snapshot_evidence": "OK",
         "required_rule_coverage": "OK",
     }
+
+
+def test_readiness_missing_raw_object_root_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connection = FakeConnection()
+    use_connection(monkeypatch, connection)
+    monkeypatch.setattr(
+        runtime,
+        "LocalImmutableRawObjectStore",
+        lambda root: (_ for _ in ()).throw(SourceSnapshotPersistenceError()),
+    )
+    status = runtime.check_readiness(Settings())
+    assert status.ready is False
+    assert status.checks["required_source_snapshot_evidence"] == "UNAVAILABLE"
+
+
+def test_snapshot_readiness_builder_uses_durable_read_adapters(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "raw"
+    root.mkdir(mode=0o700)
+    service = runtime.build_source_snapshot_readiness_service(
+        Settings(raw_object_root=root), cast(Any, object())
+    )
+    assert isinstance(service._object_store, LocalImmutableRawObjectStore)
 
 
 def test_bootstrap_and_worker_heartbeat_write_expected_rows(
@@ -329,17 +408,31 @@ def test_bootstrap_and_worker_heartbeat_write_expected_rows(
 ) -> None:
     connection = FakeConnection()
     use_connection(monkeypatch, connection)
-    bootstrapped: list[tuple[Settings, object]] = []
+    bootstrapped: list[str] = []
+
+    def preflight(active_connection: object, registration: object) -> object:
+        del active_connection, registration
+        bootstrapped.append("preflight")
+        return DemoSourcePreflightState.EMPTY
+
+    monkeypatch.setattr(
+        runtime,
+        "prepare_demo_source_bootstrap",
+        preflight,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_bootstrap_demo_source_snapshots",
+        lambda settings, active_connection: bootstrapped.append("source"),
+    )
     monkeypatch.setattr(
         runtime,
         "_bootstrap_demo_rule_bundle",
-        lambda settings, active_connection, now: bootstrapped.append(
-            (settings, active_connection)
-        ),
+        lambda settings, active_connection, now: bootstrapped.append("rule"),
     )
     runtime.bootstrap_demo(Settings())
     runtime.record_worker_heartbeat(Settings())
-    assert bootstrapped == [(Settings(), connection)]
+    assert bootstrapped == ["preflight", "source", "rule"]
     assert not any(
         "INSERT INTO runtime_coverage" in query for query, _ in connection.executed
     )
@@ -349,7 +442,7 @@ def test_bootstrap_and_worker_heartbeat_write_expected_rows(
     assert any(
         "INSERT INTO source_registry" in query for query, _ in connection.executed
     )
-    assert any(
+    assert not any(
         "INSERT INTO source_runtime_observation" in query
         for query, _ in connection.executed
     )
@@ -359,17 +452,52 @@ def test_bootstrap_and_worker_heartbeat_write_expected_rows(
     )
 
 
-def test_demo_bootstrap_refuses_to_overwrite_a_newer_observation(
+def test_bootstrap_reuses_exact_registered_source_without_registry_writes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    future = datetime.now(UTC) + timedelta(days=1)
-    connection = FakeConnection(
-        observation_insert_rows=[],
-        current_observation=source_observation_row(observed_at=future),
-    )
+    connection = FakeConnection()
     use_connection(monkeypatch, connection)
-    with pytest.raises(ObservationConflict):
+    bootstrapped: list[str] = []
+    monkeypatch.setattr(
+        runtime,
+        "prepare_demo_source_bootstrap",
+        lambda active_connection, registration: DemoSourcePreflightState.REGISTERED,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_bootstrap_demo_source_snapshots",
+        lambda settings, active_connection: bootstrapped.append("source"),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_bootstrap_demo_rule_bundle",
+        lambda settings, active_connection, now: bootstrapped.append("rule"),
+    )
+    runtime.bootstrap_demo(Settings())
+    assert bootstrapped == ["source", "rule"]
+    assert connection.executed == []
+
+
+def test_demo_bootstrap_preflight_failure_has_no_downstream_bootstrap_write(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connection = FakeConnection()
+    use_connection(monkeypatch, connection)
+    monkeypatch.setattr(
+        runtime,
+        "prepare_demo_source_bootstrap",
+        lambda active_connection, registration: (_ for _ in ()).throw(
+            DemoSourceBootstrapUnavailable()
+        ),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_bootstrap_demo_source_snapshots",
+        lambda settings, active_connection: pytest.fail("source bootstrap ran"),
+    )
+    with pytest.raises(DemoSourceBootstrapUnavailable):
         runtime.bootstrap_demo(Settings())
+    assert connection.executed == []
 
 
 def test_worker_freshness_fails_when_readiness_fails(

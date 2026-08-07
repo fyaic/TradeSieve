@@ -1,6 +1,6 @@
 # Docker reference deployment
 
-**Status:** TS-201 source-registry and TS-205 rule-bundle foundations. This stack proves packaging, PostgreSQL migration, governed synthetic source and rule readiness, independent app/worker processes, and fail-closed health behavior. Screening, review workflows, public screening CLI, MCP, and production controls are not implemented yet.
+**Status:** TS-201 source-registry, TS-202 immutable source snapshots, and TS-205 rule-bundle foundations. This stack proves packaging, PostgreSQL migration, private immutable raw bytes, governed synthetic source/rule readiness, independent app/worker processes, rollback persistence, and fail-closed health behavior. Screening, review workflows, public screening REST/CLI, MCP, and production controls are not implemented yet.
 
 ## Demo-only configuration
 
@@ -13,6 +13,11 @@ cp .env.example .env
 Every value in `.env.example` is documented inline. The database credential and synthetic source/rule coverage IDs are intentionally weak demo defaults. Central configuration validation refuses those values, debug mode, or demo bootstrap whenever `TRADESIEVE_MODE=production`.
 
 `TRADESIEVE_MIGRATION_ROOT` explicitly names the directory containing `alembic.ini` and `migrations/`. The image sets it to `/app`; startup validates both paths before invoking Alembic, so installed package paths are never mistaken for deployment resources.
+
+`TRADESIEVE_RAW_OBJECT_ROOT` is the pre-created private `/var/lib/tradesieve/raw`
+directory. Bootstrap mounts its named volume read/write; app and worker mount the same
+volume read-only; migration mounts no raw volume. The image owns the `0700` root as UID
+`10001`, and immutable objects are verified `0600` files.
 
 The reference Compose stack is explicitly demo-only because it includes the `bootstrap-demo` one-shot service. It must not be reused as a production deployment file.
 
@@ -27,7 +32,7 @@ curl --fail http://127.0.0.1:8080/health/live
 curl --fail http://127.0.0.1:8080/health/ready
 ```
 
-`docker compose up` starts PostgreSQL, runs the real Alembic migrations, loads a required-source manifest plus governed synthetic registration/current observation, and uses authorized application services to draft, approve, and activate one immutable synthetic rule bundle. It then starts the non-root read-only app and worker containers. The app, worker, and PostgreSQL services each have a healthcheck. No `runtime_coverage` rule marker is written or trusted.
+`docker compose up` starts PostgreSQL, runs the real Alembic migrations, loads the governed synthetic registration, creates and verifies two immutable source snapshots through retrieve/parse/validate/approve/activate, and uses authorized application services to activate one immutable synthetic rule bundle. It then starts the non-root read-only app and worker containers. The app, worker, and PostgreSQL services each have a healthcheck. No `runtime_coverage` source/rule marker is written or trusted.
 
 The application image uses the Docker Official Image for Python 3.13.14 through Google's Docker Hub pull-through cache and copies the separately pinned `uv` 0.12.1 binary. The acceptance script verifies both versions, UID `10001`, and read-only `/app` behavior inside the final image.
 
@@ -56,6 +61,19 @@ manifest members are current and `2` when the set is unhealthy. Credential
 references and private contractual constraints are deliberately absent. This
 operations view is CLI-only until an authenticated administration adapter exists.
 
+Inspect the authorized operations-safe snapshot listing in demo mode:
+
+```bash
+docker compose run --rm --no-deps app \
+  python -m tradesieve.manage list-source-snapshots
+```
+
+The command returns two deterministic metadata summaries when verified source evidence
+is ready and an exact empty envelope with exit `2` when it is unavailable or corrupt.
+It exposes identifiers, hashes, finite parser/schema metadata, counts, times, lifecycle
+state, and validation/diff summaries only. It has no raw-byte, record/assertion,
+registration-admin, actor-identity, reason, audit-ID, REST, or MCP surface.
+
 Inspect the authorized active-rule projection in demo mode:
 
 ```bash
@@ -68,7 +86,7 @@ The command exits `0` with one `ACTIVE` bundle or `2` with a generic unavailable
 ## Health semantics
 
 - `/health/live` checks only that the HTTP process can respond. It does not query PostgreSQL or infer source coverage.
-- `/health/ready` returns `503` unless PostgreSQL is reachable, the expected migration revision is applied, every member of the configured source-set manifest is active and current, and the configured tenant/rule-set has one validated, governed, effective active bundle whose persisted content hash and lifecycle projection agree.
+- `/health/ready` returns `503` unless PostgreSQL is reachable, the expected migration revision is applied, every member of the configured source-set manifest is active/current with verified active snapshot metadata and private raw bytes, and the configured tenant/rule-set has one validated, governed, effective active bundle whose persisted content hash and lifecycle projection agree.
 - Official-source citations fail readiness unless an explicit snapshot/provision resolver verifies them with the exact boolean `True`. The current synthetic demo uses internal-policy citations and makes no official-source or legal-coverage claim.
 - A required source is stale at `age >= stale_after`; missing runtime facts, explicit failure, or future observations are unavailable. Inactive or explicitly quarantined sources remain distinct internally.
 - Internal operations can see sorted source IDs and exact states. The public health payload maps stale/quarantined states to generic `UNAVAILABLE` and never emits source IDs.
@@ -79,10 +97,22 @@ The app can therefore remain live while readiness fails closed during a database
 
 ## Clean-environment verification and teardown
 
-The automated acceptance script uses a unique Compose project, proves pre-migration and unsafe-production failures, starts all services, verifies safe source/rule projections and repeat-bootstrap audit stability, exercises append-only and authorization-link database constraints, forces active-pointer/state/content readiness failures with exact repair, verifies `CURRENT` → `STALE` → `UNAVAILABLE` source transitions, tests a database outage, and removes volumes/containers:
+The automated acceptance script uses separate fresh and legacy/main projects. It proves
+private-volume ownership/read-only boundaries, pristine and exact legacy upgrades,
+safe projections, idempotent bootstrap, database/raw identity across recreation, two
+application rollbacks, append-only/audit constraints, missing and same-length-tampered
+raw failures, lifecycle/observation corruption refusal and controlled repair, a database
+outage, and zero container/network/volume residue:
 
 ```bash
 ./scripts/test_compose.sh
+```
+
+The independent PostgreSQL 18.4 repository/concurrency/constraint gate remains a
+separate acceptance path:
+
+```bash
+./scripts/test_source_snapshot_postgres.sh
 ```
 
 Manual teardown:

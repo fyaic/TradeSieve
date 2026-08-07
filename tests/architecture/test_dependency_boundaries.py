@@ -82,6 +82,32 @@ def test_layers_do_not_import_outward_dependencies(layer: str) -> None:
     assert not violations, "outward dependency imports found:\n" + "\n".join(violations)
 
 
+def test_source_snapshot_contracts_are_a_one_way_schema_boundary() -> None:
+    contracts_path = PACKAGE_ROOT / "application" / "source_snapshot_contracts.py"
+    query_path = PACKAGE_ROOT / "application" / "source_snapshot_query.py"
+    contract_imports = imported_modules(contracts_path)
+    forbidden = (
+        "tradesieve.adapters",
+        "tradesieve.application.source_snapshot",
+        "tradesieve.application.source_snapshot_query",
+        "tradesieve.manage",
+        "tradesieve.runtime",
+    )
+    violations = sorted(
+        imported
+        for imported in contract_imports
+        if any(
+            imported == prefix or imported.startswith(f"{prefix}.")
+            for prefix in forbidden
+        )
+    )
+
+    assert not violations
+    assert "tradesieve.application.source_snapshot_contracts" in imported_modules(
+        query_path
+    )
+
+
 @pytest.mark.parametrize(
     ("statement", "expected_import"),
     [
@@ -116,7 +142,12 @@ def test_demo_runtime_entrypoints_never_construct_authorized_requests_directly()
     """AuthorizationService must remain the sole demo authorization factory."""
 
     violations: list[str] = []
-    for name in ("demo_rule_bundle.py", "manage.py", "runtime.py"):
+    for name in (
+        "demo_rule_bundle.py",
+        "demo_source_snapshot.py",
+        "manage.py",
+        "runtime.py",
+    ):
         path = PACKAGE_ROOT / name
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):

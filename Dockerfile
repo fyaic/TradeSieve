@@ -22,6 +22,8 @@ COPY migrations ./migrations
 RUN uv sync --locked --no-dev --no-editable \
     && groupadd --gid 10001 tradesieve \
     && useradd --uid 10001 --gid tradesieve --no-create-home --shell /usr/sbin/nologin tradesieve \
+    && install -d -m 0700 /var/lib/tradesieve/raw \
+    && chown tradesieve:tradesieve /var/lib/tradesieve/raw \
     && chown -R tradesieve:tradesieve /app
 
 USER 10001:10001

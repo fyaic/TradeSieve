@@ -52,6 +52,7 @@ class Scope(StrEnum):
     HUMAN_DECISION = "decision:human"
     SOURCE_READ = "source:read"
     SOURCE_OPERATE = "source:operate"
+    SOURCE_APPROVE = "source:approve"
     POLICY_READ = "policy:read"
     POLICY_OPERATE = "policy:operate"
     POLICY_APPROVE = "policy:approve"
@@ -62,6 +63,7 @@ class Role(StrEnum):
     COMPLIANCE_REVIEWER = "compliance_reviewer"
     COMPLIANCE_OWNER = "compliance_owner"
     SOURCE_OPERATOR = "source_operator"
+    SOURCE_APPROVER = "source_approver"
     POLICY_AUTHOR = "policy_author"
     POLICY_APPROVER = "policy_approver"
     AUDITOR = "auditor"
@@ -80,6 +82,12 @@ class Operation(StrEnum):
     RECORD_CLOSED_NO_ACTION = "RECORD_CLOSED_NO_ACTION"
     SOURCE_READ = "SOURCE_READ"
     SOURCE_OPERATE = "SOURCE_OPERATE"
+    SOURCE_SNAPSHOT_INGEST = "SOURCE_SNAPSHOT_INGEST"
+    SOURCE_SNAPSHOT_PARSE = "SOURCE_SNAPSHOT_PARSE"
+    SOURCE_SNAPSHOT_VALIDATE = "SOURCE_SNAPSHOT_VALIDATE"
+    SOURCE_SNAPSHOT_APPROVE = "SOURCE_SNAPSHOT_APPROVE"
+    SOURCE_SNAPSHOT_ACTIVATE = "SOURCE_SNAPSHOT_ACTIVATE"
+    SOURCE_SNAPSHOT_ROLLBACK = "SOURCE_SNAPSHOT_ROLLBACK"
     POLICY_READ = "POLICY_READ"
     POLICY_DRAFT = "POLICY_DRAFT"
     POLICY_APPROVE = "POLICY_APPROVE"
@@ -514,6 +522,39 @@ DEFAULT_POLICIES: Mapping[Operation, AuthorizationPolicy] = MappingProxyType(
             Scope.SOURCE_OPERATE,
             HUMAN_OR_SERVICE,
             frozenset({Role.SOURCE_OPERATOR}),
+        ),
+        Operation.SOURCE_SNAPSHOT_INGEST: AuthorizationPolicy(
+            Scope.SOURCE_OPERATE,
+            HUMAN_OR_SERVICE,
+            frozenset({Role.SOURCE_OPERATOR}),
+        ),
+        Operation.SOURCE_SNAPSHOT_PARSE: AuthorizationPolicy(
+            Scope.SOURCE_OPERATE,
+            HUMAN_OR_SERVICE,
+            frozenset({Role.SOURCE_OPERATOR}),
+        ),
+        Operation.SOURCE_SNAPSHOT_VALIDATE: AuthorizationPolicy(
+            Scope.SOURCE_OPERATE,
+            HUMAN_OR_SERVICE,
+            frozenset({Role.SOURCE_OPERATOR}),
+        ),
+        Operation.SOURCE_SNAPSHOT_APPROVE: AuthorizationPolicy(
+            Scope.SOURCE_APPROVE,
+            HUMANS,
+            frozenset({Role.SOURCE_APPROVER, Role.COMPLIANCE_OWNER}),
+            author_approver_separation_required=True,
+        ),
+        Operation.SOURCE_SNAPSHOT_ACTIVATE: AuthorizationPolicy(
+            Scope.SOURCE_APPROVE,
+            HUMANS,
+            frozenset({Role.SOURCE_APPROVER, Role.COMPLIANCE_OWNER}),
+            author_approver_separation_required=True,
+        ),
+        Operation.SOURCE_SNAPSHOT_ROLLBACK: AuthorizationPolicy(
+            Scope.SOURCE_APPROVE,
+            HUMANS,
+            frozenset({Role.SOURCE_APPROVER, Role.COMPLIANCE_OWNER}),
+            author_approver_separation_required=True,
         ),
         Operation.POLICY_READ: AuthorizationPolicy(Scope.POLICY_READ, ALL_ACTORS),
         Operation.POLICY_DRAFT: AuthorizationPolicy(
