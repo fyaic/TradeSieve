@@ -141,6 +141,113 @@ def test_screening_intake_is_a_private_one_way_application_boundary() -> None:
     assert "tradesieve.application.contracts.ScreeningRequest" in imports
 
 
+def test_screening_submission_domain_and_application_boundaries_are_one_way() -> None:
+    domain_path = PACKAGE_ROOT / "domain" / "screening_submission.py"
+    application_path = PACKAGE_ROOT / "application" / "screening_submission.py"
+    adapter_path = PACKAGE_ROOT / "adapters" / "in_memory_screening_submission.py"
+    domain_imports = imported_modules(domain_path)
+    application_imports = imported_modules(application_path)
+    adapter_imports = imported_modules(adapter_path)
+    forbidden_domain = (
+        "tradesieve.application",
+        "tradesieve.adapters",
+        "tradesieve.ports",
+        "fastapi",
+        "httpx",
+        "mcp",
+        "os",
+        "pathlib",
+        "psycopg",
+        "socket",
+        "sqlalchemy",
+        "urllib",
+        "uuid",
+    )
+    forbidden_application = (
+        "tradesieve.adapters",
+        "tradesieve.ports",
+        "tradesieve.manage",
+        "tradesieve.runtime",
+        "fastapi",
+        "httpx",
+        "mcp",
+        "os",
+        "pathlib",
+        "psycopg",
+        "socket",
+        "sqlalchemy",
+        "urllib",
+        "uuid",
+    )
+
+    assert not {
+        imported
+        for imported in domain_imports
+        if any(
+            imported == prefix or imported.startswith(f"{prefix}.")
+            for prefix in forbidden_domain
+        )
+    }
+    assert not {
+        imported
+        for imported in application_imports
+        if any(
+            imported == prefix or imported.startswith(f"{prefix}.")
+            for prefix in forbidden_application
+        )
+    }
+    assert "tradesieve.domain.screening_submission" in application_imports
+    assert "tradesieve.application.auth.AuthorizationRequest" in application_imports
+    assert "tradesieve.application.auth.AuthorizationService" in application_imports
+    assert "tradesieve.application.screening_submission" in adapter_imports
+    assert "tradesieve.application.screening_intake" in adapter_imports
+    assert "threading.RLock" in adapter_imports
+
+    application_tree = ast.parse(
+        application_path.read_text(encoding="utf-8"), filename=str(application_path)
+    )
+    classes = {
+        node.name: node
+        for node in application_tree.body
+        if isinstance(node, ast.ClassDef)
+    }
+    bound_methods = {
+        node.name
+        for node in classes["BoundScreeningSubmission"].body
+        if isinstance(node, ast.FunctionDef)
+    }
+    assert "_verified_intake_for_persistence" in bound_methods
+    assert not {
+        name
+        for name in bound_methods
+        if not name.startswith("_") and name.startswith(("raw", "list", "export"))
+    }
+    protocol_methods = {
+        node.name
+        for node in classes["ScreeningSubmissionUnitOfWork"].body
+        if isinstance(node, ast.FunctionDef)
+    }
+    assert protocol_methods == {"submit_atomic", "read_result", "resolve_attempt"}
+
+    service_methods = {
+        node.name
+        for node in classes["ScreeningSubmissionService"].body
+        if isinstance(node, ast.FunctionDef) and not node.name.startswith("_")
+    }
+    assert service_methods == {"submit"}
+    service_submit = next(
+        node
+        for node in classes["ScreeningSubmissionService"].body
+        if isinstance(node, ast.FunctionDef) and node.name == "submit"
+    )
+    assert [argument.arg for argument in service_submit.args.args] == [
+        "self",
+        "intake",
+        "idempotency_key",
+    ]
+    assert not service_submit.args.kwonlyargs
+
+
 @pytest.mark.parametrize(
     ("statement", "expected_import"),
     [
