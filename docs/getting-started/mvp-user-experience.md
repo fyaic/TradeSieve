@@ -1,6 +1,6 @@
 # Target MVP user experience
 
-> **Important:** this is the Phase 1 acceptance contract for version `0.1.0`, not a claim that the current foundation implements these screening/reviewer interfaces. The current private demo implements health, governed synthetic source snapshots/rules, and narrow operations CLI projections only. The README must switch from “target” to “released” only after the golden-path test passes.
+> **Important:** this is the Phase 1 acceptance contract for version `0.1.0`, not a claim that the current foundation implements these screening/reviewer interfaces. The current private demo implements health, governed synthetic source snapshots/rules, narrow operations projections, and a fixed synthetic APPLIED/REPLAY/CONFLICT receipt lifecycle only. It accepts no caller request body and creates no screening result or case. The README must switch the REST/reviewer journey from “target” to “released” only after that later golden-path test passes.
 
 ## What the user receives
 

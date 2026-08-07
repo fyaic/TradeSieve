@@ -108,6 +108,215 @@ def test_source_snapshot_contracts_are_a_one_way_schema_boundary() -> None:
     )
 
 
+def test_screening_intake_is_a_private_one_way_application_boundary() -> None:
+    intake_path = PACKAGE_ROOT / "application" / "screening_intake.py"
+    imports = imported_modules(intake_path)
+    forbidden = (
+        "tradesieve.adapters",
+        "tradesieve.ports",
+        "tradesieve.manage",
+        "tradesieve.runtime",
+        "fastapi",
+        "httpx",
+        "mcp",
+        "os",
+        "pathlib",
+        "psycopg",
+        "requests",
+        "socket",
+        "sqlalchemy",
+        "urllib",
+    )
+    violations = sorted(
+        imported
+        for imported in imports
+        if any(
+            imported == prefix or imported.startswith(f"{prefix}.")
+            for prefix in forbidden
+        )
+    )
+
+    assert not violations
+    assert "tradesieve.application.auth.RequestContext" in imports
+    assert "tradesieve.application.contracts.ScreeningRequest" in imports
+
+
+def test_screening_submission_domain_and_application_boundaries_are_one_way() -> None:
+    domain_path = PACKAGE_ROOT / "domain" / "screening_submission.py"
+    application_path = PACKAGE_ROOT / "application" / "screening_submission.py"
+    adapter_path = PACKAGE_ROOT / "adapters" / "in_memory_screening_submission.py"
+    postgres_adapter_path = (
+        PACKAGE_ROOT / "adapters" / "postgres_screening_submission.py"
+    )
+    codec_path = PACKAGE_ROOT / "adapters" / "screening_submission_codec.py"
+    domain_imports = imported_modules(domain_path)
+    application_imports = imported_modules(application_path)
+    adapter_imports = imported_modules(adapter_path)
+    postgres_adapter_imports = imported_modules(postgres_adapter_path)
+    codec_imports = imported_modules(codec_path)
+    forbidden_domain = (
+        "tradesieve.application",
+        "tradesieve.adapters",
+        "tradesieve.ports",
+        "fastapi",
+        "httpx",
+        "mcp",
+        "os",
+        "pathlib",
+        "psycopg",
+        "socket",
+        "sqlalchemy",
+        "urllib",
+        "uuid",
+    )
+    forbidden_application = (
+        "tradesieve.adapters",
+        "tradesieve.ports",
+        "tradesieve.manage",
+        "tradesieve.runtime",
+        "fastapi",
+        "httpx",
+        "mcp",
+        "os",
+        "pathlib",
+        "psycopg",
+        "socket",
+        "sqlalchemy",
+        "urllib",
+        "uuid",
+    )
+    forbidden_codec = (
+        "tradesieve.adapters.postgres",
+        "tradesieve.domain",
+        "tradesieve.manage",
+        "tradesieve.ports",
+        "tradesieve.runtime",
+        "alembic",
+        "fastapi",
+        "httpx",
+        "mcp",
+        "os",
+        "pathlib",
+        "psycopg",
+        "socket",
+        "sqlalchemy",
+        "urllib",
+        "uuid",
+    )
+
+    assert not {
+        imported
+        for imported in domain_imports
+        if any(
+            imported == prefix or imported.startswith(f"{prefix}.")
+            for prefix in forbidden_domain
+        )
+    }
+    assert not {
+        imported
+        for imported in application_imports
+        if any(
+            imported == prefix or imported.startswith(f"{prefix}.")
+            for prefix in forbidden_application
+        )
+    }
+    assert not {
+        imported
+        for imported in codec_imports
+        if any(
+            imported == prefix or imported.startswith(f"{prefix}.")
+            for prefix in forbidden_codec
+        )
+    }
+    assert "tradesieve.domain.screening_submission" in application_imports
+    assert "tradesieve.application.auth.AuthorizationRequest" in application_imports
+    assert "tradesieve.application.auth.AuthorizationService" in application_imports
+    assert "tradesieve.application.screening_submission" in adapter_imports
+    assert "tradesieve.application.screening_intake" in adapter_imports
+    assert "threading.RLock" in adapter_imports
+    assert "psycopg.Connection" in postgres_adapter_imports
+    assert (
+        "tradesieve.adapters.screening_submission_codec.decode_request_context"
+        in postgres_adapter_imports
+    )
+    assert (
+        "tradesieve.application.screening_submission.ScreeningSubmissionAtomicWrite"
+        in postgres_adapter_imports
+    )
+    assert not {
+        imported
+        for imported in postgres_adapter_imports
+        if imported.startswith(
+            (
+                "tradesieve.manage",
+                "tradesieve.runtime",
+                "fastapi",
+                "httpx",
+                "mcp",
+                "sqlalchemy",
+            )
+        )
+    }
+    assert "tradesieve.application.auth.RequestContext" in codec_imports
+
+    codec_tree = ast.parse(
+        codec_path.read_text(encoding="utf-8"), filename=str(codec_path)
+    )
+    codec_public_functions = {
+        node.name
+        for node in codec_tree.body
+        if isinstance(node, ast.FunctionDef) and not node.name.startswith("_")
+    }
+    assert codec_public_functions == {
+        "encode_request_context",
+        "decode_request_context",
+    }
+
+    application_tree = ast.parse(
+        application_path.read_text(encoding="utf-8"), filename=str(application_path)
+    )
+    classes = {
+        node.name: node
+        for node in application_tree.body
+        if isinstance(node, ast.ClassDef)
+    }
+    bound_methods = {
+        node.name
+        for node in classes["BoundScreeningSubmission"].body
+        if isinstance(node, ast.FunctionDef)
+    }
+    assert "_verified_intake_for_persistence" in bound_methods
+    assert not {
+        name
+        for name in bound_methods
+        if not name.startswith("_") and name.startswith(("raw", "list", "export"))
+    }
+    protocol_methods = {
+        node.name
+        for node in classes["ScreeningSubmissionUnitOfWork"].body
+        if isinstance(node, ast.FunctionDef)
+    }
+    assert protocol_methods == {"submit_atomic", "read_result", "resolve_attempt"}
+
+    service_methods = {
+        node.name
+        for node in classes["ScreeningSubmissionService"].body
+        if isinstance(node, ast.FunctionDef) and not node.name.startswith("_")
+    }
+    assert service_methods == {"submit"}
+    service_submit = next(
+        node
+        for node in classes["ScreeningSubmissionService"].body
+        if isinstance(node, ast.FunctionDef) and node.name == "submit"
+    )
+    assert [argument.arg for argument in service_submit.args.args] == [
+        "self",
+        "intake",
+        "idempotency_key",
+    ]
+    assert not service_submit.args.kwonlyargs
+
+
 @pytest.mark.parametrize(
     ("statement", "expected_import"),
     [

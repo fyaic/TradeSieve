@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Never, cast
+from uuid import uuid4
 
 import psycopg
 from psycopg import Connection
@@ -17,6 +18,9 @@ from tradesieve.adapters.postgres_demo_source_bootstrap import (
     prepare_demo_source_bootstrap,
 )
 from tradesieve.adapters.postgres_rule_bundle import PostgresRuleBundleRepository
+from tradesieve.adapters.postgres_screening_submission import (
+    PostgresScreeningSubmissionUnitOfWork,
+)
 from tradesieve.adapters.postgres_source_registry import PostgresSourceRegistry
 from tradesieve.adapters.postgres_source_snapshot import (
     PostgresSourceSnapshotRepository,
@@ -31,6 +35,10 @@ from tradesieve.application.contracts import HashedVersionReference
 from tradesieve.application.rule_bundle import (
     RuleBundleReadinessService,
     RuleBundleService,
+)
+from tradesieve.application.screening_submission import (
+    ScreeningSubmissionService,
+    ScreeningSubmissionServiceResult,
 )
 from tradesieve.application.source_registry import (
     SourceRegistryService,
@@ -54,6 +62,11 @@ from tradesieve.demo_rule_bundle import (
     authorize_demo_rule_request,
     demo_bundle_identity,
     synthetic_demo_rule_bundle,
+)
+from tradesieve.demo_screening_submission import (
+    DemoScreeningEntitlementResolver,
+    DemoScreeningFixture,
+    synthetic_demo_screening_intake,
 )
 from tradesieve.demo_source_snapshot import (
     DEMO_SOURCE_ACTIVATION_REASON,
@@ -99,7 +112,7 @@ from tradesieve.ports.source_snapshot import (
     SourceSnapshotRepository,
 )
 
-MIGRATION_REVISION = "20260806_0004"
+MIGRATION_REVISION = "20260806_0005"
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +135,52 @@ def connect(settings: Settings) -> Connection[Any]:
         connect_timeout=settings.database_connect_timeout_seconds,
         autocommit=True,
     )
+
+
+def connect_screening(settings: Settings) -> Connection[Any]:
+    """Open one non-autocommit connection owned by a screening UoW operation."""
+
+    return psycopg.connect(
+        settings.database_url,
+        connect_timeout=settings.database_connect_timeout_seconds,
+        autocommit=False,
+    )
+
+
+def submit_demo_screening(
+    settings: Settings,
+    idempotency_key: object,
+    fixture: DemoScreeningFixture,
+    *,
+    clock: Callable[[], datetime] | None = None,
+    id_factory: Callable[[str], str] | None = None,
+) -> ScreeningSubmissionServiceResult:
+    """Submit one synthetic intake through real authorization and PostgreSQL UoW."""
+
+    if settings.mode != "demo":
+        raise RuntimeError("synthetic screening requires explicit demo mode")
+    attempt_time = (clock or (lambda: datetime.now(UTC)))()
+    intake = synthetic_demo_screening_intake(settings, fixture, now=attempt_time)
+    allocate = id_factory or (lambda prefix: f"{prefix}-{uuid4().hex}")
+    unit_of_work = PostgresScreeningSubmissionUnitOfWork(
+        lambda: connect_screening(settings)
+    )
+    with connect(settings) as authorization_connection:
+        authorization = AuthorizationService(
+            PostgresAuthorizationAuditSink(authorization_connection),
+            DemoScreeningEntitlementResolver(settings),
+            event_id_factory=lambda: allocate("authz"),
+        )
+        service = ScreeningSubmissionService(
+            authorization,
+            unit_of_work,
+            clock=lambda: attempt_time,
+            attempt_id_factory=lambda: allocate("attempt"),
+            intake_id_factory=lambda: allocate("intake"),
+            screening_id_factory=lambda: allocate("screening"),
+            outbox_id_factory=lambda: allocate("outbox"),
+        )
+        return service.submit(intake, idempotency_key)
 
 
 def build_source_snapshot_readiness_service(

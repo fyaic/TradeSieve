@@ -521,6 +521,100 @@ assert len(files) == 2
 assert all((p.stat().st_uid, p.stat().st_gid, stat.S_IMODE(p.stat().st_mode)) == (10001, 10001, 0o600) for p in files)
 '
 assert_snapshot_listing "$fresh_project" "0"
+
+# Prove the only current screening entry point: a fixed synthetic receipt lifecycle.
+# It accepts no request bytes from the caller and exposes only safe opaque references.
+screening_key_a="synthetic-compose-key-a"
+screening_key_b="synthetic-compose-key-b"
+fresh_applied="$("${fresh_compose[@]}" run --rm --no-deps app \
+  tradesieve-manage submit-demo-screening \
+  --idempotency-key "$screening_key_a" --fixture baseline)"
+fresh_replay="$("${fresh_compose[@]}" run --rm --no-deps app \
+  tradesieve-manage submit-demo-screening \
+  --idempotency-key "$screening_key_a" --fixture baseline)"
+if fresh_conflict="$("${fresh_compose[@]}" run --rm --no-deps app \
+  tradesieve-manage submit-demo-screening \
+  --idempotency-key "$screening_key_a" --fixture changed)"; then
+  echo "changed synthetic input unexpectedly bypassed idempotency conflict" >&2
+  exit 1
+else
+  fresh_conflict_exit=$?
+fi
+if [[ "$fresh_conflict_exit" != "4" ]]; then
+  echo "demo screening conflict exit $fresh_conflict_exit; expected 4" >&2
+  exit 1
+fi
+python -c '
+import json
+import sys
+
+applied, replay, conflict = (json.loads(value) for value in sys.argv[1:])
+assert set(applied) == {"status", "disposition", "receipt"}, applied
+assert set(replay) == {"status", "disposition", "receipt"}, replay
+assert applied["status"] == replay["status"] == "ACCEPTED"
+assert applied["disposition"] == "APPLIED", applied
+assert replay["disposition"] == "REPLAY", replay
+assert applied["receipt"] == replay["receipt"], (applied, replay)
+assert set(applied["receipt"]) == {
+    "receipt_type", "schema_version", "accepted_at", "intake_id",
+    "screening_id", "outbox_event_id",
+}, applied
+assert applied["receipt"]["receipt_type"] == "SCREENING_ACCEPTED"
+assert applied["receipt"]["schema_version"] == "1.0.0"
+assert conflict == {"status": "IDEMPOTENCY_CONFLICT"}, conflict
+serialized = " ".join(sys.argv[1:]).lower()
+for forbidden in (
+    "synthetic-compose-key-a", "key_digest", "canonical_hash", "byte_hash",
+    "authorization_event_id", "actor_subject", "correlation_id",
+    "northern bridge", "volga components", "private", "traceback",
+    "exception", "password",
+):
+    assert forbidden not in serialized, forbidden
+' "$fresh_applied" "$fresh_replay" "$fresh_conflict"
+
+# Recreate both long-running application containers while retaining PostgreSQL,
+# then prove the original durable receipt still replays exactly.
+"${fresh_compose[@]}" up -d --no-deps --force-recreate --wait app worker
+fresh_replay_after_recreate="$("${fresh_compose[@]}" run --rm --no-deps app \
+  tradesieve-manage submit-demo-screening \
+  --idempotency-key "$screening_key_a" --fixture baseline)"
+fresh_independent="$("${fresh_compose[@]}" run --rm --no-deps app \
+  tradesieve-manage submit-demo-screening \
+  --idempotency-key "$screening_key_b" --fixture baseline)"
+python -c '
+import json
+import sys
+
+original, after, independent = (json.loads(value) for value in sys.argv[1:])
+assert after["status"] == "ACCEPTED" and after["disposition"] == "REPLAY", after
+assert after["receipt"] == original["receipt"], (original, after)
+assert independent["status"] == "ACCEPTED", independent
+assert independent["disposition"] == "APPLIED", independent
+assert independent["receipt"] != original["receipt"], (original, independent)
+assert "synthetic-compose-key-b" not in sys.argv[3]
+' "$fresh_applied" "$fresh_replay_after_recreate" "$fresh_independent"
+
+fresh_screening_counts="$("${fresh_compose[@]}" exec -T postgres \
+  psql -X -U tradesieve -d tradesieve --tuples-only --no-align -c \
+  "SELECT (SELECT count(*) FROM screening_accepted_intake) || '|' ||
+          (SELECT count(*) FROM screening_identity) || '|' ||
+          (SELECT count(*) FROM screening_idempotency_ledger) || '|' ||
+          (SELECT count(*) FROM screening_accepted_outbox) || '|' ||
+          (SELECT count(*) FROM screening_attempt_audit) || '|' ||
+          (SELECT count(*) FROM screening_attempt_audit WHERE outcome='APPLIED') || '|' ||
+          (SELECT count(*) FROM screening_attempt_audit WHERE outcome='REPLAY') || '|' ||
+          (SELECT count(*) FROM screening_attempt_audit WHERE outcome='CONFLICT') || '|' ||
+          (SELECT count(*) FROM authorization_audit_event
+             WHERE operation='SCREENING_SUBMIT' AND outcome='ALLOW') || '|' ||
+          (SELECT count(*) FROM screening_attempt_audit AS attempt
+             JOIN authorization_audit_event AS auth_event
+               ON auth_event.event_id=attempt.authorization_event_id
+            WHERE auth_event.operation='SCREENING_SUBMIT'
+              AND auth_event.outcome='ALLOW')")"
+if [[ "$fresh_screening_counts" != "2|2|2|2|5|2|2|1|5|5" ]]; then
+  echo "unexpected synthetic screening graph counts: $fresh_screening_counts" >&2
+  exit 1
+fi
 fresh_identity_before="$("${fresh_compose[@]}" exec -T postgres \
   psql -X -U tradesieve -d tradesieve --tuples-only --no-align -c \
   "SELECT string_agg(object_id || ':' || content_hash || ':' || byte_length, ',' ORDER BY object_id)
@@ -1065,6 +1159,30 @@ fi
 if [[ "$production_snapshot_exit" != "3" || \
       "$production_snapshot_output" != '{"snapshots":[]}' ]]; then
   echo "unexpected production snapshot CLI boundary: exit=$production_snapshot_exit output=$production_snapshot_output" >&2
+  exit 1
+fi
+
+production_screening_output=""
+if production_screening_output="$(
+  TRADESIEVE_MODE=production \
+  TRADESIEVE_DATABASE_URL="$production_probe_database_url" \
+  TRADESIEVE_DEMO_BOOTSTRAP_ENABLED=false \
+  TRADESIEVE_RULE_BUNDLE_TENANT_ID=tenant-1 \
+  TRADESIEVE_DEPLOYMENT_ID=production-1 \
+  TRADESIEVE_REQUIRED_SOURCE_SET=approved-sources-v1 \
+  TRADESIEVE_REQUIRED_RULE_SET=approved-rules-v1 \
+  "${compose[@]}" run --rm --no-deps app \
+  tradesieve-manage submit-demo-screening \
+  --idempotency-key synthetic-production-probe --fixture baseline
+)"; then
+  echo "production demo screening unexpectedly succeeded" >&2
+  exit 1
+else
+  production_screening_exit=$?
+fi
+if [[ "$production_screening_exit" != "3" || \
+      "$production_screening_output" != '{"status": "DISABLED"}' ]]; then
+  echo "unexpected production demo screening boundary: exit=$production_screening_exit output=$production_screening_output" >&2
   exit 1
 fi
 
