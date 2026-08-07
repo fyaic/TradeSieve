@@ -51,7 +51,7 @@ flowchart LR
 
 ## 项目进度
 
-**当前阶段：Phase 1 MVP 开发中。现在已有可运行的基础设施演示，但还没有可供外部系统提交真实 screening 请求的公开接口。**
+**当前阶段：Phase 1 MVP 开发中。现在已有可运行的合成受理与基础设施演示，但还没有可供外部系统提交真实 screening 请求的公开接口。**
 
 截至 2026-08-07，进度如下：
 
@@ -63,20 +63,20 @@ flowchart LR
 | 数据源注册与就绪度 | ✅ 已完成 | 版本化来源清单、时效检查、fail-closed readiness |
 | 规则包治理 | ✅ 已完成 | 有版本、有引用、可审批/激活/回滚的合成规则包 |
 | 原始来源快照 | ✅ 已完成 | 私有不可变对象、解析/验证证据、双人治理、PostgreSQL 持久化 |
-| 规范化受理与幂等 | 🟡 开发中 | 严格 canonical intake、授权范围幂等、原子审计/outbox 已完成；PostgreSQL 实库验收和运行时接线进行中，见 [TS-302](https://github.com/fyaic/TradeSieve/issues/21) / [PR #36](https://github.com/fyaic/TradeSieve/pull/36) |
+| 规范化受理与幂等 | ✅ 合成演示可用 | 严格 canonical intake、授权范围幂等、原子审计/outbox、PostgreSQL 18.4 持久化和 demo-only 运行入口；见 [TS-302](https://github.com/fyaic/TradeSieve/issues/21) / [PR #36](https://github.com/fyaic/TradeSieve/pull/36) |
 | 确定性审查与证据 | ⏳ 下一步 | 受治理规则、来源快照和物化事实的确定性评估 |
 | 案件/发现项/处置状态 | ⏳ 计划中 | 结构化 finding、evidence、hold 和人工决定 |
 | Screening REST API | ⏳ 计划中 | CRM/OMS 同步拦截与查询；当前 OpenAPI 仍是设计契约，不是已上线接口 |
 | Screening CLI 与 MCP | ⏳ 计划中 | 面向运营/CI 和 Agent 的同契约适配器；当前尚无 MCP Server |
 | Webhook 与可观测性 | ⏳ 计划中 | 签名事件、脱敏日志/指标/链路 |
 
-当前开发分支最近一次完整门禁为 **1,702 个测试通过，9,686 条语句和 2,756 个分支 100% 覆盖**；独立 PostgreSQL 18.4 门禁也已完成迁移、真实事务、双连接竞态、约束、破坏/修复、降级再升级和零残留验证。这些证据证明当前代码边界和回归集，不代表制裁数据覆盖率、法律正确率或生产可用性。
+当前开发分支最近一次完整门禁为 **1,721 个测试通过，9,780 条语句和 2,776 个分支 100% 覆盖**；独立 PostgreSQL 18.4 门禁也已完成迁移、真实事务、双连接竞态、约束、破坏/修复、降级再升级和零残留验证。这些证据证明当前代码边界和回归集，不代表制裁数据覆盖率、法律正确率或生产可用性。
 
 详细范围见 [MVP 定义](docs/product/mvp-scope.md)、[Phase 1 计划](docs/delivery/phase-1-plan.md) 和 [敏捷 backlog](docs/delivery/phase-1-backlog.md)。
 
 ## 现在可以怎样使用
 
-目前对外可用的是一个**合成数据、demo-only 的运行基础和运维检查面**。它可以验证部署、数据库迁移、数据源/规则/快照治理、持久化和失败关闭行为；不能提交客户或交易进行 screening。
+目前对外可用的是一个**合成数据、demo-only 的受理生命周期和运维检查面**。它可以验证部署、数据库迁移、数据源/规则/快照治理、幂等受理、持久化和失败关闭行为；不能提交真实客户或交易，也不会生成风险判断、finding、case 或放行结论。
 
 ### 1. 启动参考环境
 
@@ -119,9 +119,31 @@ docker compose run --rm --no-deps app \
   python -m tradesieve.manage list-rules
 ```
 
-这些命令只返回经过裁剪的运维安全字段，不导出原始来源字节、客户数据、凭据或私有规则文本。它们不是 screening CLI。
+这些命令只返回经过裁剪的运维安全字段，不导出原始来源字节、客户数据、凭据或私有规则文本。
 
-### 3. 停止并清理 demo
+### 3. 演示一次可重放的合成受理
+
+以下入口只使用仓库内置合成交易，不读取文件、标准输入或真实业务数据。先提交一个固定合成请求：
+
+```bash
+docker compose run --rm --no-deps app \
+  tradesieve-manage submit-demo-screening \
+  --idempotency-key synthetic-order-001 \
+  --fixture baseline
+```
+
+首次返回 `APPLIED` 和一组稳定的 opaque intake/screening/outbox ID；原命令重试返回 `REPLAY`，且收据引用保持不变。用同一个 key 提交语义变化的合成版本，可观察失败关闭的幂等冲突（退出码 `4`）：
+
+```bash
+docker compose run --rm --no-deps app \
+  tradesieve-manage submit-demo-screening \
+  --idempotency-key synthetic-order-001 \
+  --fixture changed
+```
+
+这是用于架构评估、CI 和接入方理解受理语义的 operations demo，不是接收任意输入的正式 screening CLI。它只证明“请求被安全、可审计地受理”，不代表已经执行制裁/两用物项判断，更不代表可以放行。
+
+### 4. 停止并清理 demo
 
 ```bash
 docker compose down --volumes --remove-orphans
@@ -135,9 +157,9 @@ docker compose down --volumes --remove-orphans
 
 | 使用者 | 现在可做什么 | 现在不能做什么 |
 | --- | --- | --- |
-| 架构/安全评估者 | 启动 Compose；检查健康、迁移、来源、快照、规则和失败关闭行为 | 不能提交真实客户、货物或交易 |
-| 开发者 | 运行完整测试；审查领域模型、OpenAPI/JSON Schema 和合成示例 | 不应把草案 OpenAPI 当作在线 API |
-| CRM/OMS 团队 | 依据 [集成设计](docs/architecture/integration-design.md) 和合成请求准备字段映射/拦截点 | 尚不能调用 screening endpoint 或接收 webhook |
+| 架构/安全评估者 | 启动 Compose；检查健康、治理、幂等受理、重放/冲突和失败关闭行为 | 不能提交真实客户、货物或交易 |
+| 开发者 | 运行完整测试与合成收据生命周期；审查领域模型、OpenAPI/JSON Schema 和合成示例 | 不应把 demo 命令或草案 OpenAPI 当作在线 API |
+| CRM/OMS 团队 | 用合成命令验证幂等 key、稳定引用和冲突语义；依据 [集成设计](docs/architecture/integration-design.md) 准备字段映射/拦截点 | 尚不能调用 screening endpoint 或接收 webhook |
 | AI/Agent 团队 | 审查 [Agent 接口原则](docs/architecture/agent-interface-principles.md) 和共享 Schema | 尚不能连接 MCP Server |
 | 合规人员 | 审查产品范围、证据模型、规则治理和人工放行边界 | 尚没有完整案件复核工作台 |
 
@@ -178,6 +200,7 @@ CLI 和 MCP 将调用相同的应用服务和契约：CLI 面向运营、CI 与�
 
 ```bash
 ./scripts/test_source_snapshot_postgres.sh  # PostgreSQL 18.4 持久化/并发/约束
+./scripts/test_screening_submission_postgres.sh  # 受理幂等/事务/竞态/破坏修复
 ./scripts/test_compose.sh                   # 完整参考部署与零残留验收
 ```
 

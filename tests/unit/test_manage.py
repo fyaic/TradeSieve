@@ -110,7 +110,7 @@ def test_inspect_runtime_returns_status_and_details(
     assert manage.inspect_runtime(Settings()) == (0 if ready else 1)
     payload = json.loads(capsys.readouterr().out)
     assert payload["ready"] is ready
-    assert payload["expected_migration"] == "20260806_0004"
+    assert payload["expected_migration"] == "20260806_0005"
     assert payload["expected_source_coverage"] == "synthetic-demo-sources-v1"
     assert payload["expected_rule_coverage"] == "synthetic-demo-rules-v1"
 
@@ -543,3 +543,214 @@ def test_main_propagates_list_source_snapshots_exit_status(
     with pytest.raises(SystemExit) as exc_info:
         manage.main()
     assert exc_info.value.code == 2
+
+
+def submission_result(disposition: str) -> object:
+    from datetime import UTC, datetime
+
+    from tradesieve.application.screening_submission import (
+        ScreeningSubmissionServiceDisposition,
+        ScreeningSubmissionServiceResult,
+    )
+    from tradesieve.domain.screening_submission import (
+        ScreeningAcceptanceReceipt,
+        ScreeningReceiptType,
+    )
+
+    return ScreeningSubmissionServiceResult(
+        disposition=ScreeningSubmissionServiceDisposition(disposition),
+        receipt=ScreeningAcceptanceReceipt(
+            receipt_type=ScreeningReceiptType.SCREENING_ACCEPTED,
+            schema_version="1.0.0",
+            accepted_at=datetime(2026, 8, 7, 4, 5, tzinfo=UTC),
+            intake_id="intake-safe",
+            screening_id="screening-safe",
+            outbox_event_id="outbox-safe",
+        ),
+    )
+
+
+def demo_fixture(value: str) -> Any:
+    from tradesieve.demo_screening_submission import DemoScreeningFixture
+
+    return DemoScreeningFixture(value)
+
+
+def service_error(code: str) -> Exception:
+    from tradesieve.application.screening_submission import (
+        ScreeningSubmissionServiceError,
+        ScreeningSubmissionServiceErrorCode,
+    )
+
+    return ScreeningSubmissionServiceError(ScreeningSubmissionServiceErrorCode(code))
+
+
+@pytest.mark.parametrize(
+    "disposition",
+    [
+        "APPLIED",
+        "REPLAY",
+    ],
+)
+def test_submit_demo_screening_prints_only_the_safe_receipt(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    disposition: str,
+) -> None:
+    calls: list[tuple[object, object]] = []
+
+    def submit(settings: Settings, key: object, fixture: object) -> object:
+        assert settings.mode == "demo"
+        calls.append((key, fixture))
+        return submission_result(disposition)
+
+    monkeypatch.setattr(manage, "submit_demo_screening", submit)
+    assert (
+        manage.submit_demo_screening_command(
+            Settings(),
+            idempotency_key="private-synthetic-key",
+            fixture=demo_fixture("baseline"),
+        )
+        == 0
+    )
+    assert calls == [("private-synthetic-key", demo_fixture("baseline"))]
+    payload = json.loads(capsys.readouterr().out)
+    assert payload == {
+        "disposition": disposition,
+        "receipt": {
+            "accepted_at": "2026-08-07T04:05:00Z",
+            "intake_id": "intake-safe",
+            "outbox_event_id": "outbox-safe",
+            "receipt_type": "SCREENING_ACCEPTED",
+            "schema_version": "1.0.0",
+            "screening_id": "screening-safe",
+        },
+        "status": "ACCEPTED",
+    }
+    serialized = json.dumps(payload)
+    for private in (
+        "private-synthetic-key",
+        "key_digest",
+        "canonical_hash",
+        "byte_hash",
+        "authorization_event_id",
+        "actor_subject",
+        "correlation_id",
+    ):
+        assert private not in serialized
+
+
+def test_submit_demo_screening_maps_conflict_without_a_receipt(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def conflict(*args: object, **kwargs: object) -> object:
+        del args, kwargs
+        raise service_error("IDEMPOTENCY_CONFLICT")
+
+    monkeypatch.setattr(manage, "submit_demo_screening", conflict)
+    assert (
+        manage.submit_demo_screening_command(
+            Settings(),
+            idempotency_key="private-conflict-key",
+            fixture=demo_fixture("changed"),
+        )
+        == 4
+    )
+    assert json.loads(capsys.readouterr().out) == {"status": "IDEMPOTENCY_CONFLICT"}
+
+
+def test_submit_demo_screening_is_disabled_before_runtime_in_production(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        manage,
+        "submit_demo_screening",
+        lambda *args, **kwargs: pytest.fail("disabled command reached runtime"),
+    )
+    settings = Settings(
+        mode="production",
+        database_url="postgresql://service:strong-password@db/tradesieve",  # pragma: allowlist secret
+        demo_bootstrap_enabled=False,
+        rule_bundle_tenant_id="tenant-1",
+        deployment_id="production-1",
+        required_source_set="approved-sources-v1",
+        required_rule_set="approved-rules-v1",
+    )
+    assert (
+        manage.submit_demo_screening_command(
+            settings,
+            idempotency_key="private-key",
+            fixture=demo_fixture("baseline"),
+        )
+        == 3
+    )
+    assert json.loads(capsys.readouterr().out) == {"status": "DISABLED"}
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        service_error("UNAVAILABLE"),
+        psycopg.OperationalError("private-database-sentinel"),
+        RuntimeError("private-runtime-sentinel"),
+    ],
+)
+def test_submit_demo_screening_failures_are_fixed_and_redacted(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    failure: Exception,
+) -> None:
+    monkeypatch.setattr(
+        manage,
+        "submit_demo_screening",
+        lambda *args, **kwargs: (_ for _ in ()).throw(failure),
+    )
+    assert (
+        manage.submit_demo_screening_command(
+            Settings(),
+            idempotency_key="private-key-sentinel",
+            fixture=demo_fixture("baseline"),
+        )
+        == 2
+    )
+    output = capsys.readouterr().out
+    assert json.loads(output) == {"status": "UNAVAILABLE"}
+    assert "sentinel" not in output
+
+
+def test_main_routes_demo_submission_options_and_exit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    called: list[tuple[str, Any]] = []
+
+    def submit(
+        settings: Settings,
+        idempotency_key: str,
+        fixture: Any,
+    ) -> int:
+        assert settings.mode == "demo"
+        called.append((idempotency_key, fixture))
+        return 4
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "tradesieve-manage",
+            "submit-demo-screening",
+            "--idempotency-key",
+            "synthetic-key",
+            "--fixture",
+            "changed",
+        ],
+    )
+    monkeypatch.setattr(manage, "get_settings", Settings)
+    monkeypatch.setattr(
+        manage,
+        "submit_demo_screening_command",
+        submit,
+    )
+    with pytest.raises(SystemExit) as exc_info:
+        manage.main()
+    assert exc_info.value.code == 4
+    assert called == [("synthetic-key", demo_fixture("changed"))]

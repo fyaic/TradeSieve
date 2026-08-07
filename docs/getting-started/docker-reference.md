@@ -1,6 +1,6 @@
 # Docker reference deployment
 
-**Status:** TS-201 source-registry, TS-202 immutable source snapshots, and TS-205 rule-bundle foundations. This stack proves packaging, PostgreSQL migration, private immutable raw bytes, governed synthetic source/rule readiness, independent app/worker processes, rollback persistence, and fail-closed health behavior. Screening, review workflows, public screening REST/CLI, MCP, and production controls are not implemented yet.
+**Status:** TS-201 source-registry, TS-202 immutable source snapshots, TS-205 rule-bundle governance, and the TS-302 synthetic screening-receipt lifecycle. This stack proves packaging, PostgreSQL migration, private immutable raw bytes, governed synthetic source/rule readiness, authorized idempotent intake, independent app/worker processes, persistence, and fail-closed health behavior. Deterministic screening decisions, review workflows, public screening REST/CLI, MCP, and production controls are not implemented yet.
 
 ## Demo-only configuration
 
@@ -83,6 +83,26 @@ docker compose run --rm --no-deps app \
 
 The command exits `0` with one `ACTIVE` bundle or `2` with a generic unavailable/no-active envelope. It exposes stable bundle/rule identities, hashes, effective windows, finite evaluator kinds, fixture counts, and citation identities. Private policy text and internal notes are omitted. The command is deliberately disabled with exit `3` outside explicit demo mode; it is not a production identity adapter or screening interface.
 
+Exercise the authorized idempotent receipt lifecycle with the built-in synthetic transaction:
+
+```bash
+docker compose run --rm --no-deps app \
+  tradesieve-manage submit-demo-screening \
+  --idempotency-key synthetic-order-001 \
+  --fixture baseline
+```
+
+The first call exits `0` with `APPLIED`; the exact retry exits `0` with `REPLAY` and the same opaque intake, screening and outbox references. The finite `changed` fixture under the same key exits `4` with `IDEMPOTENCY_CONFLICT` and no receipt:
+
+```bash
+docker compose run --rm --no-deps app \
+  tradesieve-manage submit-demo-screening \
+  --idempotency-key synthetic-order-001 \
+  --fixture changed
+```
+
+The command accepts no request file, stdin body or production identity. It is disabled with exit `3` outside explicit demo mode and maps dependency/integrity failures to a generic exit `2` envelope. Output contains only finite status/disposition and the safe receipt; it omits the request, idempotency key/digest, hashes, actor, correlation, audit details and nested errors. This operations demo proves authorized durable intake only. It performs no rule evaluation and creates no finding, result, case or clearance.
+
 ## Health semantics
 
 - `/health/live` checks only that the HTTP process can respond. It does not query PostgreSQL or infer source coverage.
@@ -102,7 +122,8 @@ private-volume ownership/read-only boundaries, pristine and exact legacy upgrade
 safe projections, idempotent bootstrap, database/raw identity across recreation, two
 application rollbacks, append-only/audit constraints, missing and same-length-tampered
 raw failures, lifecycle/observation corruption refusal and controlled repair, a database
-outage, and zero container/network/volume residue:
+outage, an APPLIED/REPLAY/CONFLICT screening receipt lifecycle with stable references
+across container recreation, and zero container/network/volume residue:
 
 ```bash
 ./scripts/test_compose.sh
@@ -113,6 +134,7 @@ separate acceptance path:
 
 ```bash
 ./scripts/test_source_snapshot_postgres.sh
+./scripts/test_screening_submission_postgres.sh
 ```
 
 Manual teardown:

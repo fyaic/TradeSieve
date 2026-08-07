@@ -97,3 +97,15 @@ jobs:
           persist-credentials: false
       - name: Verify source snapshot persistence
         run: ./scripts/test_source_snapshot_postgres.sh
+
+  screening-submission-postgresql:
+    name: Screening submission PostgreSQL 18.4
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify screening submission persistence
+        run: ./scripts/test_screening_submission_postgres.sh

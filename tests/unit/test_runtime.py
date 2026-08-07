@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import TracebackType
@@ -11,12 +13,28 @@ import psycopg
 import pytest
 
 from tradesieve import runtime
+from tradesieve.adapters.in_memory_screening_submission import (
+    InMemoryScreeningSubmissionUnitOfWork,
+)
 from tradesieve.adapters.local_raw_object_store import LocalImmutableRawObjectStore
 from tradesieve.adapters.postgres_demo_source_bootstrap import (
     DemoSourceBootstrapUnavailable,
     DemoSourcePreflightState,
 )
+from tradesieve.application.auth import AuthorizationAuditEvent
+from tradesieve.application.screening_submission import (
+    ScreeningSubmissionAtomicWrite,
+    ScreeningSubmissionServiceDisposition,
+    ScreeningSubmissionServiceError,
+    ScreeningSubmissionServiceErrorCode,
+    ScreeningSubmissionWriteResult,
+)
 from tradesieve.config import Settings
+from tradesieve.demo_screening_submission import DemoScreeningFixture
+from tradesieve.domain.screening_submission import (
+    ScreeningIdempotencyResult,
+    ScreeningIdempotencyScope,
+)
 from tradesieve.ports.source_snapshot import SourceSnapshotPersistenceError
 
 
@@ -203,7 +221,15 @@ def use_connection(monkeypatch: pytest.MonkeyPatch, connection: FakeConnection) 
     monkeypatch.setattr(runtime, "RuleBundleReadinessService", FakeRuleReadiness)
 
 
-def test_connect_passes_timeout_and_autocommit(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize(
+    ("connector", "expected_autocommit"),
+    [(runtime.connect, True), (runtime.connect_screening, False)],
+)
+def test_connect_passes_timeout_and_explicit_autocommit(
+    monkeypatch: pytest.MonkeyPatch,
+    connector: Callable[[Settings], object],
+    expected_autocommit: bool,
+) -> None:
     captured: dict[str, object] = {}
 
     def fake_connect(database_url: str, **kwargs: object) -> object:
@@ -212,13 +238,153 @@ def test_connect_passes_timeout_and_autocommit(monkeypatch: pytest.MonkeyPatch) 
 
     monkeypatch.setattr("tradesieve.runtime.psycopg.connect", fake_connect)
     settings = Settings(database_connect_timeout_seconds=7)
-    result = runtime.connect(settings)
+    result = connector(settings)
     assert result is not None
     assert captured == {
         "database_url": settings.database_url,
         "connect_timeout": 7,
-        "autocommit": True,
+        "autocommit": expected_autocommit,
     }
+
+
+def test_submit_demo_screening_uses_committed_auth_before_fresh_uow_connections(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    order: list[str] = []
+    auth_connections: list[object] = []
+    uow_connections: list[object] = []
+    authorizations: list[AuthorizationAuditEvent] = []
+    delegate = InMemoryScreeningSubmissionUnitOfWork()
+
+    class TrackedUnitOfWork:
+        def __init__(self, factory: Callable[[], object]) -> None:
+            self._factory = factory
+
+        def submit_atomic(
+            self, request: ScreeningSubmissionAtomicWrite
+        ) -> ScreeningSubmissionWriteResult:
+            order.append("uow-open")
+            uow_connections.append(self._factory())
+            return delegate.submit_atomic(request)
+
+        def read_result(
+            self, scope: ScreeningIdempotencyScope
+        ) -> ScreeningIdempotencyResult | None:
+            order.append("uow-read-open")
+            uow_connections.append(self._factory())
+            return delegate.read_result(scope)
+
+        def resolve_attempt(
+            self,
+            scope: ScreeningIdempotencyScope,
+            canonical_hash: str,
+            attempt_id: str,
+        ) -> ScreeningSubmissionWriteResult | None:
+            order.append("uow-resolve-open")
+            uow_connections.append(self._factory())
+            return delegate.resolve_attempt(scope, canonical_hash, attempt_id)
+
+    class AuditSink:
+        def __init__(self, connection: object) -> None:
+            assert connection is auth_connections[-1]
+
+        def __call__(self, event: AuthorizationAuditEvent) -> None:
+            order.append("auth-committed")
+            authorizations.append(event)
+
+    def auth_connect(settings: Settings) -> object:
+        assert settings.mode == "demo"
+        connection = object()
+        auth_connections.append(connection)
+        return cast(Any, nullcontext(connection))
+
+    def uow_connect(settings: Settings) -> object:
+        assert settings.mode == "demo"
+        return object()
+
+    allocated = 0
+
+    def allocate(prefix: str) -> str:
+        nonlocal allocated
+        allocated += 1
+        return f"{prefix}-{allocated}"
+
+    monkeypatch.setattr(runtime, "connect", auth_connect)
+    monkeypatch.setattr(runtime, "connect_screening", uow_connect)
+    monkeypatch.setattr(runtime, "PostgresAuthorizationAuditSink", AuditSink)
+    monkeypatch.setattr(
+        runtime, "PostgresScreeningSubmissionUnitOfWork", TrackedUnitOfWork
+    )
+    now = datetime(2026, 8, 7, 4, 10, tzinfo=UTC)
+
+    applied = runtime.submit_demo_screening(
+        Settings(),
+        "synthetic-key",
+        DemoScreeningFixture.BASELINE,
+        clock=lambda: now,
+        id_factory=allocate,
+    )
+    replay = runtime.submit_demo_screening(
+        Settings(),
+        "synthetic-key",
+        DemoScreeningFixture.BASELINE,
+        clock=lambda: now + timedelta(seconds=1),
+        id_factory=allocate,
+    )
+    assert applied.disposition is ScreeningSubmissionServiceDisposition.APPLIED
+    assert replay.disposition is ScreeningSubmissionServiceDisposition.REPLAY
+    assert replay.receipt == applied.receipt
+    assert order == [
+        "auth-committed",
+        "uow-open",
+        "auth-committed",
+        "uow-open",
+    ]
+    assert len(auth_connections) == len(uow_connections) == 2
+    assert len({id(item) for item in (*auth_connections, *uow_connections)}) == 4
+    assert all(event.operation == "SCREENING_SUBMIT" for event in authorizations)
+    assert all(event.outcome.value == "ALLOW" for event in authorizations)
+    assert all(event.client_id == "tradesieve-demo-cli" for event in authorizations)
+    with pytest.raises(ScreeningSubmissionServiceError) as exc_info:
+        runtime.submit_demo_screening(
+            Settings(),
+            "synthetic-key",
+            DemoScreeningFixture.CHANGED,
+            clock=lambda: now + timedelta(seconds=2),
+            id_factory=allocate,
+        )
+    assert (
+        exc_info.value.code is ScreeningSubmissionServiceErrorCode.IDEMPOTENCY_CONFLICT
+    )
+    assert order[-2:] == ["auth-committed", "uow-open"]
+
+
+def test_submit_demo_screening_is_disabled_before_connections(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        runtime,
+        "connect",
+        lambda settings: pytest.fail("disabled demo opened auth connection"),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "connect_screening",
+        lambda settings: pytest.fail("disabled demo opened UoW connection"),
+    )
+    settings = Settings(
+        mode="production",
+        database_url="postgresql://service:strong-password@db/tradesieve",  # pragma: allowlist secret
+        demo_bootstrap_enabled=False,
+        rule_bundle_tenant_id="tenant-1",
+        deployment_id="production-1",
+        required_source_set="approved-sources-v1",
+        required_rule_set="approved-rules-v1",
+    )
+    with pytest.raises(RuntimeError, match="explicit demo mode"):
+        runtime.submit_demo_screening(
+            settings, "synthetic-key", DemoScreeningFixture.BASELINE
+        )
 
 
 def test_readiness_reports_database_unavailable(

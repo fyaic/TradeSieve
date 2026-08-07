@@ -18,10 +18,15 @@ from tradesieve.application.auth import (
     Operation,
 )
 from tradesieve.application.rule_bundle import RuleBundleUnavailable
+from tradesieve.application.screening_submission import (
+    ScreeningSubmissionServiceError,
+    ScreeningSubmissionServiceErrorCode,
+)
 from tradesieve.application.source_registry import SourceRegistryService
 from tradesieve.application.source_snapshot_contracts import SourceSnapshotListing
 from tradesieve.config import Settings, get_settings
 from tradesieve.demo_rule_bundle import DemoRuleActor, authorize_demo_rule_request
+from tradesieve.demo_screening_submission import DemoScreeningFixture
 from tradesieve.demo_source_snapshot import (
     DEMO_SOURCE_ID,
     DemoSourceActor,
@@ -35,6 +40,7 @@ from tradesieve.runtime import (
     build_source_snapshot_readiness_service,
     check_readiness,
     connect,
+    submit_demo_screening,
 )
 
 
@@ -191,18 +197,71 @@ def list_source_snapshots(settings: Settings) -> int:
     return 0 if listing.snapshots else 2
 
 
+def submit_demo_screening_command(
+    settings: Settings,
+    *,
+    idempotency_key: object,
+    fixture: DemoScreeningFixture,
+) -> int:
+    """Run one synthetic-only screening receipt demonstration."""
+
+    if settings.mode != "demo":
+        print(json.dumps({"status": "DISABLED"}, sort_keys=True))
+        return 3
+    try:
+        result = submit_demo_screening(settings, idempotency_key, fixture).reverify()
+    except ScreeningSubmissionServiceError as error:
+        if error.code is ScreeningSubmissionServiceErrorCode.IDEMPOTENCY_CONFLICT:
+            print(json.dumps({"status": "IDEMPOTENCY_CONFLICT"}, sort_keys=True))
+            return 4
+        print(json.dumps({"status": "UNAVAILABLE"}, sort_keys=True))
+        return 2
+    except Exception:
+        print(json.dumps({"status": "UNAVAILABLE"}, sort_keys=True))
+        return 2
+    receipt = result.receipt
+    accepted_at = receipt.accepted_at.isoformat().replace("+00:00", "Z")
+    print(
+        json.dumps(
+            {
+                "status": "ACCEPTED",
+                "disposition": result.disposition.value,
+                "receipt": {
+                    "receipt_type": receipt.receipt_type.value,
+                    "schema_version": receipt.schema_version,
+                    "accepted_at": accepted_at,
+                    "intake_id": receipt.intake_id,
+                    "screening_id": receipt.screening_id,
+                    "outbox_event_id": receipt.outbox_event_id,
+                },
+            },
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "command",
-        choices=(
-            "migrate",
-            "bootstrap-demo",
-            "inspect",
-            "list-sources",
-            "list-source-snapshots",
-            "list-rules",
-        ),
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    for command_name in (
+        "migrate",
+        "bootstrap-demo",
+        "inspect",
+        "list-sources",
+        "list-source-snapshots",
+        "list-rules",
+    ):
+        subparsers.add_parser(command_name)
+    submission = subparsers.add_parser(
+        "submit-demo-screening",
+        help="submit a synthetic demo screening receipt",
+    )
+    submission.add_argument("--idempotency-key", required=True)
+    submission.add_argument(
+        "--fixture",
+        required=True,
+        choices=tuple(DemoScreeningFixture),
     )
     args = parser.parse_args()
     settings = get_settings()
@@ -216,8 +275,16 @@ def main() -> None:
         raise SystemExit(list_sources(settings))
     elif args.command == "list-source-snapshots":
         raise SystemExit(list_source_snapshots(settings))
-    else:
+    elif args.command == "list-rules":
         raise SystemExit(list_rules(settings))
+    else:
+        raise SystemExit(
+            submit_demo_screening_command(
+                settings,
+                idempotency_key=args.idempotency_key,
+                fixture=DemoScreeningFixture(args.fixture),
+            )
+        )
 
 
 if __name__ == "__main__":  # pragma: no cover

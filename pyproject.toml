@@ -27,6 +27,9 @@ dependencies = [
     "uvicorn==0.52.1",
 ]
 
+[project.scripts]
+tradesieve-manage = "tradesieve.manage:main"
+
 [dependency-groups]
 dev = [
     "detect-secrets==1.5.0",
