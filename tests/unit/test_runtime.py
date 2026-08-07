@@ -512,17 +512,18 @@ def test_worker_freshness_fails_when_readiness_fails(
 
 
 @pytest.mark.parametrize(
-    ("heartbeat", "expected"),
+    ("heartbeat_age", "naive", "expected"),
     [
-        (None, False),
-        (datetime.now(UTC) - timedelta(minutes=1), False),
-        (datetime.now(UTC).replace(tzinfo=None), True),
-        (datetime.now(UTC), True),
+        (None, False, False),
+        (timedelta(minutes=1), False, False),
+        (timedelta(), True, True),
+        (timedelta(), False, True),
     ],
 )
 def test_worker_heartbeat_freshness(
     monkeypatch: pytest.MonkeyPatch,
-    heartbeat: datetime | None,
+    heartbeat_age: timedelta | None,
+    naive: bool,
     expected: bool,
 ) -> None:
     monkeypatch.setattr(
@@ -530,6 +531,9 @@ def test_worker_heartbeat_freshness(
         "check_readiness",
         lambda settings: runtime.RuntimeStatus(True, {"database": "OK"}),
     )
+    heartbeat = None if heartbeat_age is None else datetime.now(UTC) - heartbeat_age
+    if heartbeat is not None and naive:
+        heartbeat = heartbeat.replace(tzinfo=None)
     use_connection(monkeypatch, FakeConnection(heartbeat=heartbeat))
     assert runtime.worker_is_fresh(Settings()) is expected
 
