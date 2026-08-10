@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="light dark">
     <meta
       name="description"
-      content="TradeSieve 合成国际物流 CRM 拦截演示，不处理真实客户数据。"
+      content="TradeSieve 使用合成国际物流交易调用真实活跃官方来源的 CRM 门禁演示。"
     >
     <title>华舟货运 CRM | TradeSieve 演示</title>
     <link rel="icon" href="data:,">
@@ -25,7 +25,7 @@
           </div>
         </div>
         <div class="topbar-context">
-          <span class="environment-label">纯合成演示</span>
+          <span class="environment-label">合成交易 / 真实官方来源</span>
           <span class="operator">上海分公司 / 销售一组</span>
         </div>
       </header>
@@ -121,7 +121,7 @@
                 <section class="mapping-section" aria-labelledby="mapping-heading">
                   <div>
                     <h3 id="mapping-heading">发送给 TradeSieve 的边界</h3>
-                    <p>CRM 映射规范字段，审查服务返回不透明案件引用。</p>
+                    <p>CRM 映射规范字段，审查服务读取已验证的活跃官方来源版本。</p>
                   </div>
                   <dl id="mapping-list" class="mapping-list"></dl>
                 </section>
@@ -133,7 +133,7 @@
                     <h3 id="screening-heading">合规门禁</h3>
                     <p>自动化只能收紧，不能放行</p>
                   </div>
-                  <span id="screening-mode" class="demo-tag">预置合成规则</span>
+                  <span id="screening-mode" class="demo-tag">EU FSF + Annex I</span>
                 </div>
                 <div id="screening-panel" aria-live="polite"></div>
               </aside>
@@ -149,9 +149,9 @@
         <h4>尚未发起审查</h4>
         <p>点击“发起合规审查”，查看 CRM 如何根据业务动作执行拦截、补件或升级。</p>
         <ul>
-          <li>主体与强标识符</li>
-          <li>货物、路线与最终用途</li>
-          <li>支付参与方与单证完整性</li>
+          <li>EU FSF 官方名称候选</li>
+          <li>EU Annex I 控制号与缺失技术事实</li>
+          <li>来源版本、哈希和原生证据定位</li>
         </ul>
       </div>
     </template>

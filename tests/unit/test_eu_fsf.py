@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import http.client
 import json
 import ssl
@@ -993,7 +994,7 @@ def test_https_transport_reads_bounded_identity_response_and_closes() -> None:
     assert connection.closed == 1
     assert connection.requests[0][0] == "GET"
     assert connection.requests[0][1].startswith("/api/hub/search/datasets/")
-    assert connection.requests[0][2]["Accept-Encoding"] == "identity"
+    assert connection.requests[0][2]["Accept-Encoding"] == "gzip, identity"
     assert factory.calls == [("data.europa.eu", 5.0, context)]
 
 
@@ -1042,6 +1043,10 @@ def test_https_transport_rejects_every_non_exact_url_before_network(url: str) ->
             EuFsfSourceErrorCode.RESPONSE_INVALID,
         ),
         (
+            FakeResponse(headers={"Content-Encoding": "br"}),
+            EuFsfSourceErrorCode.RESPONSE_INVALID,
+        ),
+        (
             FakeResponse(headers={"Content-Length": "invalid"}),
             EuFsfSourceErrorCode.RESPONSE_INVALID,
         ),
@@ -1052,6 +1057,10 @@ def test_https_transport_rejects_every_non_exact_url_before_network(url: str) ->
         (
             FakeResponse(headers={"Content-Length": "101"}),
             EuFsfSourceErrorCode.RESPONSE_TOO_LARGE,
+        ),
+        (
+            FakeResponse(headers={"Content-Length": "8"}),
+            EuFsfSourceErrorCode.RESPONSE_INVALID,
         ),
         (
             FakeResponse(chunks=[b"x" * 101]),
@@ -1076,6 +1085,124 @@ def test_https_transport_fails_closed_on_response_errors(
         code, lambda: transport.get(EU_FSF_DATASET_URL, maximum_bytes=100)
     )
     assert connection.closed == 1
+
+
+def test_https_transport_boundedly_decodes_one_complete_gzip_member() -> None:
+    compressed = gzip.compress(b"payload")
+    connection = FakeConnection(
+        FakeResponse(
+            headers={
+                "Content-Encoding": "gzip",
+                "Content-Length": str(len(compressed)),
+                "Content-Type": "application/xml",
+            },
+            chunks=[compressed[:5], compressed[5:], b""],
+        )
+    )
+
+    result = HttpsEuFsfTransport(
+        connection_factory=ConnectionFactory([connection])
+    ).get(EU_FSF_DATASET_URL, maximum_bytes=100)
+
+    assert result.content == b"payload"
+    assert result.content_type == "application/xml"
+
+
+@pytest.mark.parametrize(
+    ("content", "maximum", "code"),
+    [
+        (b"not-gzip", 100, EuFsfSourceErrorCode.RESPONSE_INVALID),
+        (gzip.compress(b"payload")[:-1], 100, EuFsfSourceErrorCode.RESPONSE_INVALID),
+        (
+            gzip.compress(b"payload") + b"trailing",
+            100,
+            EuFsfSourceErrorCode.RESPONSE_INVALID,
+        ),
+        (gzip.compress(b"x" * 101), 100, EuFsfSourceErrorCode.RESPONSE_TOO_LARGE),
+    ],
+)
+def test_https_transport_rejects_invalid_or_oversized_gzip(
+    content: bytes,
+    maximum: int,
+    code: EuFsfSourceErrorCode,
+) -> None:
+    connection = FakeConnection(
+        FakeResponse(
+            headers={"Content-Encoding": "gzip"},
+            chunks=[content, b""],
+        )
+    )
+    assert_source_error(
+        code,
+        lambda: HttpsEuFsfTransport(
+            connection_factory=ConnectionFactory([connection])
+        ).get(EU_FSF_DATASET_URL, maximum_bytes=maximum),
+    )
+
+
+def test_https_transport_rejects_a_stalled_gzip_decoder(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class StalledDecoder:
+        unconsumed_tail = b"gzip"
+        unused_data = b""
+        eof = False
+
+        def decompress(self, content: bytes, _maximum: int) -> bytes:
+            self.unconsumed_tail = content
+            return b""
+
+        def flush(self, _maximum: int) -> bytes:
+            return b""
+
+    monkeypatch.setattr(
+        "tradesieve.adapters.eu_fsf.zlib.decompressobj",
+        lambda _mode: StalledDecoder(),
+    )
+    connection = FakeConnection(
+        FakeResponse(
+            headers={"Content-Encoding": "gzip"},
+            chunks=[b"gzip", b""],
+        )
+    )
+    assert_source_error(
+        EuFsfSourceErrorCode.RESPONSE_INVALID,
+        lambda: HttpsEuFsfTransport(
+            connection_factory=ConnectionFactory([connection])
+        ).get(EU_FSF_DATASET_URL, maximum_bytes=100),
+    )
+
+
+def test_https_transport_bounds_gzip_decoder_flush(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FlushDecoder:
+        unconsumed_tail = b""
+        unused_data = b""
+        eof = True
+
+        def decompress(self, _content: bytes, _maximum: int) -> bytes:
+            return b""
+
+        def flush(self, maximum: int) -> bytes:
+            return b"x" * maximum
+
+    monkeypatch.setattr(
+        "tradesieve.adapters.eu_fsf.zlib.decompressobj",
+        lambda _mode: FlushDecoder(),
+    )
+    connection = FakeConnection(
+        FakeResponse(
+            headers={"Content-Encoding": "gzip"},
+            chunks=[b"gzip", b""],
+        )
+    )
+    assert_source_error(
+        EuFsfSourceErrorCode.RESPONSE_TOO_LARGE,
+        lambda: HttpsEuFsfTransport(
+            connection_factory=ConnectionFactory([connection])
+        ).get(EU_FSF_DATASET_URL, maximum_bytes=100),
+    )
 
 
 def test_https_transport_validates_redirect_before_second_connection() -> None:

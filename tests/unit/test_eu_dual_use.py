@@ -18,6 +18,7 @@ import tradesieve.adapters.eu_dual_use as adapter
 from tradesieve.adapters.eu_dual_use import (
     EuDualUseFormexParser,
     EuDualUseOfficialSourceConnector,
+    EuDualUseRetrievedSource,
     EuDualUseSourceError,
     EuDualUseSourceErrorCode,
     HttpsEuDualUseTransport,
@@ -194,7 +195,7 @@ def test_defensive_domain_validation_rejects_corruption() -> None:
         classification_verified=True,
         technical_specification_available=True,
     )
-    invalid = (
+    invalid: tuple[Callable[[], object], ...] = (
         lambda: EuDualUseControlEntry("bad", "x", "/ANNEX/x"),
         lambda: EuDualUseControlEntry(" 0a000 ", "x", "/ANNEX/x"),
         lambda: EuDualUseControlEntry("0A000", "", "/ANNEX/x"),
@@ -403,9 +404,16 @@ class FakeTransport:
 
 def test_connector_retrieves_exact_official_source_and_parses_it() -> None:
     transport = FakeTransport()
-    result = EuDualUseOfficialSourceConnector(transport, clock=lambda: NOW).retrieve()
+    connector = EuDualUseOfficialSourceConnector(transport, clock=lambda: NOW)
+    retrieved = connector.retrieve_source()
+    result = retrieved.control_list
     assert len(result.entries) == 300
+    assert retrieved.retrieved_at == NOW
+    assert retrieved.content == transport.document.content
+    assert retrieved.content_hash == result.source_archive_hash
+    assert retrieved.content_type == "application/zip"
     assert transport.calls == [(EU_DUAL_USE_SOURCE_URL, MAX_EU_DUAL_USE_ARCHIVE_BYTES)]
+    assert len(connector.retrieve().entries) == 300
 
 
 @pytest.mark.parametrize(
@@ -494,6 +502,33 @@ def test_connector_redacts_dependency_failures_and_validates_shape() -> None:
     )
 
 
+def test_retrieved_source_rejects_corrupt_raw_projection_binding() -> None:
+    raw = archive()
+    listing = EuDualUseFormexParser().parse(raw, retrieved_at=NOW)
+    valid = EuDualUseRetrievedSource(
+        NOW,
+        f"sha256:{hashlib.sha256(raw).hexdigest()}",
+        "application/zip",
+        raw,
+        listing,
+    )
+    invalid: tuple[Callable[[], object], ...] = (
+        lambda: corrupt(valid, retrieved_at=datetime(2026, 8, 10)),
+        lambda: corrupt(valid, content=cast(Any, "bad")),
+        lambda: corrupt(valid, content=b"wrong"),
+        lambda: corrupt(valid, content_hash="bad"),
+        lambda: corrupt(valid, content_type=""),
+        lambda: corrupt(valid, control_list=cast(Any, "bad")),
+        lambda: corrupt(
+            valid,
+            control_list=replace(valid.control_list, retrieved_at=NOW.replace(hour=3)),
+        ),
+    )
+    for action in invalid:
+        with pytest.raises(ValueError):
+            action()
+
+
 class FakeResponse:
     def __init__(
         self,
@@ -571,6 +606,22 @@ def test_https_transport_reads_bounded_identity_response_and_closes() -> None:
         "/resource/cellar/ec080244-c0fa-11f0-a612-01aa75ed71a1.0006.02/DOC_1",
     )
     assert connection.requests[0][2]["Accept-Encoding"] == "identity"
+
+
+def test_https_transport_rejects_a_truncated_declared_response() -> None:
+    response = FakeResponse(
+        headers={"Content-Length": "2"},
+        chunks=[b"x", b""],
+    )
+    connection = FakeConnection(response)
+    source_error(
+        EuDualUseSourceErrorCode.RESPONSE_INVALID,
+        lambda: transport_for(connection).get(
+            EU_DUAL_USE_SOURCE_URL,
+            maximum_bytes=2,
+        ),
+    )
+    assert connection.closed == 1
 
 
 @pytest.mark.parametrize(

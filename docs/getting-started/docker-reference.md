@@ -1,6 +1,6 @@
 # Docker reference deployment
 
-**Status:** TS-201 source-registry, TS-202 immutable source snapshots, TS-205 rule-bundle governance, the TS-302 synthetic screening-receipt lifecycle, and the TS-505 demo CRM seam. This stack proves packaging, PostgreSQL migration, private immutable raw bytes, governed synthetic source/rule readiness, authorized idempotent intake, a fixed browser demonstration, independent app/worker processes, persistence, and fail-closed health behavior. Deterministic live screening decisions, review workflows, public screening REST/CLI, MCP, and production controls are not implemented yet.
+**Status:** The reference stack includes the source/rule/intake foundations plus migration `20260810_0006`, persisted EU official-source projections, an authenticated official-screening REST technical preview, and a demo CRM that reads the active official bundle. Review workflows, full tenant/OIDC authorization, Russia-specific controls, MCP, and production controls remain incomplete.
 
 ## Demo-only configuration
 
@@ -11,6 +11,8 @@ cp .env.example .env
 ```
 
 Every value in `.env.example` is documented inline. The database credential and synthetic source/rule coverage IDs are intentionally weak demo defaults. Central configuration validation refuses those values, debug mode, or demo bootstrap whenever `TRADESIEVE_MODE=production`.
+
+The template also contains the SHA-256 digest of a local demo-only Bearer token for `POST /v1/official-screenings`. Production mode rejects that digest. Generate a random deployment token outside the repository, store only its `sha256:<hex>` digest in `TRADESIEVE_OFFICIAL_API_TOKEN_SHA256`, and deliver the raw token through an approved secret channel.
 
 `TRADESIEVE_MIGRATION_ROOT` explicitly names the directory containing `alembic.ini` and `migrations/`. The image sets it to `/app`; startup validates both paths before invoking Alembic, so installed package paths are never mistaken for deployment resources.
 
@@ -32,13 +34,32 @@ curl --fail http://127.0.0.1:8080/health/live
 curl --fail http://127.0.0.1:8080/health/ready
 ```
 
-The demo-only synthetic logistics CRM is available at:
+Refresh and atomically activate the current official bundle before testing official screening:
+
+```bash
+docker compose run --rm --no-deps app \
+  python -m tradesieve.manage refresh-official-sources
+```
+
+The command exits `0` with `APPLIED` or `IDEMPOTENT`. A failure exits `2` and leaves the prior active pointer unchanged. The live official-source demo is then available at:
 
 ```text
 http://127.0.0.1:8080/demo/crm
 ```
 
-It accepts only repository-owned fixture IDs and uses precomputed canonical results. See [the demo CRM guide](demo-crm.md) before evaluating it; it is not a live sanctions or export-control engine.
+It accepts only repository-owned synthetic transaction IDs. The visible screen button calls the active FSF/Annex I engine; it does not use the retained precomputed regression route. See [the demo CRM guide](demo-crm.md) for exact coverage and limitations.
+
+The same engine is exposed to external test clients:
+
+```bash
+curl --fail-with-body \
+  -H 'Authorization: Bearer local_demo_only_official_screening_token' \
+  -H 'Content-Type: application/json' \
+  --data-binary @screening.json \
+  http://127.0.0.1:8080/v1/official-screenings
+```
+
+This endpoint is a bounded technical preview. It does not persist the request/result/case, and its deployment-scoped token is not the final identity model.
 
 `docker compose up` starts PostgreSQL, runs the real Alembic migrations, loads the governed synthetic registration, creates and verifies two immutable source snapshots through retrieve/parse/validate/approve/activate, and uses authorized application services to activate one immutable synthetic rule bundle. It then starts the non-root read-only app and worker containers. The app, worker, and PostgreSQL services each have a healthcheck. No `runtime_coverage` source/rule marker is written or trusted.
 
@@ -144,6 +165,7 @@ separate acceptance path:
 ```bash
 ./scripts/test_source_snapshot_postgres.sh
 ./scripts/test_screening_submission_postgres.sh
+./scripts/test_official_source_postgres.sh
 ```
 
 Manual teardown:

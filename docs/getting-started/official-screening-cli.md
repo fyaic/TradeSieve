@@ -1,8 +1,8 @@
-# Official EU source screening CLI technical preview
+# Official EU source refresh and screening technical preview
 
-**Status:** implemented technical preview; not a production screening endpoint.
+**Status:** persisted CLI and authenticated REST technical preview; not production clearance.
 
-`tradesieve-manage screen-official` is the first executable TradeSieve path that uses current official source bytes rather than repository fixtures. It exists to prove the source, parser, evidence, and conservative-assessment contracts before those contracts are placed behind persisted activation, REST, and MCP adapters.
+TradeSieve now has two deliberately separate official-source workflows. `refresh-official-sources` retrieves, verifies, projects, and atomically activates EU FSF plus EU Annex I in PostgreSQL. `screen-active` and `POST /v1/official-screenings` use only that fresh active bundle. `screen-official` remains a stateless diagnostic that retrieves both sources for every invocation.
 
 ## What it actually does
 
@@ -10,8 +10,9 @@ Each invocation retrieves both sources afresh:
 
 | Control | Official source | Implemented behavior |
 | --- | --- | --- |
-| EU financial sanctions | data.europa.eu dataset metadata → European Commission FSF XML 1.1 distribution | bounded TLS retrieval, fixed official URL policy, content hash, finite XML parser, strong typed identifier exact match, exact normalized-alias candidate lookup, ambiguity/weak-alias/unusable-identifier handling, source-native locator |
-| EU dual-use Annex I | Publications Office CELLAR item for CELEX `32025R2003` | bounded TLS retrieval, ZIP safety checks, Formex schema/title checks, 384 unique control entries across categories 0–9, explicit-code lookup, technical/classification missing-fact assessment |
+| EU financial sanctions | data.europa.eu dataset metadata → European Commission FSF XML 1.1 distribution | fixed URL/TLS policy; bounded gzip or identity transfer; exact decompressed-byte hash; finite XML parser; immutable entity/alias/identifier rows; strong typed identifier exact match; exact normalized-alias candidates; source-native locator |
+| EU dual-use Annex I | Publications Office CELLAR item for CELEX `32025R2003` | bounded TLS retrieval, exact response length, ZIP safety, Formex schema/title checks, 384 unique entries across categories 0–9, immutable row projection, explicit-code lookup and missing-fact assessment |
+| Active source bundle | PostgreSQL migration `20260810_0006` | content-addressed raw bytes, projection hashes/counts, immutable activation event, atomic active pointer, idempotent repeat activation, full re-hash on read, 48-hour freshness gate |
 
 The dual-use source is the current 2025 delegated update known on 2026-08-10. Unlike the daily sanctions catalogue discovery, its CELEX/CELLAR version is pinned. A later delegated regulation must be discovered, reviewed, tested, and activated before this connector can claim the new version.
 
@@ -43,14 +44,50 @@ At least one `party_identifiers` or `party_names` entry is required. Names are U
 
 `classification_verified` records whether a qualified classification step supplied the Annex I candidate. `technical_specification_available` records only document availability; it does not assert that every legal threshold in the entry has been satisfied. TradeSieve does not infer an Annex I code from an HS/CN/TARIC code.
 
-## Run
+## Refresh and activate
+
+With the reference PostgreSQL stack running:
+
+```bash
+docker compose run --rm --no-deps app \
+  python -m tradesieve.manage refresh-official-sources
+```
+
+The output contains only bundle/snapshot hashes, safe counts, activation time, and `APPLIED` or `IDEMPOTENT`. Raw bytes, aliases, identifiers, control text, source URLs containing access tokens, and database details are not printed. A failed refresh never changes the active pointer.
+
+## Screen the active bundle
+
+```bash
+docker compose run --rm --no-deps app \
+  python -m tradesieve.manage screen-active --request screening.json
+```
+
+`screen-active` fails with exit `2` if no bundle exists, any persisted row/hash/count/relationship is corrupt, a source retrieval or activation timestamp is in the future, or any source/bundle age exceeds 48 hours.
+
+## Authenticated HTTP
+
+The demo token below is local-only. The service stores only its SHA-256 digest; production configuration rejects the demo digest.
+
+```bash
+curl --fail-with-body \
+  -H 'Authorization: Bearer local_demo_only_official_screening_token' \
+  -H 'Content-Type: application/json' \
+  --data-binary @screening.json \
+  http://127.0.0.1:8080/v1/official-screenings
+```
+
+Authentication runs before business-body parsing. The endpoint requires JSON and a `Content-Length` between 1 byte and 1 MiB. Invalid credentials return `401`; invalid contracts return a generic `422` without echoing request values; an absent/stale/corrupt source or database failure returns a generic `503` and must be treated as a hold.
+
+This endpoint is an executable vertical slice, not the final tenant-scoped and idempotent `POST /v1/screenings` case API. It currently stores neither the request nor a screening/case record.
+
+## Stateless live diagnostic
 
 ```bash
 uv sync --locked --all-groups
 uv run tradesieve-manage screen-official --request screening.json
 ```
 
-To keep the identifier out of shell history:
+To keep identifiers out of shell history:
 
 ```bash
 uv run tradesieve-manage screen-official --request - < screening.json
@@ -60,8 +97,8 @@ Exit codes:
 
 | Code | Meaning |
 | --- | --- |
-| `0` | Both official sources were retrieved, verified, parsed, and assessed |
-| `2` | An official source, TLS/network dependency, parser, or integrity check was unavailable/invalid; caller must hold |
+| `0` | Refresh/active read/stateless retrieval and assessment completed |
+| `2` | Required source, database, parser, persisted integrity, or freshness was unavailable/invalid; caller must hold |
 | `3` | Request file/JSON/schema was invalid |
 
 ## Output and decisions
@@ -72,8 +109,8 @@ The JSON output contains only evidence needed to reproduce the source assertion:
 - A missing classification or technical specification produces `YELLOW` + `REQUEST_EVIDENCE`.
 - No exact sanctions identifier and no Annex I entry produces at most `GREEN_CANDIDATE` + `MONITOR`; this is not clearance.
 
-Only an authorised human may clear or block a named transaction. Fuzzy/transliterated name matching, ownership/control propagation, destination/end-use/catch-all rules, Russia Regulation `833/2014` goods annexes, persisted source activation, screening/case records, REST authentication, MCP, and webhooks remain outside this technical-preview slice.
+Only an authorised human may clear or block a named transaction. Fuzzy/transliterated matching, ownership/control propagation, destination/end-use/catch-all rules, Russia Regulation `833/2014` goods annexes, formal technical-threshold evaluation, screening/case records, tenant/OIDC authorization, MCP, and webhooks remain outside this slice.
 
 ## Safe evaluation data
 
-Use synthetic or specifically approved test identifiers. Although source records are public official designations, do not commit customer, shipment, payment, or investigation data to the repository. The command currently evaluates in memory and does not persist its request or result.
+Use synthetic or specifically approved test identifiers. Although source records are public official designations, do not commit customer, shipment, payment, or investigation data to the repository. Refresh persists official source bytes/projections only; current CLI/REST assessment does not persist its request or result.

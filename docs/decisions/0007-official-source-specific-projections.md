@@ -17,12 +17,12 @@ The first useful product slice must prove that official bytes—not synthetic fi
 4. The EU Annex I connector reads the exact official Publications Office CELLAR item for a reviewed CELEX version, rejects unsafe archives/XML, and projects unique control entries. Version change is an explicit governed event, not an unnoticed overwrite.
 5. Exact identifier and explicit Annex I code lookup produce evidence. They never grant automatic clearance. Missing, conflicting, ambiguous, stale, or unavailable evidence tightens the business action.
 6. HS/CN/TARIC codes may later retrieve candidates, but only qualified classification plus required technical parameters can support a formal controlled-item finding.
-7. CLI, REST, and MCP adapters call the same application service. The first CLI technical preview may retrieve in memory; persisted activation and authenticated service interfaces remain required before production use.
+7. CLI, REST, and MCP adapters call the same application service. `refresh-official-sources` owns retrieval and atomic activation; `screen-active`, authenticated `POST /v1/official-screenings`, and the visible demo CRM action use the same persisted engine. `screen-official` remains a stateless network diagnostic. MCP remains future work.
 
 ## Consequences
 
 - The source boundary is more code than a generic blob parser, but schema drift, URL policy, licensing, identifiers, and legal versions become explicit and independently testable.
-- PostgreSQL migrations and probes are required for row-level official projections and active-version selection.
+- Migration `20260810_0006` and `test_official_source_postgres.sh` enforce row-level official projections, content-addressed raw bytes, idempotent activation, a single active version and database immutability on PostgreSQL 18.4.
 - Daily FSF retrieval can discover the current distribution; annual/ad hoc legal-list amendments require a monitored CELEX update workflow.
 - The first party-screening slice includes explainable exact normalized-alias candidates. Full party screening still requires fuzzy/transliterated entity resolution and ownership/control. Full goods screening still requires technical-rule assertions, catch-all/end-use/destination controls, and Russia-specific annexes.
 - No source or matcher response can bypass ADR-0002 human-only clearance.

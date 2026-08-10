@@ -277,6 +277,7 @@ def test_fixtures_are_stable_finite_obviously_synthetic_and_ordered() -> None:
                 deployment_id="production-1",
                 required_source_set="approved-sources",
                 required_rule_set="approved-rules",
+                official_api_token_sha256="sha256:" + "a" * 64,
             )
         )
 

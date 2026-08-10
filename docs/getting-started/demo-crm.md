@@ -1,30 +1,32 @@
 # 合成国际物流 CRM 演示
 
-**状态：** Phase 1 demo-only 集成样例。  
-**数据：** 全部为仓库内置合成数据，不得替换为真实客户、货物、付款或身份数据。  
+**状态：** Phase 1 demo-only 交易界面 + 真实活跃 EU 官方来源技术预览。
+
+**数据：** 交易、路线、金额和单证均为仓库内置合成数据；首条记录使用一个公开 EU FSF 企业别名作为可重复验收事实，不代表真实客户关系。
+
 **对应 story：** [TS-505 / #37](https://github.com/fyaic/TradeSieve/issues/37)
 
 ## 它演示什么
 
-这个页面模拟一家中国国际货运代理公司的询报价工作台。销售可以选择一条报价，在“报价放行”之前发起 TradeSieve 审查，并观察 CRM 如何处理：
+这个页面模拟一家中国国际货运代理公司的询报价工作台。销售可以选择一条报价，在“报价放行”之前发起 TradeSieve 审查。浏览器不执行规则；demo 后端把固定交易映射成官方审查请求，并调用 PostgreSQL 中的新鲜活跃 FSF/Annex I bundle：
 
-- 红灯 P0：暂停报价并升级合规复核；
-- 黄灯 P1：保持拦截，并显示具体补件要求；
-- 绿灯候选：没有开放 P0/P1，但仍等待授权人工确认，不能由系统自动放行；
-- 外部引用：CRM 只保留 `screening_id`、`case_id`、结果指纹、状态和业务动作；
-- 解耦边界：货物、主体、路线和付款字段通过规范契约映射，规则和审查证据不写进 CRM。
+- EU FSF 名称候选、EU reference 和原生 XML 定位；
+- Annex I 控制号状态、CELEX、条目定位和缺失事实；
+- 同一个 source bundle 下的 FSF/Annex I snapshot ID 和内容哈希；
+- `HOLD` / `REQUEST_EVIDENCE` / `MONITOR`；任何结果都不自动放行；
+- 来源未激活、陈旧、损坏或数据库不可用时，CRM 保持拦截。
 
 页面包含 5 条固定场景：
 
-| 场景 | 主要业务事实 | 预置合成结果 |
+| 场景 | 主要业务事实 | 当前真实来源审查表现 |
 | --- | --- | --- |
-| 上海到莫斯科的工业控制设备 | 合成强标识符命中、最终用户缺失、技术参数不完整 | 红灯 P0，暂停并升级 |
-| 深圳到法兰克福的锂电池模组 | MSDS、UN38.3 和运输鉴定资料不完整 | 黄灯 P1，暂停并补件 |
-| 宁波经杰贝阿里转售的伺服驱动器 | 最终用户、最终使用国和转售路径未知 | 黄灯 P1，保持拦截 |
-| 青岛到鹿特丹的一般工业维护品 | 合成确定性控制没有开放 P0/P1 | 绿灯候选，等待人工确认 |
-| 上海到伊斯坦布尔的精密传感器 | 技术参数和最终用途证据不足 | 黄灯 P1，暂停并补件 |
+| 上海到莫斯科的工业控制设备 | 公开 FSF 企业别名验收样本；Annex I 候选 `3A001`；技术规格缺失 | 名称候选 + 控制项存在，`RED/HOLD`；要求合格归类复核和技术规格 |
+| 深圳到法兰克福的锂电池模组 | 合成主体；只有 HS 候选，没有 Annex I 归类 | 未作受控物项推断，要求 Annex I 归类/合格人员复核 |
+| 宁波经杰贝阿里转售的伺服驱动器 | 合成主体；最终用户和 Annex I 归类未提供 | 当前只反馈名单/归类缺口；路线和转售控制尚未接入本引擎 |
+| 青岛到鹿特丹的一般工业维护品 | 合成主体；技术资料存在但没有 Annex I 归类 | 仍要求合格归类，不把一般货描或 HS 当作自动绿灯 |
+| 上海到伊斯坦布尔的精密传感器 | 合成主体；技术参数和正式归类缺失 | 请求补充归类和技术事实；最终用途规则仍待后续接入 |
 
-名称、地址、登记号、金额、时间、路线和单证均为合成 fixture。它们的结构尽量贴近中国货代销售、报价和订舱流程，但不对应任何真实企业或个人。
+除明确标出的公开名单测试别名外，名称、地址、登记号、金额、时间、路线和单证均为合成 fixture。结构贴近中国货代销售、报价和订舱流程，但不对应真实业务。
 
 ## 启动和使用
 
@@ -33,6 +35,13 @@
 ```bash
 cp .env.example .env
 docker compose up -d --build --wait
+```
+
+首次打开页面前刷新并激活官方来源：
+
+```bash
+docker compose run --rm --no-deps app \
+  python -m tradesieve.manage refresh-official-sources
 ```
 
 打开：
@@ -44,8 +53,8 @@ http://127.0.0.1:8080/demo/crm
 1. 在左侧选择一条询报价；
 2. 查看 CRM 已有的运输、货物、金额和单证字段；
 3. 点击“发起合规审查”；
-4. 查看信号灯、P0/P1、业务动作、风险事项、补件要求和不透明案件引用；
-5. 切换场景，比较 CRM 对红灯、黄灯和绿灯候选的不同处理。
+4. 查看信号灯、业务动作、官方名单/Annex I 证据、缺失事实和来源哈希；
+5. 停止数据库或在 48 小时后不刷新，验证 CRM 失败关闭而不是隐式通过。
 
 停止并删除 demo 数据：
 
@@ -59,19 +68,22 @@ docker compose down --volumes --remove-orphans
 sequenceDiagram
     participant User as 销售/操作人员
     participant CRM as 合成 CRM 页面
-    participant Demo as demo-only 适配器
-    participant Contract as TradeSieve 规范契约
+    participant Demo as demo-only CRM 网关
+    participant Service as 活跃官方来源审查服务
+    participant DB as PostgreSQL 官方 bundle
 
     User->>CRM: 选择报价并发起审查
     CRM->>Demo: POST 固定 fixture ID
-    Demo->>Contract: 严格解码并校验 ScreeningRequest
-    Contract-->>Demo: canonical input + hash
-    Demo->>Contract: 校验预置 ScreeningResult
-    Demo-->>CRM: state / action / findings / evidence / IDs
-    CRM->>CRM: 显示并执行 HOLD / REQUEST_EVIDENCE / ESCALATE
+    Demo->>Demo: 映射主体名称 + Annex I 候选/资料事实
+    Demo->>Service: OfficialScreeningRequest
+    Service->>DB: 读取并完整复核新鲜活跃 bundle
+    DB-->>Service: FSF + Annex I 不可变投影
+    Service-->>Demo: evidence + source hashes + business_action
+    Demo-->>CRM: 官方来源结果
+    CRM->>CRM: 执行 HOLD / REQUEST_EVIDENCE / MONITOR
 ```
 
-这个 story 故意只接受仓库内固定的 `record_id`，不接收任意客户输入。服务会对映射后的 `ScreeningRequest` 执行真实的规范解码、上下文绑定和输入指纹校验；`ScreeningResult` 也使用正式 Pydantic 规范模型校验。但是 finding 和处置是预置合成 fixture，不是实时名单、物项或法律规则执行结果。
+这个路由故意只接受仓库内固定的 `record_id`，不接收任意客户输入。真实名单和控制项证据来自最近一次已验证激活，而不是预置响应。旧的 `/screen` 预置 fixture 路由仍保留给规范模型回归测试，但页面不再调用它。
 
 ## 与正式 REST 集成的替换缝
 
@@ -81,16 +93,17 @@ sequenceDiagram
 GET  /demo/api/crm/records
 GET  /demo/api/crm/records/{record_id}
 POST /demo/api/crm/records/{record_id}/screen
+POST /demo/api/crm/records/{record_id}/screen-official
 ```
 
 这些路由：
 
 - 只在 `TRADESIEVE_MODE=demo` 时注册；
 - 不出现在公开 OpenAPI；
-- 不持久化案件，也不处理任意输入；
-- 不改变当前正式 HTTP 操作清单。
+- `/screen-official` 不持久化案件，但读取真实活跃官方来源；
+- 浏览器不持有 `/v1/official-screenings` 的 Bearer token。
 
-[TS-501 / #24](https://github.com/fyaic/TradeSieve/issues/24) 完成后，CRM 网关应把固定 demo 调用替换为 `POST /v1/screenings`，并继续以相同方式执行返回的 `business_action`。生产集成还要补齐：
+外部 CRM/OMS 可用认证技术预览 `POST /v1/official-screenings` 验证同一应用服务；完整生产集成仍应收敛到 [TS-501 / #24](https://github.com/fyaic/TradeSieve/issues/24) 的 `POST /v1/screenings` 案件/幂等契约，并补齐：
 
 1. 经验证的服务身份与对象级授权；
 2. `Idempotency-Key`、correlation ID、超时与重试；
@@ -103,11 +116,14 @@ CRM 不应复制 TradeSieve 内部的制裁记录、规则表达式、相似度�
 
 ## 明确限制
 
-- 它不是实时制裁名单筛查、两用物项归类或敏感货物判断服务；
+- 它会读取最近激活的真实 EU 官方来源，但不是“每次点击都联网”；来源最长允许 48 小时，刷新应由受控运维任务执行；
+- 名称仅做 Unicode 规范化后的官方别名精确候选，不含模糊、音译、词序变体和所有权/控制；
+- 两用物项仅核验显式 Annex I 控制号是否存在并列出缺失事实，不会从 HS、货描或模型自动作正式技术归类；
+- 俄罗斯 `833/2014` 货物附件、路线、最终用途、catch-all、金融/服务限制尚未接入；
 - 它不代表欧盟、美国、中国或任何其他法域的法律结论；
 - 它不证明任何主体、货物、路线、付款或交易可以放行；
 - 它没有案件持久化、证据提交、人工决定、webhook、CLI 或 MCP 闭环；
 - 红灯和黄灯用于演示拦截效果，绿灯候选仍不是人工放行；
-- 正式确定性控制、案件状态和 REST 路由分别由 [TS-303 / #22](https://github.com/fyaic/TradeSieve/issues/22)、[TS-401 / #23](https://github.com/fyaic/TradeSieve/issues/23) 和 [TS-501 / #24](https://github.com/fyaic/TradeSieve/issues/24) 交付。
+- 完整确定性控制、案件状态和生产 REST 路由分别由 [TS-303 / #22](https://github.com/fyaic/TradeSieve/issues/22)、[TS-401 / #23](https://github.com/fyaic/TradeSieve/issues/23) 和 [TS-501 / #24](https://github.com/fyaic/TradeSieve/issues/24) 继续交付。
 
 不要把页面截图、响应或 fixture 当作客户尽调、银行沟通、许可证申请或法律意见。

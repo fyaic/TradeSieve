@@ -18,8 +18,8 @@ TradeSieve documentation is decision-oriented: requirements preserve what is nee
 
 - [Development setup and checks](getting-started/development.md)
 - [Docker reference deployment](getting-started/docker-reference.md)
-- [Synthetic international-logistics CRM demo](getting-started/demo-crm.md)
-- [Official EU source screening CLI technical preview](getting-started/official-screening-cli.md)
+- [Synthetic international-logistics CRM over live official sources](getting-started/demo-crm.md)
+- [Official EU source refresh, CLI, and REST technical preview](getting-started/official-screening-cli.md)
 - [Target MVP user experience](getting-started/mvp-user-experience.md)
 - [Draft OpenAPI contract](../api/openapi/tradesieve.v1.json)
 - [Shared JSON Schema registry](../api/schemas/tradesieve.contracts.v1.json)

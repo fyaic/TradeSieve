@@ -18,7 +18,7 @@
 | --- | --- | --- | --- | --- |
 | [TS-201](https://github.com/fyaic/TradeSieve/issues/19) Runtime source registry | S1 | Source operator knows scope/owner/licence/freshness | Governance fields required; read API/CLI redacts credentials | TS-101/103 |
 | [TS-202](https://github.com/fyaic/TradeSieve/issues/20) Immutable snapshot lifecycle | S1/S2 | Operator can retrieve/quarantine/hash/validate/diff/activate/rollback | Durable synthetic lifecycle/rollback, private bytes, safe canonical DTOs, and corruption refusal; no REST/MCP/raw export | TS-201/104 |
-| [TS-203](https://github.com/fyaic/TradeSieve/issues/3) EU source connector proof | S1/S2 | Team proves real EU data lifecycle | Live FSF discovery/retrieval/parser/exact evidence and Annex I CELLAR parser are implemented in-memory; durable projection, activation/diff/rollback and scheduled probe remain | TS-202 |
+| [TS-203](https://github.com/fyaic/TradeSieve/issues/3) EU source connector proof | S1/S2 | Team proves real EU data lifecycle | Live FSF/Annex I retrieval, immutable source-specific PostgreSQL projections, atomic activation, idempotent refresh, fresh active read, exact evidence and isolated PostgreSQL gate implemented; scheduled refresh/diff alerting and legal-version discovery remain | TS-202 |
 | [TS-204](https://github.com/fyaic/TradeSieve/issues/4) OFAC SLS connector proof | S2 | Team proves delta-capable source lifecycle | Snapshot/delta, stable IDs, program fields, history boundary documented | TS-202 |
 | [TS-205](https://github.com/fyaic/TradeSieve/issues/27) Versioned rule bundle | S1/S2 | Result identifies cited rule/policy version | Source/scope/effective/owner/tests/activation/rollback stored | Issue #2, TS-202 |
 | TS-206 Impact analysis and rescreen jobs | S2 | Relevant open cases update after source/rule change | Test delta queues linked cases, produces events, invalidates affected decision only | TS-202/205/402 |
@@ -49,11 +49,11 @@
 
 | Story | Sprint | User outcome | Acceptance summary | Depends on |
 | --- | --- | --- | --- | --- |
-| [TS-501](https://github.com/fyaic/TradeSieve/issues/24) Versioned REST API and typed errors | S1/S2 | CRM/OMS can screen/read/submit/request safely | Auth, limits, idempotency, OpenAPI, error semantics and interactive docs pass | TS-301/307/401 |
+| [TS-501](https://github.com/fyaic/TradeSieve/issues/24) Versioned REST API and typed errors | S1/S2 | CRM/OMS can screen/read/submit/request safely | Official-source-only `POST /v1/official-screenings` technical preview has hashed Bearer auth, byte/media limits and safe errors; full tenant/OIDC, idempotent cases, reads, OpenAPI artifact and rate limits remain | TS-301/307/401 |
 | TS-502 CLI client | S3 | Analyst can validate/screen/read using files/stdin | Human/JSON output, stdout/stderr, safe exit codes, REST parity | TS-501 |
 | TS-503 MCP adapter | S3 | Agent can screen/read/explain/request review safely | Official SDK/target protocol, structured parity, narrow scopes, no clearance/bulk/arbitrary tools | Issue #9, TS-501 |
 | TS-504 Signed webhook delivery | S3 | Caller receives reliable state changes | Outbox, signature/timestamp/rotation, retry/dead-letter, at-least-once and dedupe tests | TS-401/104 |
-| [TS-505](https://github.com/fyaic/TradeSieve/issues/37) Sample CRM/OMS gate | S1 demo / S3 full | Integrator first sees a fixed synthetic CRM interception demo, then the complete integration | Demo maps fixed records to canonical contracts and enforces conservative results; full story later adds formal REST, webhook verification, re-read and named-action release | Issue #1, TS-501/504 |
+| [TS-505](https://github.com/fyaic/TradeSieve/issues/37) Sample CRM/OMS gate | S1 demo / S3 full | Integrator first sees a fixed synthetic CRM interception demo, then the complete integration | Visible demo now maps fixed synthetic transactions to the real active FSF/Annex I service and enforces failure-closed actions; full story still needs formal case REST, webhook verification, re-read and named-action release | Issue #1, TS-501/504 |
 
 ## [E6 — Security, operations, and MVP acceptance](https://github.com/fyaic/TradeSieve/issues/16)
 

@@ -8,6 +8,7 @@ import ssl
 import zipfile
 from collections.abc import Callable
 from contextlib import suppress
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from io import BytesIO
@@ -92,6 +93,38 @@ class EuDualUseSourceError(Exception):
             raise ValueError("source error code must be typed")
         self.code = code
         super().__init__(_MESSAGES[code])
+
+
+@dataclass(frozen=True, slots=True)
+class EuDualUseRetrievedSource:
+    retrieved_at: datetime
+    content_hash: str
+    content_type: str
+    content: bytes
+    control_list: EuDualUseControlList
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.retrieved_at, datetime)
+            or self.retrieved_at.tzinfo is None
+            or self.retrieved_at.utcoffset() is None
+        ):
+            raise ValueError("retrieved_at must be timezone-aware")
+        if not isinstance(self.content, bytes) or not self.content:
+            raise ValueError("retrieved content must be non-empty bytes")
+        expected_hash = f"sha256:{hashlib.sha256(self.content).hexdigest()}"
+        if self.content_hash != expected_hash:
+            raise ValueError("retrieved content hash is invalid")
+        if not isinstance(self.content_type, str) or not self.content_type:
+            raise ValueError("retrieved content type is invalid")
+        if not isinstance(self.control_list, EuDualUseControlList):
+            raise ValueError("retrieved control list must be typed")
+        if (
+            self.control_list.retrieved_at != self.retrieved_at
+            or self.control_list.source_archive_hash != self.content_hash
+            or self.control_list.source_archive_bytes != len(self.content)
+        ):
+            raise ValueError("retrieved content does not match its control list")
 
 
 def _fail(code: EuDualUseSourceErrorCode) -> Never:
@@ -225,6 +258,8 @@ class HttpsEuDualUseTransport:
                 total += len(chunk)
                 if total > maximum_bytes:
                     _fail(EuDualUseSourceErrorCode.RESPONSE_TOO_LARGE)
+            if declared is not None and total != declared_length:
+                _fail(EuDualUseSourceErrorCode.RESPONSE_INVALID)
             if total == 0:
                 _fail(EuDualUseSourceErrorCode.RESPONSE_INVALID)
             return EuDualUseHttpDocument(
@@ -371,6 +406,9 @@ class EuDualUseOfficialSourceConnector:
         self._clock = clock or (lambda: datetime.now(UTC))
 
     def retrieve(self) -> EuDualUseControlList:
+        return self.retrieve_source().control_list
+
+    def retrieve_source(self) -> EuDualUseRetrievedSource:
         try:
             document = self._transport.get(
                 EU_DUAL_USE_SOURCE_URL,
@@ -391,7 +429,14 @@ class EuDualUseOfficialSourceConnector:
             _fail(EuDualUseSourceErrorCode.RESPONSE_INVALID)
         now = self._clock()
         try:
-            return self._parser.parse(document.content, retrieved_at=now)
+            control_list = self._parser.parse(document.content, retrieved_at=now)
+            return EuDualUseRetrievedSource(
+                retrieved_at=now,
+                content_hash=f"sha256:{hashlib.sha256(document.content).hexdigest()}",
+                content_type=media_type,
+                content=document.content,
+                control_list=control_list,
+            )
         except EuDualUseSourceError:
             raise
         except Exception:
@@ -402,6 +447,7 @@ __all__ = [
     "EU_DUAL_USE_CELEX",
     "EuDualUseFormexParser",
     "EuDualUseOfficialSourceConnector",
+    "EuDualUseRetrievedSource",
     "EuDualUseSourceError",
     "EuDualUseSourceErrorCode",
     "HttpsEuDualUseTransport",

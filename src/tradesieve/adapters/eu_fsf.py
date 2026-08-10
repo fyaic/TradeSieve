@@ -6,6 +6,7 @@ import hashlib
 import http.client
 import json
 import ssl
+import zlib
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
@@ -285,7 +286,7 @@ class HttpsEuFsfTransport:
                     target,
                     headers={
                         "Accept": "application/json, application/xml, text/xml",
-                        "Accept-Encoding": "identity",
+                        "Accept-Encoding": "gzip, identity",
                         "User-Agent": "TradeSieve-EU-FSF/0.1",
                     },
                 )
@@ -299,7 +300,10 @@ class HttpsEuFsfTransport:
                     continue
                 if response.status != 200:
                     _fail(EuFsfSourceErrorCode.HTTP_STATUS)
-                if response.getheader("Content-Encoding") not in {None, "identity"}:
+                content_encoding = (
+                    response.getheader("Content-Encoding") or "identity"
+                ).lower()
+                if content_encoding not in {"gzip", "identity"}:
                     _fail(EuFsfSourceErrorCode.RESPONSE_INVALID)
                 declared = response.getheader("Content-Length")
                 if declared is not None:
@@ -313,6 +317,12 @@ class HttpsEuFsfTransport:
                         _fail(EuFsfSourceErrorCode.RESPONSE_TOO_LARGE)
                 chunks: list[bytes] = []
                 total = 0
+                decoded_total = 0
+                decompressor = (
+                    zlib.decompressobj(16 + zlib.MAX_WBITS)
+                    if content_encoding == "gzip"
+                    else None
+                )
                 while True:
                     chunk = response.read(
                         min(_READ_CHUNK_BYTES, maximum_bytes + 1 - total)
@@ -325,13 +335,46 @@ class HttpsEuFsfTransport:
                     total += len(chunk)
                     if total > maximum_bytes:
                         _fail(EuFsfSourceErrorCode.RESPONSE_TOO_LARGE)
+                if declared is not None and total != declared_length:
+                    _fail(EuFsfSourceErrorCode.RESPONSE_INVALID)
+                content = b"".join(chunks)
+                if decompressor is not None:
+                    decoded_chunks: list[bytes] = []
+                    pending = content
+                    try:
+                        while pending:
+                            decoded = decompressor.decompress(
+                                pending, maximum_bytes + 1 - decoded_total
+                            )
+                            decoded_chunks.append(decoded)
+                            decoded_total += len(decoded)
+                            if decoded_total > maximum_bytes:
+                                _fail(EuFsfSourceErrorCode.RESPONSE_TOO_LARGE)
+                            next_pending = decompressor.unconsumed_tail
+                            if next_pending and len(next_pending) == len(pending):
+                                _fail(EuFsfSourceErrorCode.RESPONSE_INVALID)
+                            pending = next_pending
+                        decoded = decompressor.flush(maximum_bytes + 1 - decoded_total)
+                    except zlib.error:
+                        _fail(EuFsfSourceErrorCode.RESPONSE_INVALID)
+                    decoded_chunks.append(decoded)
+                    decoded_total += len(decoded)
+                    if decoded_total > maximum_bytes:
+                        _fail(EuFsfSourceErrorCode.RESPONSE_TOO_LARGE)
+                    if (
+                        not decompressor.eof
+                        or decompressor.unused_data
+                        or decompressor.unconsumed_tail
+                    ):
+                        _fail(EuFsfSourceErrorCode.RESPONSE_INVALID)
+                    content = b"".join(decoded_chunks)
                 content_type = response.getheader("Content-Type") or (
                     "application/octet-stream"
                 )
                 return EuFsfHttpDocument(
                     final_url=current,
                     content_type=content_type,
-                    content=b"".join(chunks),
+                    content=content,
                 )
             except EuFsfSourceError:
                 raise

@@ -24,6 +24,7 @@ from tradesieve.application.auth import (
 from tradesieve.application.contracts import (
     BusinessAction,
     CaseState,
+    ClassificationScheme,
     ContractModel,
     DataClassification,
     DocumentType,
@@ -34,6 +35,12 @@ from tradesieve.application.contracts import (
     ScreeningRequest,
     ScreeningResult,
     Signal,
+)
+from tradesieve.application.official_screening import (
+    OfficialGoodsCandidate,
+    OfficialPartyName,
+    OfficialScreeningRequest,
+    OfficialScreeningResult,
 )
 from tradesieve.application.screening_intake import (
     JSON_MEDIA_TYPE,
@@ -138,6 +145,18 @@ class DemoCrmScreeningResponse(ContractModel):
     integration_events: list[DemoCrmIntegrationEvent]
 
 
+class DemoCrmOfficialScreeningResponse(ContractModel):
+    demo_only: Literal[True] = True
+    live_official_sources: Literal[True] = True
+    data_classification: Literal["SYNTHETIC_TRANSACTION"] = "SYNTHETIC_TRANSACTION"
+    warning: Literal[
+        "合成交易已调用真实活跃官方来源；结果用于技术验收，不是法律放行。"
+    ] = "合成交易已调用真实活跃官方来源；结果用于技术验收，不是法律放行。"
+    record_id: str
+    result: OfficialScreeningResult
+    integration_events: list[DemoCrmIntegrationEvent]
+
+
 @dataclass(frozen=True, slots=True)
 class _FindingFixture:
     kind: str
@@ -238,7 +257,7 @@ def _base_request(
                     "type": "SYNTHETIC_REGISTRATION_ID",
                     "value": "CN-SYNTHETIC-91310000-001",
                     "issuer": "CN",
-                }
+                },
             ],
             "address": "上海市虹口区合成路 18 号",
         },
@@ -288,7 +307,7 @@ def _base_request(
                     "basis": "Synthetic bank and customer compliance policy scope.",
                     "fact_class": "SOURCE_ASSERTION",
                     "source_refs": ["demo-crm-policy:1.0.0"],
-                }
+                },
             ],
             "parties": parties,
             "ownership_and_control": [],
@@ -512,8 +531,8 @@ def _make_scenarios() -> dict[str, _Scenario]:
     record = _record(
         record_id="crm-quote-260810-0047",
         quote_number="HZ-260810-0047",
-        customer_name="伏尔加工业系统（合成）有限公司",
-        customer_country="俄罗斯",
+        customer_name="Benevolence International Foundation（公开名单测试样本）",
+        customer_country="美国 / 俄罗斯路线（合成交易）",
         sales_owner="顾明远",
         service_mode="中欧班列 + 卡车",
         incoterm="DAP Moscow",
@@ -539,8 +558,8 @@ def _make_scenarios() -> dict[str, _Scenario]:
     request = _base_request(
         record_id=record.record_id,
         correlation_id="crm-demo-red-0047",
-        buyer_name="ООО Волга Промышленные Системы (синтетика)",
-        buyer_country="RU",
+        buyer_name="Benevolence International Foundation",
+        buyer_country="US",
         buyer_identifier="RU-SYNTHETIC-7704-884219",
         end_user_name=None,
         end_user_country=None,
@@ -557,7 +576,16 @@ def _make_scenarios() -> dict[str, _Scenario]:
                     "code": "853710",
                     "candidate_only": True,
                     "rationale": "Supplier candidate code, pending review.",
-                }
+                },
+                {
+                    "candidate_ref": "annex-i-1",
+                    "scheme": "EU_DUAL_USE_ANNEX_I",
+                    "code": "3A001",
+                    "candidate_only": True,
+                    "rationale": (
+                        "Public Annex I code used only to exercise the live gate."
+                    ),
+                },
             ],
             "quantity": "36",
             "quantity_unit": "pieces",
@@ -1150,6 +1178,41 @@ def screen_demo_crm_record(
     )
 
 
+def official_request_for_demo_crm_record(
+    settings: Settings,
+    record_id: str,
+) -> OfficialScreeningRequest:
+    """Map one fixed synthetic CRM record into the live official-source contract."""
+
+    _require_demo(settings)
+    scenario = _SCENARIOS.get(record_id)
+    if scenario is None:
+        raise KeyError(record_id)
+    annex_candidates = [
+        candidate.code
+        for line in scenario.request.goods
+        for candidate in line.classification_candidates
+        if candidate.scheme is ClassificationScheme.EU_DUAL_USE_ANNEX_I
+    ]
+    annex_code = annex_candidates[0] if len(annex_candidates) == 1 else None
+    technical_specification_available = bool(
+        scenario.request.goods
+        and all(line.technical_specification for line in scenario.request.goods)
+    )
+    return OfficialScreeningRequest(
+        party_names=[
+            OfficialPartyName(name=party.legal_name)
+            for party in scenario.request.parties
+            if party.legal_name is not None
+        ],
+        goods=OfficialGoodsCandidate(
+            annex_i_code=annex_code,
+            classification_verified=False,
+            technical_specification_available=technical_specification_available,
+        ),
+    )
+
+
 def _require_demo(settings: Settings) -> None:
     if settings.mode != "demo":
         raise RuntimeError("synthetic CRM demonstrator requires explicit demo mode")
@@ -1157,9 +1220,12 @@ def _require_demo(settings: Settings) -> None:
 
 __all__ = [
     "DemoCrmDetailResponse",
+    "DemoCrmIntegrationEvent",
     "DemoCrmListResponse",
+    "DemoCrmOfficialScreeningResponse",
     "DemoCrmScreeningResponse",
     "get_demo_crm_record",
     "list_demo_crm_records",
+    "official_request_for_demo_crm_record",
     "screen_demo_crm_record",
 ]

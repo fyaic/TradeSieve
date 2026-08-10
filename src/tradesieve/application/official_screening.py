@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal, Protocol
 
 from pydantic import Field, model_validator
@@ -30,6 +31,7 @@ from tradesieve.domain.eu_fsf import (
     EuFsfNameQuery,
     EuFsfSnapshot,
 )
+from tradesieve.domain.official_sources import ActiveOfficialSources
 
 
 class _RetrievedFsf(Protocol):
@@ -53,6 +55,10 @@ class _EuDualUseSource(Protocol):
 
 class _EuFsfParser(Protocol):
     def parse(self, content: bytes) -> EuFsfSnapshot: ...
+
+
+class _ActiveOfficialRepository(Protocol):
+    def get_active(self) -> ActiveOfficialSources: ...
 
 
 class OfficialPartyIdentifier(ContractModel):
@@ -162,6 +168,9 @@ class OfficialScreeningResult(ContractModel):
     signal: Signal
     business_action: BusinessAction
     automatic_clearance: Literal[False] = False
+    source_bundle_id: str | None = None
+    source_bundle_content_hash: str | None = None
+    source_bundle_activated_at: str | None = None
     sanctions: OfficialSanctionsResult
     dual_use: OfficialDualUseResult
     caveats: list[str]
@@ -192,6 +201,46 @@ class OfficialScreeningService:
         fsf_snapshot = self._fsf_parser.parse(retrieved_fsf.content)
         if fsf_snapshot.raw_content_hash != retrieved_fsf.content_hash:
             raise RuntimeError("official FSF retrieval/parser integrity mismatch")
+        dual_list = self._dual_use_source.retrieve()
+        return OfficialScreeningEngine().screen(
+            request,
+            fsf_snapshot=fsf_snapshot,
+            fsf_retrieved_at=retrieved_fsf.retrieved_at,
+            dual_use_control_list=dual_list,
+        )
+
+
+class OfficialScreeningEngine:
+    """Canonical deterministic evaluation over one already verified source pair."""
+
+    def screen(
+        self,
+        request: OfficialScreeningRequest,
+        *,
+        fsf_snapshot: EuFsfSnapshot,
+        fsf_retrieved_at: datetime,
+        dual_use_control_list: EuDualUseControlList,
+        source_bundle: ActiveOfficialSources | None = None,
+    ) -> OfficialScreeningResult:
+        if not isinstance(request, OfficialScreeningRequest):
+            raise ValueError("official screening request must be typed")
+        if not isinstance(fsf_snapshot, EuFsfSnapshot) or not isinstance(
+            dual_use_control_list, EuDualUseControlList
+        ):
+            raise ValueError("official screening projections must be typed")
+        if (
+            not isinstance(fsf_retrieved_at, datetime)
+            or fsf_retrieved_at.tzinfo is None
+            or fsf_retrieved_at.utcoffset() is None
+        ):
+            raise ValueError("official FSF retrieval time must be timezone-aware")
+        if source_bundle is not None and (
+            not isinstance(source_bundle, ActiveOfficialSources)
+            or source_bundle.fsf_snapshot != fsf_snapshot
+            or source_bundle.dual_use_control_list != dual_use_control_list
+            or source_bundle.fsf_retrieved_at != fsf_retrieved_at
+        ):
+            raise ValueError("official source bundle does not bind the projections")
         fsf_index = EuFsfExactIndex(fsf_snapshot)
         matches = [
             fsf_index.query(EuFsfExactQuery(item.type, item.value, item.country))
@@ -228,9 +277,8 @@ class OfficialScreeningService:
             for item in candidates.evidence
         ]
 
-        dual_list = self._dual_use_source.retrieve()
         goods = request.goods
-        dual_assessment = EuDualUseAssessmentEngine(dual_list).assess(
+        dual_assessment = EuDualUseAssessmentEngine(dual_use_control_list).assess(
             goods.annex_i_code,
             classification_verified=goods.classification_verified,
             technical_specification_available=(goods.technical_specification_available),
@@ -266,13 +314,24 @@ class OfficialScreeningService:
         return OfficialScreeningResult(
             signal=signal,
             business_action=action,
+            source_bundle_id=(
+                source_bundle.bundle_id if source_bundle is not None else None
+            ),
+            source_bundle_content_hash=(
+                source_bundle.bundle_content_hash if source_bundle is not None else None
+            ),
+            source_bundle_activated_at=(
+                source_bundle.activated_at.isoformat()
+                if source_bundle is not None
+                else None
+            ),
             sanctions=OfficialSanctionsResult(
                 source_generation_date=fsf_snapshot.generation_date.isoformat(),
                 source_global_file_id=fsf_snapshot.global_file_id,
                 source_snapshot_id=fsf_snapshot.snapshot_id,
                 source_snapshot_content_hash=fsf_snapshot.content_hash,
                 source_raw_content_hash=fsf_snapshot.raw_content_hash,
-                source_retrieved_at=retrieved_fsf.retrieved_at.isoformat(),
+                source_retrieved_at=fsf_retrieved_at.isoformat(),
                 identifier_query_count=len(matches),
                 identifier_statuses=[match.status.value for match in matches],
                 identifier_evidence=identifier_evidence,
@@ -282,10 +341,10 @@ class OfficialScreeningService:
             ),
             dual_use=OfficialDualUseResult(
                 source_effective_from=EU_DUAL_USE_EFFECTIVE_FROM.isoformat(),
-                source_snapshot_id=dual_list.snapshot_id,
-                source_snapshot_content_hash=dual_list.content_hash,
-                source_archive_hash=dual_list.source_archive_hash,
-                source_retrieved_at=dual_list.retrieved_at.isoformat(),
+                source_snapshot_id=dual_use_control_list.snapshot_id,
+                source_snapshot_content_hash=dual_use_control_list.content_hash,
+                source_archive_hash=dual_use_control_list.source_archive_hash,
+                source_retrieved_at=dual_use_control_list.retrieved_at.isoformat(),
                 status=dual_assessment.status.value,
                 requested_code=dual_assessment.requested_code,
                 entry_content_hash=entry.content_hash if entry is not None else None,
@@ -305,6 +364,58 @@ class OfficialScreeningService:
         )
 
 
+class PersistedOfficialScreeningService:
+    """Screen only against a fresh, atomically active official source bundle."""
+
+    def __init__(
+        self,
+        repository: _ActiveOfficialRepository,
+        *,
+        clock: Callable[[], datetime] | None = None,
+        maximum_source_age: timedelta = timedelta(hours=48),
+    ) -> None:
+        if not hasattr(repository, "get_active"):
+            raise ValueError("official source repository must implement get_active")
+        if clock is not None and not callable(clock):
+            raise ValueError("screening clock must be callable")
+        if (
+            not isinstance(maximum_source_age, timedelta)
+            or maximum_source_age <= timedelta(0)
+            or maximum_source_age > timedelta(days=30)
+        ):
+            raise ValueError("maximum official source age is invalid")
+        self._repository = repository
+        self._clock = clock or (lambda: datetime.now(UTC))
+        self._maximum_source_age = maximum_source_age
+
+    def screen(self, request: OfficialScreeningRequest) -> OfficialScreeningResult:
+        active = self._repository.get_active()
+        if not isinstance(active, ActiveOfficialSources):
+            raise RuntimeError(
+                "active official source repository returned invalid data"
+            )
+        now = self._clock()
+        if now.tzinfo is None or now.utcoffset() is None:
+            raise RuntimeError("official screening clock is invalid")
+        source_times = (
+            active.fsf_retrieved_at,
+            active.dual_use_control_list.retrieved_at,
+            active.activated_at,
+        )
+        if any(
+            timestamp > now or now - timestamp > self._maximum_source_age
+            for timestamp in source_times
+        ):
+            raise RuntimeError("active official source bundle is stale")
+        return OfficialScreeningEngine().screen(
+            request,
+            fsf_snapshot=active.fsf_snapshot,
+            fsf_retrieved_at=active.fsf_retrieved_at,
+            dual_use_control_list=active.dual_use_control_list,
+            source_bundle=active,
+        )
+
+
 __all__ = [
     "EU_FSF_IDENTIFIER_TYPES",
     "OfficialGoodsCandidate",
@@ -312,5 +423,7 @@ __all__ = [
     "OfficialPartyName",
     "OfficialScreeningRequest",
     "OfficialScreeningResult",
+    "OfficialScreeningEngine",
     "OfficialScreeningService",
+    "PersistedOfficialScreeningService",
 ]
