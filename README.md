@@ -51,7 +51,7 @@ flowchart LR
 
 ## 项目进度
 
-**当前阶段：Phase 1 MVP 开发中。EU 官方 FSF 与 Annex I 已能经过验证后原子写入 PostgreSQL，并由 CLI、认证 REST 和合成 CRM 调用同一个活跃版本审查服务；完整案件、人工作业、MCP 和俄罗斯专项控制仍未完成。**
+**当前阶段：Phase 1 MVP 开发中。EU 官方 FSF 与 Annex I 已能经过验证后原子写入 PostgreSQL，并由 CLI、认证 REST 和合成 CRM 调用同一个活跃版本审查服务；OFAC SLS 已完成联网连接器、稳定 UID 差分与重放证明，但尚未进入活跃来源池；完整案件、人工作业、MCP 和俄罗斯专项控制仍未完成。**
 
 截至 2026-08-10，进度如下：
 
@@ -67,6 +67,7 @@ flowchart LR
 | 合成物流 CRM 门禁 | 🧪 真实来源技术预览 | 5 条中国货代风格合成询报价；页面按钮调用 PostgreSQL 活跃官方来源，不再使用预置结论。首条记录以公开 FSF 企业别名和 `3A001` 验证 `RED/HOLD`；见 [使用指南](docs/getting-started/demo-crm.md) |
 | EU 官方制裁名单 | 🧪 活跃版本可用 | 经 data.europa.eu 发现当前 FSF XML；有界 gzip/identity 下载、安全解析、原始哈希、6,234 主体/31,053 别名/3,007 标识投影、不可变激活、强标识精确匹配和官方别名候选；尚无模糊/音译/所有权匹配 |
 | EU 两用物项 Annex I | 🧪 活跃版本可用 | 从 Publications Office CELLAR 读取 `32025R2003` 官方 Formex 附件并持久化 384 个控制条目；核验显式 Annex I 控制号和缺失事实，不从 HS 或货描自动归类 |
+| OFAC SLS 制裁名单 | 🧪 联网连接器证明 | 固定官方 SDN/Consolidated XML 入口、一次严格约束的 GovCloud 下载跳转、安全解析、源哈希、稳定 UID/条目哈希差分、强标识与名称候选、确定性重放均已验证；尚未持久化/激活或接入 CLI、REST、CRM |
 | 官方来源刷新与审查 CLI | ✅ 可运行 | `refresh-official-sources` 原子激活同一 FSF/Annex I bundle；`screen-active` 只使用 48 小时内的活跃版本；`screen-official` 保留为每次联网下载的诊断入口 |
 | 持久化来源投影与激活 | ✅ 已完成首个垂直切片 | migration `20260810_0006` 保存内容寻址原始字节、来源专用行投影、激活事件和单一活跃指针；重复刷新幂等，缺失/损坏/陈旧时失败关闭 |
 | 完整确定性审查与证据 | ⏳ 进行中 | 官方别名精确规范化候选已接入；模糊/音译实体解析、所有权/控制、俄罗斯 `833/2014` 货物附件、路线/最终用途/catch-all 仍待接入 |
@@ -75,13 +76,13 @@ flowchart LR
 | Screening CLI 与 MCP | ⏳ 计划中 | 面向运营/CI 和 Agent 的同契约适配器；当前尚无 MCP Server |
 | Webhook 与可观测性 | ⏳ 计划中 | 签名事件、脱敏日志/指标/链路 |
 
-当前开发分支最近一次完整测试门禁为 **1,934 个测试通过，11,847 条语句和 3,438 个分支 100% 覆盖**；独立 PostgreSQL 18.4 官方投影门禁验证了 migration `0006`、激活/幂等、完整回读、三类不可变约束和零残留。2026-08-10 真实端到端验收中，EU FSF 生成时间为 `2026-08-05T16:47:04.449+02:00`，解析并持久化 6,234 个主体、31,053 个别名和 3,007 个有效标识；官方 Annex I 持久化 384 个控制条目；首次刷新约 21.5 秒，重复幂等刷新约 13.7 秒，认证 REST 和 CRM 均返回同一 bundle 的 `RED/HOLD`。这些证据证明当前代码边界和来源可达性，不代表全球名单覆盖、法律正确率或生产可用性。
+当前开发分支最近一次完整测试门禁为 **2,028 个测试通过，12,753 条语句和 3,732 个分支 100% 覆盖**；独立 PostgreSQL 18.4 官方投影门禁验证了 migration `0006`、激活/幂等、完整回读、三类不可变约束和零残留。2026-08-10 真实端到端验收中，EU FSF 生成时间为 `2026-08-05T16:47:04.449+02:00`，解析并持久化 6,234 个主体、31,053 个别名和 3,007 个有效标识；官方 Annex I 持久化 384 个控制条目；首次刷新约 21.5 秒，重复幂等刷新约 13.7 秒，认证 REST 和 CRM 均返回同一 bundle 的 `RED/HOLD`。同日 OFAC 联网探针验证了 SDN 19,199 条与 Consolidated 481 条的严格解析、内容哈希和确定性重放，但尚未把 OFAC 激活到运行时来源池。这些证据证明当前代码边界和来源可达性，不代表全球名单覆盖、法律正确率或生产可用性。
 
 详细范围见 [MVP 定义](docs/product/mvp-scope.md)、[Phase 1 计划](docs/delivery/phase-1-plan.md) 和 [敏捷 backlog](docs/delivery/phase-1-backlog.md)。
 
 ## 现在可以怎样使用
 
-当前主路径是“官方来源刷新并原子激活 → CLI/REST/CRM 读取同一活跃 bundle → 返回保守业务动作和可追溯证据”。合成 CRM 只提供测试交易，名单和 Annex I 证据来自真实活跃官方版本。该垂直切片仍是技术预览：不持久化任意 REST 请求/结果或案件，也没有正式 OIDC、完整实体解析、俄罗斯专项货物控制或 MCP。
+当前主路径是“EU 官方来源刷新并原子激活 → CLI/REST/CRM 读取同一活跃 bundle → 返回保守业务动作和可追溯证据”。合成 CRM 只提供测试交易，名单和 Annex I 证据来自真实活跃官方版本。OFAC 当前只有独立联网证据探针，不能被解释为运行时覆盖。该垂直切片仍是技术预览：不持久化任意 REST 请求/结果或案件，也没有正式 OIDC、完整实体解析、俄罗斯专项货物控制或 MCP。
 
 ### 1. 启动参考环境
 
@@ -290,7 +291,12 @@ CLI 和 MCP 将调用相同的应用服务和契约：CLI 面向运营、CI 与�
 ./scripts/test_screening_submission_postgres.sh  # 受理幂等/事务/竞态/破坏修复
 ./scripts/test_official_source_postgres.sh  # 官方投影/激活/幂等/不可变约束
 ./scripts/test_compose.sh                   # 完整参考部署与零残留验收
+uv run python scripts/ofac_sls_live_probe.py  # OFAC SDN/non-SDN 联网解析与重放证据
 ```
+
+OFAC 探针只输出日期、计数、字节数、哈希和重放状态，不输出名单主体或标识；
+它验证连接器边界，不会写入 PostgreSQL，也不会改变当前活跃审查来源。详见
+[OFAC SLS 连接器证明](docs/research/ofac-sls-connector-proof.md)。
 
 详见 [开发环境](docs/getting-started/development.md) 和 [Docker 参考部署](docs/getting-started/docker-reference.md)。测试与示例只能使用合成数据，禁止提交客户、货运、支付、身份、凭据或生产证据。
 

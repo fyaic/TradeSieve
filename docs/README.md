@@ -63,6 +63,7 @@ TradeSieve documentation is decision-oriented: requirements preserve what is nee
 
 - [Landscape synthesis](research/landscape.md)
 - [Regulatory and official data sources](research/regulatory-and-data-sources.md)
+- [OFAC SLS connector proof and history boundary](research/ofac-sls-connector-proof.md)
 - [Open-source projects and standards](research/open-source-and-standards.md)
 - [Academic research](research/academic-research.md)
 - [Industry patterns](research/industry-patterns.md)

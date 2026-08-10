@@ -1,5 +1,5 @@
 schema_version: 1
-accessed_at: "2026-08-06"
+accessed_at: "2026-08-10"
 policy:
   primary_sources_control: true
   production_use_requires_licence_review: true
@@ -101,8 +101,44 @@ sources:
     authority: U.S. Department of the Treasury, OFAC
     jurisdiction: US
     url: https://ofac.treasury.gov/sanctions-list-service
-    use: Sanctions list downloads, customized datasets, and deltas
-    access: Public service; production connector terms must be reviewed
+    use: Fixed official entry point for SDN and consolidated non-SDN comprehensive XML publications
+    access: Public service; legacy XML and one signed AWS GovCloud publication redirect verified 2026-08-10; production terms must be reviewed
+
+  - id: ofac-faq-90
+    title: OFAC FAQ 90 — comprehensive and delta files
+    category: official-guidance
+    authority: U.S. Department of the Treasury, OFAC
+    jurisdiction: US
+    url: https://ofac.treasury.gov/faqs/90
+    use: Full-refresh versus delta operating policy for locally maintained databases
+    access: Public official FAQ; verified 2026-08-10
+
+  - id: ofac-faq-1031
+    title: OFAC FAQ 1031 — record UID
+    category: official-guidance
+    authority: U.S. Department of the Treasury, OFAC
+    jurisdiction: US
+    url: https://ofac.treasury.gov/faqs/1031
+    use: Stable numeric record identity for snapshot diffs and replay
+    access: Public official FAQ; verified 2026-08-10
+
+  - id: ofac-advanced-format-faq
+    title: Frequently Asked Questions on Advanced Sanctions List Standard
+    category: official-technical-documentation
+    authority: U.S. Department of the Treasury, OFAC
+    jurisdiction: US
+    url: https://ofac.treasury.gov/sdn-list-data-formats-data-schemas/frequently-asked-questions-on-advanced-sanctions-list-standard
+    use: Relationship between supported legacy SDN/consolidated XML and advanced sanctions-list formats
+    access: Public official technical FAQ; verified 2026-08-10
+
+  - id: ofac-sls-namespace-change-2024
+    title: OFAC Sanctions List Service XML namespace change notice
+    category: official-technical-announcement
+    authority: U.S. Department of the Treasury, OFAC
+    jurisdiction: US
+    url: https://ofac.treasury.gov/recent-actions/20240507_44
+    use: Fixed legacy XML namespace and schema-drift validation
+    access: Public official notice; verified 2026-08-10
 
   - id: ofac-faq-401
     title: OFAC FAQ 401 — 50 Percent Rule
