@@ -112,7 +112,7 @@ def test_inspect_runtime_returns_status_and_details(
     assert manage.inspect_runtime(Settings()) == (0 if ready else 1)
     payload = json.loads(capsys.readouterr().out)
     assert payload["ready"] is ready
-    assert payload["expected_migration"] == "20260810_0006"
+    assert payload["expected_migration"] == "20260810_0007"
     assert payload["expected_source_coverage"] == "synthetic-demo-sources-v1"
     assert payload["expected_rule_coverage"] == "synthetic-demo-rules-v1"
 
@@ -830,8 +830,9 @@ def test_screen_official_command_prints_canonical_result(
 
     class FakeService:
         def __init__(self, *args: object, **kwargs: object) -> None:
-            assert len(args) == 2
+            assert len(args) == 3
             assert kwargs["fsf_parser"] is not None
+            assert kwargs["ofac_parser"] is not None
 
         def screen(self, value: object) -> FakeResult:
             calls.append(value)
@@ -914,8 +915,9 @@ def test_refresh_official_sources_command_prints_safe_receipt(
 
     class Service:
         def __init__(self, *args: object, **kwargs: object) -> None:
-            assert len(args) == 3
+            assert len(args) == 4
             assert kwargs["fsf_parser"] is not None
+            assert kwargs["ofac_parser"] is not None
 
         def refresh(self) -> Result:
             calls.append("refresh")

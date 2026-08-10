@@ -32,10 +32,13 @@ from tradesieve.domain.eu_fsf import (
     EuFsfSnapshot,
     EuFsfSubjectType,
 )
+from tradesieve.domain.ofac_sls import OfacSlsListKind, OfacSnapshot
 from tradesieve.domain.official_sources import (
     ActiveOfficialSources,
     official_source_bundle_id,
 )
+
+from ..ofac_test_data import ofac_pair
 
 NOW = datetime(2026, 8, 10, 4, 30, tzinfo=UTC)
 
@@ -135,6 +138,34 @@ class Parser:
         return self.value
 
 
+@dataclass(frozen=True)
+class RetrievedOfac:
+    content_hash: str
+    snapshot: OfacSnapshot
+
+
+class OfacSource:
+    def __init__(self, snapshots: tuple[OfacSnapshot, OfacSnapshot]) -> None:
+        self.values = {
+            snapshot.list_kind: RetrievedOfac(snapshot.raw_content_hash, snapshot)
+            for snapshot in snapshots
+        }
+        self.calls: list[OfacSlsListKind] = []
+
+    def retrieve(self, list_kind: OfacSlsListKind) -> RetrievedOfac:
+        self.calls.append(list_kind)
+        return self.values[list_kind]
+
+
+class OfacParser:
+    def __init__(self) -> None:
+        self.calls: list[OfacSlsListKind] = []
+
+    def parse(self, source: RetrievedOfac) -> OfacSnapshot:
+        self.calls.append(source.snapshot.list_kind)
+        return source.snapshot
+
+
 def request(
     *,
     number: str = "36-3823186",
@@ -157,7 +188,7 @@ def request(
 def service(
     *,
     snapshot: EuFsfSnapshot | None = None,
-) -> tuple[OfficialScreeningService, Source, Source, Parser]:
+) -> tuple[OfficialScreeningService, Source, Source, Parser, OfacSource, OfacParser]:
     parsed = snapshot or fsf_snapshot()
     fsf_source = Source(
         RetrievedFsf(
@@ -168,20 +199,26 @@ def service(
     )
     dual_source = Source(dual_list())
     parser = Parser(parsed)
+    ofac_source = OfacSource(ofac_pair(retrieved_at=NOW))
+    ofac_parser = OfacParser()
     return (
         OfficialScreeningService(
             cast(Any, fsf_source),
             cast(Any, dual_source),
+            ofac_source,
             fsf_parser=parser,
+            ofac_parser=cast(Any, ofac_parser),
         ),
         fsf_source,
         dual_source,
         parser,
+        ofac_source,
+        ofac_parser,
     )
 
 
 def test_exact_sanctions_and_annex_entry_hold_with_versioned_evidence() -> None:
-    subject, fsf_source, dual_source, parser = service()
+    subject, fsf_source, dual_source, parser, ofac_source, ofac_parser = service()
     result = subject.screen(request())
 
     assert result.signal is Signal.RED
@@ -195,14 +232,18 @@ def test_exact_sanctions_and_annex_entry_hold_with_versioned_evidence() -> None:
     )
     assert result.sanctions.name_statuses == []
     assert result.sanctions.name_evidence == []
+    assert [item.list_kind for item in result.ofac.lists] == ["SDN", "CONSOLIDATED"]
+    assert all(item.identifier_evidence for item in result.ofac.lists)
     assert "36-3823186" not in result.model_dump_json()
     assert result.dual_use.status == "CONTROL_ENTRY_FOUND"
     assert result.dual_use.requested_code == "0A000"
     assert result.dual_use.entry_content_hash is not None
     assert result.dual_use.source_native_locator == "/ANNEX/NP[NO.P='0A000']"
-    assert len(result.caveats) == 6
+    assert len(result.caveats) == 7
     assert fsf_source.calls == dual_source.calls == 1
     assert parser.contents == [b"source bytes"]
+    assert ofac_source.calls == [OfacSlsListKind.SDN, OfacSlsListKind.CONSOLIDATED]
+    assert ofac_parser.calls == ofac_source.calls
 
 
 def test_missing_goods_classification_requests_evidence_after_no_match() -> None:
@@ -275,7 +316,9 @@ def test_integrity_mismatch_and_untyped_dependencies_fail_closed() -> None:
     subject = OfficialScreeningService(
         cast(Any, mismatched_source),
         cast(Any, Source(dual_list())),
+        OfacSource(ofac_pair(retrieved_at=NOW)),
         fsf_parser=Parser(parsed),
+        ofac_parser=cast(Any, OfacParser()),
     )
     assert (
         parsed.raw_content_hash
@@ -290,20 +333,25 @@ def test_integrity_mismatch_and_untyped_dependencies_fail_closed() -> None:
         OfficialScreeningService(
             cast(Any, object()),
             cast(Any, Source(dual_list())),
+            OfacSource(ofac_pair(retrieved_at=NOW)),
             fsf_parser=Parser(fsf_snapshot()),
+            ofac_parser=cast(Any, OfacParser()),
         )
 
 
 def active_sources() -> ActiveOfficialSources:
     fsf = fsf_snapshot()
     dual = dual_list()
-    bundle_id = official_source_bundle_id(fsf, dual)
+    ofac_sdn, ofac_consolidated = ofac_pair(retrieved_at=NOW)
+    bundle_id = official_source_bundle_id(fsf, dual, ofac_sdn, ofac_consolidated)
     return ActiveOfficialSources(
         bundle_id=bundle_id,
         bundle_content_hash="sha256:" + bundle_id.removeprefix("official-bundle-"),
         fsf_retrieved_at=NOW,
         fsf_snapshot=fsf,
         dual_use_control_list=dual,
+        ofac_sdn_snapshot=ofac_sdn,
+        ofac_consolidated_snapshot=ofac_consolidated,
         activated_at=NOW,
     )
 
@@ -357,24 +405,64 @@ def test_engine_and_persisted_dependency_contracts_fail_closed() -> None:
             fsf_snapshot=active.fsf_snapshot,
             fsf_retrieved_at=NOW,
             dual_use_control_list=active.dual_use_control_list,
+            ofac_sdn_snapshot=active.ofac_sdn_snapshot,
+            ofac_consolidated_snapshot=active.ofac_consolidated_snapshot,
         ),
         lambda: engine.screen(
             request(),
             fsf_snapshot=cast(Any, "bad"),
             fsf_retrieved_at=NOW,
             dual_use_control_list=active.dual_use_control_list,
-        ),
-        lambda: engine.screen(
-            request(),
-            fsf_snapshot=active.fsf_snapshot,
-            fsf_retrieved_at=datetime(2026, 8, 10),
-            dual_use_control_list=active.dual_use_control_list,
+            ofac_sdn_snapshot=active.ofac_sdn_snapshot,
+            ofac_consolidated_snapshot=active.ofac_consolidated_snapshot,
         ),
         lambda: engine.screen(
             request(),
             fsf_snapshot=active.fsf_snapshot,
             fsf_retrieved_at=NOW,
             dual_use_control_list=active.dual_use_control_list,
+            ofac_sdn_snapshot=cast(Any, "bad"),
+            ofac_consolidated_snapshot=active.ofac_consolidated_snapshot,
+        ),
+        lambda: engine.screen(
+            request(),
+            fsf_snapshot=active.fsf_snapshot,
+            fsf_retrieved_at=NOW,
+            dual_use_control_list=active.dual_use_control_list,
+            ofac_sdn_snapshot=active.ofac_consolidated_snapshot,
+            ofac_consolidated_snapshot=active.ofac_consolidated_snapshot,
+        ),
+        lambda: engine.screen(
+            request(),
+            fsf_snapshot=active.fsf_snapshot,
+            fsf_retrieved_at=NOW,
+            dual_use_control_list=active.dual_use_control_list,
+            ofac_sdn_snapshot=active.ofac_sdn_snapshot,
+            ofac_consolidated_snapshot=cast(Any, "bad"),
+        ),
+        lambda: engine.screen(
+            request(),
+            fsf_snapshot=active.fsf_snapshot,
+            fsf_retrieved_at=NOW,
+            dual_use_control_list=active.dual_use_control_list,
+            ofac_sdn_snapshot=active.ofac_sdn_snapshot,
+            ofac_consolidated_snapshot=active.ofac_sdn_snapshot,
+        ),
+        lambda: engine.screen(
+            request(),
+            fsf_snapshot=active.fsf_snapshot,
+            fsf_retrieved_at=datetime(2026, 8, 10),
+            dual_use_control_list=active.dual_use_control_list,
+            ofac_sdn_snapshot=active.ofac_sdn_snapshot,
+            ofac_consolidated_snapshot=active.ofac_consolidated_snapshot,
+        ),
+        lambda: engine.screen(
+            request(),
+            fsf_snapshot=active.fsf_snapshot,
+            fsf_retrieved_at=NOW,
+            dual_use_control_list=active.dual_use_control_list,
+            ofac_sdn_snapshot=active.ofac_sdn_snapshot,
+            ofac_consolidated_snapshot=active.ofac_consolidated_snapshot,
             source_bundle=replace(active, fsf_retrieved_at=NOW - timedelta(seconds=1)),
         ),
     )

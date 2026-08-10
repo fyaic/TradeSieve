@@ -372,6 +372,61 @@
           }
         }
       }
+    },
+    "/v1/official-screenings": {
+      "post": {
+        "summary": "Screen against the fresh active official-source bundle",
+        "description": "Technical preview over EU FSF, EU Annex I, OFAC SDN, and OFAC Consolidated. Candidate evidence can only hold or escalate; it never provides legal clearance. Requests and cases are not yet persisted by this route.",
+        "operationId": "officialScreeningTechnicalPreview",
+        "security": [
+          {
+            "OfficialScreeningBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OfficialScreeningRequest"
+              },
+              "examples": {
+                "public_source_candidate": {
+                  "$ref": "#/components/examples/OfficialScreeningRequest"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Conservative official-source screening result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfficialScreeningResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid workload bearer token"
+          },
+          "411": {
+            "description": "A bounded Content-Length is required"
+          },
+          "415": {
+            "description": "Only application/json is accepted"
+          },
+          "422": {
+            "description": "The request contract is invalid"
+          },
+          "503": {
+            "description": "No fresh verified official-source bundle"
+          }
+        },
+        "x-tradesieve-implementation-status": "technical-preview"
+      }
     }
   },
   "components": {
@@ -381,6 +436,11 @@
         "scheme": "bearer",
         "bearerFormat": "JWT",
         "description": "OIDC/OAuth access token with audience and operation scopes"
+      },
+      "OfficialScreeningBearer": {
+        "type": "http",
+        "description": "Deployment-scoped workload bearer token.",
+        "scheme": "bearer"
       }
     },
     "parameters": {
@@ -2228,6 +2288,809 @@
           "AGENT"
         ],
         "title": "LifecycleActorType",
+        "type": "string"
+      },
+      "OfficialDualUseResult": {
+        "additionalProperties": false,
+        "properties": {
+          "source": {
+            "const": "EU_DUAL_USE_ANNEX_I",
+            "default": "EU_DUAL_USE_ANNEX_I",
+            "title": "Source",
+            "type": "string"
+          },
+          "source_celex": {
+            "const": "32025R2003",
+            "default": "32025R2003",
+            "title": "Source Celex",
+            "type": "string"
+          },
+          "source_effective_from": {
+            "title": "Source Effective From",
+            "type": "string"
+          },
+          "source_snapshot_id": {
+            "title": "Source Snapshot Id",
+            "type": "string"
+          },
+          "source_snapshot_content_hash": {
+            "title": "Source Snapshot Content Hash",
+            "type": "string"
+          },
+          "source_archive_hash": {
+            "title": "Source Archive Hash",
+            "type": "string"
+          },
+          "source_retrieved_at": {
+            "title": "Source Retrieved At",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "requested_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Code"
+          },
+          "entry_content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Content Hash"
+          },
+          "source_native_locator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Native Locator"
+          },
+          "missing_facts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Facts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "source_effective_from",
+          "source_snapshot_id",
+          "source_snapshot_content_hash",
+          "source_archive_hash",
+          "source_retrieved_at",
+          "status",
+          "requested_code",
+          "entry_content_hash",
+          "source_native_locator",
+          "missing_facts"
+        ],
+        "title": "OfficialDualUseResult",
+        "type": "object"
+      },
+      "OfficialGoodsCandidate": {
+        "additionalProperties": false,
+        "properties": {
+          "annex_i_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Annex I Code"
+          },
+          "classification_verified": {
+            "default": false,
+            "title": "Classification Verified",
+            "type": "boolean"
+          },
+          "technical_specification_available": {
+            "default": false,
+            "title": "Technical Specification Available",
+            "type": "boolean"
+          }
+        },
+        "title": "OfficialGoodsCandidate",
+        "type": "object"
+      },
+      "OfficialOfacIdentifierEvidence": {
+        "additionalProperties": false,
+        "properties": {
+          "list_kind": {
+            "title": "List Kind",
+            "type": "string"
+          },
+          "entry_uid": {
+            "title": "Entry Uid",
+            "type": "string"
+          },
+          "subject_type": {
+            "title": "Subject Type",
+            "type": "string"
+          },
+          "programs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Programs",
+            "type": "array"
+          },
+          "identifier_uid": {
+            "title": "Identifier Uid",
+            "type": "string"
+          },
+          "identifier_type": {
+            "title": "Identifier Type",
+            "type": "string"
+          },
+          "source_native_locator": {
+            "title": "Source Native Locator",
+            "type": "string"
+          }
+        },
+        "required": [
+          "list_kind",
+          "entry_uid",
+          "subject_type",
+          "programs",
+          "identifier_uid",
+          "identifier_type",
+          "source_native_locator"
+        ],
+        "title": "OfficialOfacIdentifierEvidence",
+        "type": "object"
+      },
+      "OfficialOfacListResult": {
+        "additionalProperties": false,
+        "properties": {
+          "list_kind": {
+            "title": "List Kind",
+            "type": "string"
+          },
+          "source_publish_date": {
+            "title": "Source Publish Date",
+            "type": "string"
+          },
+          "source_snapshot_id": {
+            "title": "Source Snapshot Id",
+            "type": "string"
+          },
+          "source_snapshot_content_hash": {
+            "title": "Source Snapshot Content Hash",
+            "type": "string"
+          },
+          "source_raw_content_hash": {
+            "title": "Source Raw Content Hash",
+            "type": "string"
+          },
+          "source_retrieved_at": {
+            "title": "Source Retrieved At",
+            "type": "string"
+          },
+          "identifier_query_count": {
+            "title": "Identifier Query Count",
+            "type": "integer"
+          },
+          "identifier_statuses": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Identifier Statuses",
+            "type": "array"
+          },
+          "identifier_evidence": {
+            "items": {
+              "$ref": "#/components/schemas/OfficialOfacIdentifierEvidence"
+            },
+            "title": "Identifier Evidence",
+            "type": "array"
+          },
+          "name_query_count": {
+            "title": "Name Query Count",
+            "type": "integer"
+          },
+          "name_statuses": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Name Statuses",
+            "type": "array"
+          },
+          "name_evidence": {
+            "items": {
+              "$ref": "#/components/schemas/OfficialOfacNameEvidence"
+            },
+            "title": "Name Evidence",
+            "type": "array"
+          }
+        },
+        "required": [
+          "list_kind",
+          "source_publish_date",
+          "source_snapshot_id",
+          "source_snapshot_content_hash",
+          "source_raw_content_hash",
+          "source_retrieved_at",
+          "identifier_query_count",
+          "identifier_statuses",
+          "identifier_evidence",
+          "name_query_count",
+          "name_statuses",
+          "name_evidence"
+        ],
+        "title": "OfficialOfacListResult",
+        "type": "object"
+      },
+      "OfficialOfacNameEvidence": {
+        "additionalProperties": false,
+        "properties": {
+          "list_kind": {
+            "title": "List Kind",
+            "type": "string"
+          },
+          "entry_uid": {
+            "title": "Entry Uid",
+            "type": "string"
+          },
+          "subject_type": {
+            "title": "Subject Type",
+            "type": "string"
+          },
+          "programs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Programs",
+            "type": "array"
+          },
+          "source_native_locator": {
+            "title": "Source Native Locator",
+            "type": "string"
+          },
+          "alias_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alias Category"
+          }
+        },
+        "required": [
+          "list_kind",
+          "entry_uid",
+          "subject_type",
+          "programs",
+          "source_native_locator",
+          "alias_category"
+        ],
+        "title": "OfficialOfacNameEvidence",
+        "type": "object"
+      },
+      "OfficialOfacResult": {
+        "additionalProperties": false,
+        "properties": {
+          "source": {
+            "const": "OFAC_SANCTIONS_LIST_SERVICE",
+            "default": "OFAC_SANCTIONS_LIST_SERVICE",
+            "title": "Source",
+            "type": "string"
+          },
+          "lists": {
+            "items": {
+              "$ref": "#/components/schemas/OfficialOfacListResult"
+            },
+            "title": "Lists",
+            "type": "array"
+          }
+        },
+        "required": [
+          "lists"
+        ],
+        "title": "OfficialOfacResult",
+        "type": "object"
+      },
+      "OfficialPartyIdentifier": {
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Country"
+          }
+        },
+        "required": [
+          "type",
+          "value"
+        ],
+        "title": "OfficialPartyIdentifier",
+        "type": "object"
+      },
+      "OfficialPartyName": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "OfficialPartyName",
+        "type": "object"
+      },
+      "OfficialSanctionsEvidence": {
+        "additionalProperties": false,
+        "properties": {
+          "eu_reference_number": {
+            "title": "Eu Reference Number",
+            "type": "string"
+          },
+          "entity_logical_id": {
+            "title": "Entity Logical Id",
+            "type": "string"
+          },
+          "subject_type": {
+            "title": "Subject Type",
+            "type": "string"
+          },
+          "identifier_type": {
+            "title": "Identifier Type",
+            "type": "string"
+          },
+          "identifier_assertion_hash": {
+            "title": "Identifier Assertion Hash",
+            "type": "string"
+          },
+          "source_native_locator": {
+            "title": "Source Native Locator",
+            "type": "string"
+          },
+          "country_consistent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country Consistent"
+          },
+          "usable_for_exact_match": {
+            "title": "Usable For Exact Match",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "eu_reference_number",
+          "entity_logical_id",
+          "subject_type",
+          "identifier_type",
+          "identifier_assertion_hash",
+          "source_native_locator",
+          "country_consistent",
+          "usable_for_exact_match"
+        ],
+        "title": "OfficialSanctionsEvidence",
+        "type": "object"
+      },
+      "OfficialSanctionsNameEvidence": {
+        "additionalProperties": false,
+        "properties": {
+          "eu_reference_number": {
+            "title": "Eu Reference Number",
+            "type": "string"
+          },
+          "entity_logical_id": {
+            "title": "Entity Logical Id",
+            "type": "string"
+          },
+          "subject_type": {
+            "title": "Subject Type",
+            "type": "string"
+          },
+          "alias_assertion_hash": {
+            "title": "Alias Assertion Hash",
+            "type": "string"
+          },
+          "source_native_locator": {
+            "title": "Source Native Locator",
+            "type": "string"
+          },
+          "strong_alias": {
+            "title": "Strong Alias",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "eu_reference_number",
+          "entity_logical_id",
+          "subject_type",
+          "alias_assertion_hash",
+          "source_native_locator",
+          "strong_alias"
+        ],
+        "title": "OfficialSanctionsNameEvidence",
+        "type": "object"
+      },
+      "OfficialSanctionsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "source": {
+            "const": "EU_CONSOLIDATED_FINANCIAL_SANCTIONS_FILE",
+            "default": "EU_CONSOLIDATED_FINANCIAL_SANCTIONS_FILE",
+            "title": "Source",
+            "type": "string"
+          },
+          "source_generation_date": {
+            "title": "Source Generation Date",
+            "type": "string"
+          },
+          "source_global_file_id": {
+            "title": "Source Global File Id",
+            "type": "string"
+          },
+          "source_snapshot_id": {
+            "title": "Source Snapshot Id",
+            "type": "string"
+          },
+          "source_snapshot_content_hash": {
+            "title": "Source Snapshot Content Hash",
+            "type": "string"
+          },
+          "source_raw_content_hash": {
+            "title": "Source Raw Content Hash",
+            "type": "string"
+          },
+          "source_retrieved_at": {
+            "title": "Source Retrieved At",
+            "type": "string"
+          },
+          "identifier_query_count": {
+            "title": "Identifier Query Count",
+            "type": "integer"
+          },
+          "identifier_statuses": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Identifier Statuses",
+            "type": "array"
+          },
+          "identifier_evidence": {
+            "items": {
+              "$ref": "#/components/schemas/OfficialSanctionsEvidence"
+            },
+            "title": "Identifier Evidence",
+            "type": "array"
+          },
+          "name_query_count": {
+            "title": "Name Query Count",
+            "type": "integer"
+          },
+          "name_statuses": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Name Statuses",
+            "type": "array"
+          },
+          "name_evidence": {
+            "items": {
+              "$ref": "#/components/schemas/OfficialSanctionsNameEvidence"
+            },
+            "title": "Name Evidence",
+            "type": "array"
+          }
+        },
+        "required": [
+          "source_generation_date",
+          "source_global_file_id",
+          "source_snapshot_id",
+          "source_snapshot_content_hash",
+          "source_raw_content_hash",
+          "source_retrieved_at",
+          "identifier_query_count",
+          "identifier_statuses",
+          "identifier_evidence",
+          "name_query_count",
+          "name_statuses",
+          "name_evidence"
+        ],
+        "title": "OfficialSanctionsResult",
+        "type": "object"
+      },
+      "OfficialScreeningRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "const": "1.0.0",
+            "default": "1.0.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "party_identifiers": {
+            "items": {
+              "$ref": "#/components/schemas/OfficialPartyIdentifier"
+            },
+            "maxItems": 64,
+            "title": "Party Identifiers",
+            "type": "array"
+          },
+          "party_names": {
+            "items": {
+              "$ref": "#/components/schemas/OfficialPartyName"
+            },
+            "maxItems": 64,
+            "title": "Party Names",
+            "type": "array"
+          },
+          "goods": {
+            "$ref": "#/components/schemas/OfficialGoodsCandidate"
+          }
+        },
+        "required": [
+          "goods"
+        ],
+        "title": "OfficialScreeningRequest",
+        "type": "object"
+      },
+      "OfficialScreeningResult": {
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "const": "1.0.0",
+            "default": "1.0.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "signal": {
+            "$ref": "#/components/schemas/Signal"
+          },
+          "business_action": {
+            "$ref": "#/components/schemas/BusinessAction"
+          },
+          "automatic_clearance": {
+            "const": false,
+            "default": false,
+            "title": "Automatic Clearance",
+            "type": "boolean"
+          },
+          "source_bundle_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Bundle Id"
+          },
+          "source_bundle_content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Bundle Content Hash"
+          },
+          "source_bundle_activated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Bundle Activated At"
+          },
+          "sanctions": {
+            "$ref": "#/components/schemas/OfficialSanctionsResult"
+          },
+          "ofac": {
+            "$ref": "#/components/schemas/OfficialOfacResult"
+          },
+          "dual_use": {
+            "$ref": "#/components/schemas/OfficialDualUseResult"
+          },
+          "caveats": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Caveats",
+            "type": "array"
+          }
+        },
+        "required": [
+          "signal",
+          "business_action",
+          "sanctions",
+          "ofac",
+          "dual_use",
+          "caveats"
+        ],
+        "title": "OfficialScreeningResult",
+        "type": "object"
+      },
+      "OfficialSourceRefreshResult": {
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "const": "1.0.0",
+            "default": "1.0.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/OfficialSourceWriteOutcome"
+          },
+          "bundle_id": {
+            "title": "Bundle Id",
+            "type": "string"
+          },
+          "bundle_content_hash": {
+            "title": "Bundle Content Hash",
+            "type": "string"
+          },
+          "fsf_snapshot_id": {
+            "title": "Fsf Snapshot Id",
+            "type": "string"
+          },
+          "fsf_snapshot_content_hash": {
+            "title": "Fsf Snapshot Content Hash",
+            "type": "string"
+          },
+          "fsf_entity_count": {
+            "title": "Fsf Entity Count",
+            "type": "integer"
+          },
+          "fsf_alias_count": {
+            "title": "Fsf Alias Count",
+            "type": "integer"
+          },
+          "fsf_identifier_count": {
+            "title": "Fsf Identifier Count",
+            "type": "integer"
+          },
+          "dual_use_snapshot_id": {
+            "title": "Dual Use Snapshot Id",
+            "type": "string"
+          },
+          "dual_use_snapshot_content_hash": {
+            "title": "Dual Use Snapshot Content Hash",
+            "type": "string"
+          },
+          "dual_use_entry_count": {
+            "title": "Dual Use Entry Count",
+            "type": "integer"
+          },
+          "ofac_sdn_snapshot_id": {
+            "title": "Ofac Sdn Snapshot Id",
+            "type": "string"
+          },
+          "ofac_sdn_snapshot_content_hash": {
+            "title": "Ofac Sdn Snapshot Content Hash",
+            "type": "string"
+          },
+          "ofac_sdn_entry_count": {
+            "title": "Ofac Sdn Entry Count",
+            "type": "integer"
+          },
+          "ofac_sdn_alias_count": {
+            "title": "Ofac Sdn Alias Count",
+            "type": "integer"
+          },
+          "ofac_sdn_identifier_count": {
+            "title": "Ofac Sdn Identifier Count",
+            "type": "integer"
+          },
+          "ofac_consolidated_snapshot_id": {
+            "title": "Ofac Consolidated Snapshot Id",
+            "type": "string"
+          },
+          "ofac_consolidated_snapshot_content_hash": {
+            "title": "Ofac Consolidated Snapshot Content Hash",
+            "type": "string"
+          },
+          "ofac_consolidated_entry_count": {
+            "title": "Ofac Consolidated Entry Count",
+            "type": "integer"
+          },
+          "ofac_consolidated_alias_count": {
+            "title": "Ofac Consolidated Alias Count",
+            "type": "integer"
+          },
+          "ofac_consolidated_identifier_count": {
+            "title": "Ofac Consolidated Identifier Count",
+            "type": "integer"
+          },
+          "activated_at": {
+            "title": "Activated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome",
+          "bundle_id",
+          "bundle_content_hash",
+          "fsf_snapshot_id",
+          "fsf_snapshot_content_hash",
+          "fsf_entity_count",
+          "fsf_alias_count",
+          "fsf_identifier_count",
+          "dual_use_snapshot_id",
+          "dual_use_snapshot_content_hash",
+          "dual_use_entry_count",
+          "ofac_sdn_snapshot_id",
+          "ofac_sdn_snapshot_content_hash",
+          "ofac_sdn_entry_count",
+          "ofac_sdn_alias_count",
+          "ofac_sdn_identifier_count",
+          "ofac_consolidated_snapshot_id",
+          "ofac_consolidated_snapshot_content_hash",
+          "ofac_consolidated_entry_count",
+          "ofac_consolidated_alias_count",
+          "ofac_consolidated_identifier_count",
+          "activated_at"
+        ],
+        "title": "OfficialSourceRefreshResult",
+        "type": "object"
+      },
+      "OfficialSourceWriteOutcome": {
+        "enum": [
+          "APPLIED",
+          "IDEMPOTENT"
+        ],
+        "title": "OfficialSourceWriteOutcome",
         "type": "string"
       },
       "OwnershipControlRelationship": {
@@ -4700,6 +5563,23 @@
             "decision_expires_at": null
           }
         }
+      },
+      "OfficialScreeningRequest": {
+        "summary": "Public-source candidate input for the technical preview",
+        "value": {
+          "schema_version": "1.0.0",
+          "party_identifiers": [],
+          "party_names": [
+            {
+              "name": "JOINT STOCK COMPANY SOVCOMFLOT"
+            }
+          ],
+          "goods": {
+            "annex_i_code": "3A001",
+            "classification_verified": true,
+            "technical_specification_available": true
+          }
+        }
       }
     }
   },
@@ -4744,7 +5624,9 @@
   "x-tradesieve-canonical-source": {
     "model": "tradesieve.application.contracts",
     "additional_models": [
-      "tradesieve.application.source_snapshot_contracts"
+      "tradesieve.application.source_snapshot_contracts",
+      "tradesieve.application.official_screening",
+      "tradesieve.application.official_source_refresh"
     ],
     "generator": "scripts/generate_contract.py",
     "drift_check": "uv run --locked python scripts/generate_contract.py --check"
@@ -4758,6 +5640,15 @@
     },
     "SourceSnapshotHistory": {
       "$ref": "#/components/schemas/SourceSnapshotHistory"
+    },
+    "OfficialScreeningRequest": {
+      "$ref": "#/components/schemas/OfficialScreeningRequest"
+    },
+    "OfficialScreeningResult": {
+      "$ref": "#/components/schemas/OfficialScreeningResult"
+    },
+    "OfficialSourceRefreshResult": {
+      "$ref": "#/components/schemas/OfficialSourceRefreshResult"
     }
   }
 }

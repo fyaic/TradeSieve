@@ -73,6 +73,15 @@ if [[ "$psql_version" != "psql (PostgreSQL) 18.4" ]]; then
 fi
 
 run_bounded "$probe_timeout_seconds" \
+  "${compose[@]}" run --rm --no-deps \
+  --volume "$repo_root/scripts:/acceptance:ro" \
+  app python /acceptance/ofac_official_source_upgrade_probe.py
+
+"${compose[@]}" down --volumes --remove-orphans
+assert_zero_residue
+"${compose[@]}" up -d --wait postgres
+
+run_bounded "$probe_timeout_seconds" \
   "${compose[@]}" run --rm --no-deps app \
   python -m tradesieve.manage migrate
 run_bounded "$probe_timeout_seconds" \

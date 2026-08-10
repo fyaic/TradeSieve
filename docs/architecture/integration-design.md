@@ -26,7 +26,7 @@ The seam preserves the intended ownership split:
 - TradeSieve contracts own the official screening request/result, source hashes, evidence locators and conservative business action;
 - the browser never evaluates sanctions, goods or route rules;
 - demo routes are registered only in explicit demo mode, accept no arbitrary business input and stay outside the formal OpenAPI inventory;
-- a retained `/screen` fixture route still regression-tests the canonical precomputed contract, but the browser calls `/screen-official` and displays real active FSF/Annex I evidence;
+- a retained `/screen` fixture route still regression-tests the canonical precomputed contract, but the browser calls `/screen-official` and displays real active EU FSF/Annex I and OFAC evidence;
 - `POST /v1/official-screenings` has a deployment-scoped hashed Bearer credential, request-envelope limits and fail-closed source freshness, but is not the final tenant/OIDC/idempotent case API;
 - [TS-303](https://github.com/fyaic/TradeSieve/issues/22), [TS-401](https://github.com/fyaic/TradeSieve/issues/23) and [TS-501](https://github.com/fyaic/TradeSieve/issues/24) add broader controls, durable cases and the formal integration surface.
 
@@ -38,13 +38,17 @@ flowchart LR
     DB[("Atomic active official bundle")]
     FSF["EU FSF projection"]
     DUAL["EU Annex I projection"]
+    SDN["OFAC SDN projection"]
+    CONS["OFAC Consolidated projection"]
 
     CRM --> HTTP --> APP --> DB
     DB --> FSF
     DB --> DUAL
+    DB --> SDN
+    DB --> CONS
 ```
 
-Source refresh is an operator-only command. It retrieves and verifies both official sources before one database transaction writes immutable projections, appends an activation event and changes the active pointer. Business requests never mix independently refreshed source versions. If the active bundle is missing, older than 48 hours, in the future, or fails full read-time reconstruction/hashing, CLI/REST/demo screening is unavailable and the caller holds.
+Source refresh is an operator-only command. It retrieves and verifies all four official publications before one database transaction writes immutable projections, appends an activation event and changes the active pointer. Business requests never mix independently refreshed source versions. If the active bundle is incomplete, missing, older than 48 hours, in the future, or fails full read-time reconstruction/hashing, CLI/REST/demo screening is unavailable and the caller holds.
 
 See [the demo guide](../getting-started/demo-crm.md) for scenarios, startup and limitations.
 

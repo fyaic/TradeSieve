@@ -3,6 +3,8 @@
 **Status:** Accepted
 **Date:** 2026-08-10
 
+**Extended by:** [ADR-0008](0008-atomic-four-source-active-bundle.md), which retains this projection decision and expands the active aggregate to EU FSF, EU Annex I, OFAC SDN and OFAC Consolidated.
+
 ## Context
 
 The generic Phase 1 snapshot model intentionally bounded a parsed source to 512 records and a compact canonical payload. The live EU Financial Sanctions File observed on 2026-08-10 contains 6,234 entities, 31,053 aliases, and 3,007 substantive strong identifiers in a 25.8 MiB XML document. The current EU dual-use Annex I Formex text contains 384 long, hierarchical control entries. Raising the generic JSON limits would create monolithic rows, poor query plans, and unclear source semantics.
@@ -22,7 +24,7 @@ The first useful product slice must prove that official bytes—not synthetic fi
 ## Consequences
 
 - The source boundary is more code than a generic blob parser, but schema drift, URL policy, licensing, identifiers, and legal versions become explicit and independently testable.
-- Migration `20260810_0006` and `test_official_source_postgres.sh` enforce row-level official projections, content-addressed raw bytes, idempotent activation, a single active version and database immutability on PostgreSQL 18.4.
+- Migration `20260810_0006` established the EU projection baseline. Migration `20260810_0007` and `test_official_source_postgres.sh` preserve that history while enforcing the complete four-source active aggregate described by ADR-0008.
 - Daily FSF retrieval can discover the current distribution; annual/ad hoc legal-list amendments require a monitored CELEX update workflow.
 - The first party-screening slice includes explainable exact normalized-alias candidates. Full party screening still requires fuzzy/transliterated entity resolution and ownership/control. Full goods screening still requires technical-rule assertions, catch-all/end-use/destination controls, and Russia-specific annexes.
 - No source or matcher response can bypass ADR-0002 human-only clearance.

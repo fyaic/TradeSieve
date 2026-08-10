@@ -1,6 +1,6 @@
 # OFAC Sanctions List Service connector proof
 
-**Status:** TS-204 live connector proof; not yet an active runtime source.
+**Status:** TS-204 connector proof completed; TS-204A now activates both publications in the runtime four-source bundle.
 **Observed:** 2026-08-10.
 **Authority:** U.S. Department of the Treasury, Office of Foreign Assets Control.
 
@@ -82,23 +82,28 @@ verified snapshots. Current publications cannot reconstruct facts removed before
 point. Any later OFAC archive/delta ingestion must identify its own provenance and
 must not silently fill that gap.
 
-## What is still missing before runtime use
+## Runtime integration evidence and remaining boundary
 
-This proof is not yet part of the PostgreSQL active official bundle and is not read by
-`screen-active`, REST or the CRM demo. The next integration slice must:
+Migration `20260810_0007` adds source-specific immutable OFAC snapshot, entry,
+program, alias, address, identifier, fact and vessel projections. EU FSF, EU Annex I,
+OFAC SDN and OFAC Consolidated are now activated atomically. An upgraded 0006 EU-only
+pointer is preserved as history but fails closed until a complete four-source refresh.
 
-1. extend the active bundle from a hard-coded EU pair to a versioned multi-source set;
-2. add immutable OFAC raw/projection tables, activation events and corruption checks;
-3. register owner, refresh/staleness policy, access terms and operational alerts;
-4. schedule comprehensive refresh, diff validation and affected-case rescreening;
-5. add OFAC evidence to the canonical screening result without weakening human-only
-   clearance; and
-6. obtain named compliance/legal review for source scope, program effects, ownership
-   rules, retention and API/MCP exposure.
+`screen-active`, authenticated `POST /v1/official-screenings` and the demo CRM now use
+the same persisted application service. The result keeps SDN and Consolidated evidence
+separate, omits source name/identifier values, and treats any candidate as `RED/HOLD`.
+The isolated live gate proved an applied refresh, an idempotent replay, current source
+counts, an exact public SOVCOMFLOT candidate carrying `RUSSIA-EO14024`, and identical
+CLI/REST bundle evidence.
 
-The proof deliberately avoids forcing OFAC into the existing EU-only persistence
-shape. That integration changes the active-source aggregate and needs its own migration
-and reviewable application contract.
+Still required for a production claim:
+
+1. governed scheduling, monitoring, alerting and affected-case rescreening;
+2. named compliance/legal review for source scope, program effects and retention;
+3. OFAC 50 Percent Rule and other ownership/control propagation with evidence;
+4. fuzzy/transliterated entity resolution and reviewed thresholds;
+5. formal tenant/OIDC authorization, durable cases and reviewer decisions; and
+6. separately scoped API/MCP exposure and operational rate/performance evidence.
 
 ## Primary sources
 

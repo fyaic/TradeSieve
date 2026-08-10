@@ -1,6 +1,6 @@
 # Docker reference deployment
 
-**Status:** The reference stack includes the source/rule/intake foundations plus migration `20260810_0006`, persisted EU official-source projections, an authenticated official-screening REST technical preview, and a demo CRM that reads the active official bundle. Review workflows, full tenant/OIDC authorization, Russia-specific controls, MCP, and production controls remain incomplete.
+**Status:** The reference stack includes the source/rule/intake foundations plus migration `20260810_0007`, persisted EU FSF/Annex I and OFAC SDN/Consolidated projections, an authenticated official-screening REST technical preview, and a demo CRM that reads the active four-source bundle. Review workflows, full tenant/OIDC authorization, OFAC ownership propagation, Russia-specific goods/route controls, MCP, and production controls remain incomplete.
 
 ## Demo-only configuration
 
@@ -47,7 +47,7 @@ The command exits `0` with `APPLIED` or `IDEMPOTENT`. A failure exits `2` and le
 http://127.0.0.1:8080/demo/crm
 ```
 
-It accepts only repository-owned synthetic transaction IDs. The visible screen button calls the active FSF/Annex I engine; it does not use the retained precomputed regression route. See [the demo CRM guide](demo-crm.md) for exact coverage and limitations.
+It accepts only repository-owned synthetic transaction IDs. The visible screen button calls the active EU/OFAC/Annex I engine; it does not use the retained precomputed regression route. See [the demo CRM guide](demo-crm.md) for exact coverage and limitations.
 
 The same engine is exposed to external test clients:
 
@@ -166,6 +166,7 @@ separate acceptance path:
 ./scripts/test_source_snapshot_postgres.sh
 ./scripts/test_screening_submission_postgres.sh
 ./scripts/test_official_source_postgres.sh
+./scripts/test_official_screening_live.sh
 ```
 
 Manual teardown:

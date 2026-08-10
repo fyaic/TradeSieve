@@ -1,6 +1,6 @@
 # 合成国际物流 CRM 演示
 
-**状态：** Phase 1 demo-only 交易界面 + 真实活跃 EU 官方来源技术预览。
+**状态：** Phase 1 demo-only 交易界面 + 真实活跃 EU/OFAC 官方来源技术预览。
 
 **数据：** 交易、路线、金额和单证均为仓库内置合成数据；首条记录使用一个公开 EU FSF 企业别名作为可重复验收事实，不代表真实客户关系。
 
@@ -8,11 +8,12 @@
 
 ## 它演示什么
 
-这个页面模拟一家中国国际货运代理公司的询报价工作台。销售可以选择一条报价，在“报价放行”之前发起 TradeSieve 审查。浏览器不执行规则；demo 后端把固定交易映射成官方审查请求，并调用 PostgreSQL 中的新鲜活跃 FSF/Annex I bundle：
+这个页面模拟一家中国国际货运代理公司的询报价工作台。销售可以选择一条报价，在“报价放行”之前发起 TradeSieve 审查。浏览器不执行规则；demo 后端把固定交易映射成官方审查请求，并调用 PostgreSQL 中的新鲜活跃四源 bundle：
 
 - EU FSF 名称候选、EU reference 和原生 XML 定位；
+- OFAC SDN/Consolidated 的独立版本、program、名称/强标识候选和原生定位；
 - Annex I 控制号状态、CELEX、条目定位和缺失事实；
-- 同一个 source bundle 下的 FSF/Annex I snapshot ID 和内容哈希；
+- 同一个 source bundle 下的 FSF/Annex I/OFAC SDN/OFAC Consolidated snapshot ID 和内容哈希；
 - `HOLD` / `REQUEST_EVIDENCE` / `MONITOR`；任何结果都不自动放行；
 - 来源未激活、陈旧、损坏或数据库不可用时，CRM 保持拦截。
 
@@ -77,7 +78,7 @@ sequenceDiagram
     Demo->>Demo: 映射主体名称 + Annex I 候选/资料事实
     Demo->>Service: OfficialScreeningRequest
     Service->>DB: 读取并完整复核新鲜活跃 bundle
-    DB-->>Service: FSF + Annex I 不可变投影
+    DB-->>Service: EU FSF + Annex I + OFAC 双清单不可变投影
     Service-->>Demo: evidence + source hashes + business_action
     Demo-->>CRM: 官方来源结果
     CRM->>CRM: 执行 HOLD / REQUEST_EVIDENCE / MONITOR
@@ -116,13 +117,14 @@ CRM 不应复制 TradeSieve 内部的制裁记录、规则表达式、相似度�
 
 ## 明确限制
 
-- 它会读取最近激活的真实 EU 官方来源，但不是“每次点击都联网”；来源最长允许 48 小时，刷新应由受控运维任务执行；
+- 它会读取最近激活的真实 EU/OFAC 官方来源，但不是“每次点击都联网”；来源最长允许 48 小时，刷新应由受控运维任务执行；
 - 名称仅做 Unicode 规范化后的官方别名精确候选，不含模糊、音译、词序变体和所有权/控制；
+- OFAC 名单候选不等于 50 Percent Rule、program 法律效果或交易禁止结论；
 - 两用物项仅核验显式 Annex I 控制号是否存在并列出缺失事实，不会从 HS、货描或模型自动作正式技术归类；
 - 俄罗斯 `833/2014` 货物附件、路线、最终用途、catch-all、金融/服务限制尚未接入；
 - 它不代表欧盟、美国、中国或任何其他法域的法律结论；
 - 它不证明任何主体、货物、路线、付款或交易可以放行；
-- 它没有案件持久化、证据提交、人工决定、webhook、CLI 或 MCP 闭环；
+- 它没有案件持久化、证据提交、人工决定、webhook 或 MCP 闭环；当前官方来源 CLI 已可用，但不是完整案件客户端；
 - 红灯和黄灯用于演示拦截效果，绿灯候选仍不是人工放行；
 - 完整确定性控制、案件状态和生产 REST 路由分别由 [TS-303 / #22](https://github.com/fyaic/TradeSieve/issues/22)、[TS-401 / #23](https://github.com/fyaic/TradeSieve/issues/23) 和 [TS-501 / #24](https://github.com/fyaic/TradeSieve/issues/24) 继续交付。
 

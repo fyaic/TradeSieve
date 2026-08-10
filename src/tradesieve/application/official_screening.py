@@ -31,7 +31,30 @@ from tradesieve.domain.eu_fsf import (
     EuFsfNameQuery,
     EuFsfSnapshot,
 )
+from tradesieve.domain.ofac_sls import (
+    OfacCandidateStatus,
+    OfacIdentifierIndex,
+    OfacIdentifierQuery,
+    OfacNameIndex,
+    OfacNameQuery,
+    OfacSlsListKind,
+    OfacSnapshot,
+)
 from tradesieve.domain.official_sources import ActiveOfficialSources
+
+OFAC_REQUEST_IDENTIFIER_TYPES: dict[str, tuple[str, ...]] = {
+    "id": ("National ID No.", "National Foreign ID Number"),
+    "imo": ("Vessel Registration Identification",),
+    "passport": ("Passport",),
+    "regnumber": (
+        "Business Registration Number",
+        "Company Number",
+        "Registration ID",
+        "Registration Number",
+    ),
+    "swiftbic": ("SWIFT/BIC",),
+    "taxid": ("Tax ID No.",),
+}
 
 
 class _RetrievedFsf(Protocol):
@@ -59,6 +82,19 @@ class _EuFsfParser(Protocol):
 
 class _ActiveOfficialRepository(Protocol):
     def get_active(self) -> ActiveOfficialSources: ...
+
+
+class _RetrievedOfac(Protocol):
+    @property
+    def content_hash(self) -> str: ...
+
+
+class _OfacSource(Protocol):
+    def retrieve(self, list_kind: OfacSlsListKind) -> _RetrievedOfac: ...
+
+
+class _OfacParser(Protocol):
+    def parse(self, source: _RetrievedOfac) -> OfacSnapshot: ...
 
 
 class OfficialPartyIdentifier(ContractModel):
@@ -163,6 +199,45 @@ class OfficialDualUseResult(ContractModel):
     missing_facts: list[str]
 
 
+class OfficialOfacIdentifierEvidence(ContractModel):
+    list_kind: str
+    entry_uid: str
+    subject_type: str
+    programs: list[str]
+    identifier_uid: str
+    identifier_type: str
+    source_native_locator: str
+
+
+class OfficialOfacNameEvidence(ContractModel):
+    list_kind: str
+    entry_uid: str
+    subject_type: str
+    programs: list[str]
+    source_native_locator: str
+    alias_category: str | None
+
+
+class OfficialOfacListResult(ContractModel):
+    list_kind: str
+    source_publish_date: str
+    source_snapshot_id: str
+    source_snapshot_content_hash: str
+    source_raw_content_hash: str
+    source_retrieved_at: str
+    identifier_query_count: int
+    identifier_statuses: list[str]
+    identifier_evidence: list[OfficialOfacIdentifierEvidence]
+    name_query_count: int
+    name_statuses: list[str]
+    name_evidence: list[OfficialOfacNameEvidence]
+
+
+class OfficialOfacResult(ContractModel):
+    source: Literal["OFAC_SANCTIONS_LIST_SERVICE"] = "OFAC_SANCTIONS_LIST_SERVICE"
+    lists: list[OfficialOfacListResult]
+
+
 class OfficialScreeningResult(ContractModel):
     schema_version: Literal["1.0.0"] = "1.0.0"
     signal: Signal
@@ -172,6 +247,7 @@ class OfficialScreeningResult(ContractModel):
     source_bundle_content_hash: str | None = None
     source_bundle_activated_at: str | None = None
     sanctions: OfficialSanctionsResult
+    ofac: OfficialOfacResult
     dual_use: OfficialDualUseResult
     caveats: list[str]
 
@@ -183,16 +259,22 @@ class OfficialScreeningService:
         self,
         fsf_source: _EuFsfSource,
         dual_use_source: _EuDualUseSource,
+        ofac_source: _OfacSource,
         *,
         fsf_parser: _EuFsfParser,
+        ofac_parser: _OfacParser,
     ) -> None:
-        if not hasattr(fsf_source, "retrieve") or not hasattr(
-            dual_use_source, "retrieve"
+        if (
+            not hasattr(fsf_source, "retrieve")
+            or not hasattr(dual_use_source, "retrieve")
+            or not hasattr(ofac_source, "retrieve")
         ):
             raise ValueError("official screening sources must implement retrieve")
         self._fsf_source = fsf_source
         self._dual_use_source = dual_use_source
+        self._ofac_source = ofac_source
         self._fsf_parser = fsf_parser
+        self._ofac_parser = ofac_parser
 
     def screen(self, request: OfficialScreeningRequest) -> OfficialScreeningResult:
         if not isinstance(request, OfficialScreeningRequest):
@@ -202,16 +284,24 @@ class OfficialScreeningService:
         if fsf_snapshot.raw_content_hash != retrieved_fsf.content_hash:
             raise RuntimeError("official FSF retrieval/parser integrity mismatch")
         dual_list = self._dual_use_source.retrieve()
+        ofac_sdn = self._ofac_parser.parse(
+            self._ofac_source.retrieve(OfacSlsListKind.SDN)
+        )
+        ofac_consolidated = self._ofac_parser.parse(
+            self._ofac_source.retrieve(OfacSlsListKind.CONSOLIDATED)
+        )
         return OfficialScreeningEngine().screen(
             request,
             fsf_snapshot=fsf_snapshot,
             fsf_retrieved_at=retrieved_fsf.retrieved_at,
             dual_use_control_list=dual_list,
+            ofac_sdn_snapshot=ofac_sdn,
+            ofac_consolidated_snapshot=ofac_consolidated,
         )
 
 
 class OfficialScreeningEngine:
-    """Canonical deterministic evaluation over one already verified source pair."""
+    """Canonical deterministic evaluation over one verified four-source set."""
 
     def screen(
         self,
@@ -220,6 +310,8 @@ class OfficialScreeningEngine:
         fsf_snapshot: EuFsfSnapshot,
         fsf_retrieved_at: datetime,
         dual_use_control_list: EuDualUseControlList,
+        ofac_sdn_snapshot: OfacSnapshot,
+        ofac_consolidated_snapshot: OfacSnapshot,
         source_bundle: ActiveOfficialSources | None = None,
     ) -> OfficialScreeningResult:
         if not isinstance(request, OfficialScreeningRequest):
@@ -228,6 +320,13 @@ class OfficialScreeningEngine:
             dual_use_control_list, EuDualUseControlList
         ):
             raise ValueError("official screening projections must be typed")
+        if (
+            not isinstance(ofac_sdn_snapshot, OfacSnapshot)
+            or ofac_sdn_snapshot.list_kind is not OfacSlsListKind.SDN
+            or not isinstance(ofac_consolidated_snapshot, OfacSnapshot)
+            or ofac_consolidated_snapshot.list_kind is not OfacSlsListKind.CONSOLIDATED
+        ):
+            raise ValueError("OFAC screening projections must bind both list kinds")
         if (
             not isinstance(fsf_retrieved_at, datetime)
             or fsf_retrieved_at.tzinfo is None
@@ -239,6 +338,8 @@ class OfficialScreeningEngine:
             or source_bundle.fsf_snapshot != fsf_snapshot
             or source_bundle.dual_use_control_list != dual_use_control_list
             or source_bundle.fsf_retrieved_at != fsf_retrieved_at
+            or source_bundle.ofac_sdn_snapshot != ofac_sdn_snapshot
+            or source_bundle.ofac_consolidated_snapshot != ofac_consolidated_snapshot
         ):
             raise ValueError("official source bundle does not bind the projections")
         fsf_index = EuFsfExactIndex(fsf_snapshot)
@@ -277,6 +378,72 @@ class OfficialScreeningEngine:
             for item in candidates.evidence
         ]
 
+        ofac_results: list[OfficialOfacListResult] = []
+        ofac_candidate_signal = False
+        for ofac_snapshot in (ofac_sdn_snapshot, ofac_consolidated_snapshot):
+            identifier_index = OfacIdentifierIndex(ofac_snapshot)
+            ofac_identifier_candidates = [
+                identifier_index.search(OfacIdentifierQuery(type_code, item.value))
+                for item in request.party_identifiers
+                for type_code in OFAC_REQUEST_IDENTIFIER_TYPES.get(item.type, ())
+            ]
+            ofac_identifier_evidence = [
+                OfficialOfacIdentifierEvidence(
+                    list_kind=evidence.list_kind.value,
+                    entry_uid=evidence.entry_uid,
+                    subject_type=evidence.subject_type.value,
+                    programs=list(evidence.programs),
+                    identifier_uid=evidence.identifier.uid,
+                    identifier_type=evidence.identifier.type_code,
+                    source_native_locator=evidence.identifier.native_locator,
+                )
+                for candidates in ofac_identifier_candidates
+                for evidence in candidates.evidence
+            ]
+            ofac_name_index = OfacNameIndex(ofac_snapshot)
+            ofac_name_candidates = [
+                ofac_name_index.search(OfacNameQuery(item.name))
+                for item in request.party_names
+            ]
+            ofac_name_evidence = [
+                OfficialOfacNameEvidence(
+                    list_kind=evidence.list_kind.value,
+                    entry_uid=evidence.entry_uid,
+                    subject_type=evidence.subject_type.value,
+                    programs=list(evidence.programs),
+                    source_native_locator=evidence.native_locator,
+                    alias_category=evidence.alias_category,
+                )
+                for candidates in ofac_name_candidates
+                for evidence in candidates.evidence
+            ]
+            if any(
+                candidates.status is not OfacCandidateStatus.NO_CANDIDATE
+                for candidates in ofac_identifier_candidates
+            ) or any(
+                candidates.status is not OfacCandidateStatus.NO_CANDIDATE
+                for candidates in ofac_name_candidates
+            ):
+                ofac_candidate_signal = True
+            ofac_results.append(
+                OfficialOfacListResult(
+                    list_kind=ofac_snapshot.list_kind.value,
+                    source_publish_date=ofac_snapshot.publish_date.isoformat(),
+                    source_snapshot_id=ofac_snapshot.snapshot_id,
+                    source_snapshot_content_hash=ofac_snapshot.content_hash,
+                    source_raw_content_hash=ofac_snapshot.raw_content_hash,
+                    source_retrieved_at=ofac_snapshot.retrieved_at.isoformat(),
+                    identifier_query_count=len(ofac_identifier_candidates),
+                    identifier_statuses=[
+                        item.status.value for item in ofac_identifier_candidates
+                    ],
+                    identifier_evidence=ofac_identifier_evidence,
+                    name_query_count=len(ofac_name_candidates),
+                    name_statuses=[item.status.value for item in ofac_name_candidates],
+                    name_evidence=ofac_name_evidence,
+                )
+            )
+
         goods = request.goods
         dual_assessment = EuDualUseAssessmentEngine(dual_use_control_list).assess(
             goods.annex_i_code,
@@ -297,7 +464,12 @@ class OfficialScreeningEngine:
             for candidates in name_candidates
         )
         dual_entry_signal = dual_assessment.entry is not None
-        if strong_sanctions_signal or name_candidate_signal or dual_entry_signal:
+        if (
+            strong_sanctions_signal
+            or name_candidate_signal
+            or ofac_candidate_signal
+            or dual_entry_signal
+        ):
             signal = Signal.RED
             action = BusinessAction.HOLD
         elif dual_assessment.status in {
@@ -339,6 +511,7 @@ class OfficialScreeningEngine:
                 name_statuses=[item.status.value for item in name_candidates],
                 name_evidence=name_evidence,
             ),
+            ofac=OfficialOfacResult(lists=ofac_results),
             dual_use=OfficialDualUseResult(
                 source_effective_from=EU_DUAL_USE_EFFECTIVE_FROM.isoformat(),
                 source_snapshot_id=dual_use_control_list.snapshot_id,
@@ -357,6 +530,7 @@ class OfficialScreeningEngine:
                 "Exact source evidence is not legal clearance.",
                 "Name results are exact normalized-alias candidates, not fuzzy matches.",
                 "Transliteration, fuzzy matching and ownership/control remain required.",
+                "OFAC list membership does not implement the 50 Percent Rule.",
                 "An Annex I code is not inferred from HS/CN/TARIC data.",
                 "Catch-all, destination, end-use and sanctions controls remain required.",
                 "Only an authorised human may clear or block the transaction.",
@@ -400,6 +574,8 @@ class PersistedOfficialScreeningService:
         source_times = (
             active.fsf_retrieved_at,
             active.dual_use_control_list.retrieved_at,
+            active.ofac_sdn_snapshot.retrieved_at,
+            active.ofac_consolidated_snapshot.retrieved_at,
             active.activated_at,
         )
         if any(
@@ -412,6 +588,8 @@ class PersistedOfficialScreeningService:
             fsf_snapshot=active.fsf_snapshot,
             fsf_retrieved_at=active.fsf_retrieved_at,
             dual_use_control_list=active.dual_use_control_list,
+            ofac_sdn_snapshot=active.ofac_sdn_snapshot,
+            ofac_consolidated_snapshot=active.ofac_consolidated_snapshot,
             source_bundle=active,
         )
 

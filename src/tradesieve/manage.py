@@ -7,7 +7,7 @@ import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import psycopg
 from alembic import command
@@ -24,6 +24,12 @@ from tradesieve.adapters.eu_fsf import (
     EuFsfSourceError,
     EuFsfXmlParser,
     HttpsEuFsfTransport,
+)
+from tradesieve.adapters.ofac_sls import (
+    HttpsOfacSlsTransport,
+    OfacSlsOfficialSourceConnector,
+    OfacSlsSourceError,
+    OfacSlsXmlParser,
 )
 from tradesieve.adapters.postgres_official_sources import (
     OfficialSourcePersistenceError,
@@ -312,11 +318,18 @@ def screen_official_command(*, request_location: str) -> int:
     service = OfficialScreeningService(
         EuFsfOfficialSourceConnector(HttpsEuFsfTransport()),
         EuDualUseOfficialSourceConnector(HttpsEuDualUseTransport()),
+        OfacSlsOfficialSourceConnector(HttpsOfacSlsTransport()),
         fsf_parser=EuFsfXmlParser(),
+        ofac_parser=cast(Any, OfacSlsXmlParser()),
     )
     try:
         result = service.screen(request)
-    except (EuFsfSourceError, EuDualUseSourceError, RuntimeError):
+    except (
+        EuFsfSourceError,
+        EuDualUseSourceError,
+        OfacSlsSourceError,
+        RuntimeError,
+    ):
         print(json.dumps({"status": "OFFICIAL_SOURCE_UNAVAILABLE"}, sort_keys=True))
         return 2
     print(result.model_dump_json())
@@ -324,19 +337,22 @@ def screen_official_command(*, request_location: str) -> int:
 
 
 def refresh_official_sources_command(settings: Settings) -> int:
-    """Fetch, verify, persist, and atomically activate both official sources."""
+    """Fetch, verify, persist, and atomically activate all official sources."""
 
     try:
         with connect(settings) as connection:
             result = OfficialSourceRefreshService(
                 EuFsfOfficialSourceConnector(HttpsEuFsfTransport()),
                 EuDualUseOfficialSourceConnector(HttpsEuDualUseTransport()),
+                OfacSlsOfficialSourceConnector(HttpsOfacSlsTransport()),
                 PostgresOfficialSourceRepository(connection),
                 fsf_parser=EuFsfXmlParser(),
+                ofac_parser=cast(Any, OfacSlsXmlParser()),
             ).refresh()
     except (
         EuFsfSourceError,
         EuDualUseSourceError,
+        OfacSlsSourceError,
         OfficialSourcePersistenceError,
         psycopg.Error,
         RuntimeError,

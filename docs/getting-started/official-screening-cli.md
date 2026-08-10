@@ -1,24 +1,28 @@
-# Official EU source refresh and screening technical preview
+# Four-source official refresh and screening technical preview
 
 **Status:** persisted CLI and authenticated REST technical preview; not production clearance.
 
-TradeSieve now has two deliberately separate official-source workflows. `refresh-official-sources` retrieves, verifies, projects, and atomically activates EU FSF plus EU Annex I in PostgreSQL. `screen-active` and `POST /v1/official-screenings` use only that fresh active bundle. `screen-official` remains a stateless diagnostic that retrieves both sources for every invocation.
+TradeSieve has two deliberately separate official-source workflows. `refresh-official-sources` retrieves, verifies, projects, and atomically activates EU FSF, EU Annex I, OFAC SDN and OFAC Consolidated in PostgreSQL. `screen-active` and `POST /v1/official-screenings` use only that fresh four-source bundle. `screen-official` remains a stateless diagnostic that retrieves all four publications for every invocation.
 
 ## What it actually does
 
-Each invocation retrieves both sources afresh:
+The refresh workflow retrieves all four publications before it can advance the active pointer:
 
 | Control | Official source | Implemented behavior |
 | --- | --- | --- |
 | EU financial sanctions | data.europa.eu dataset metadata → European Commission FSF XML 1.1 distribution | fixed URL/TLS policy; bounded gzip or identity transfer; exact decompressed-byte hash; finite XML parser; immutable entity/alias/identifier rows; strong typed identifier exact match; exact normalized-alias candidates; source-native locator |
 | EU dual-use Annex I | Publications Office CELLAR item for CELEX `32025R2003` | bounded TLS retrieval, exact response length, ZIP safety, Formex schema/title checks, 384 unique entries across categories 0–9, immutable row projection, explicit-code lookup and missing-fact assessment |
-| Active source bundle | PostgreSQL migration `20260810_0006` | content-addressed raw bytes, projection hashes/counts, immutable activation event, atomic active pointer, idempotent repeat activation, full re-hash on read, 48-hour freshness gate |
+| OFAC SDN | Treasury Sanctions List Service comprehensive `SDN.XML` | fixed SLS entrypoint; one strictly checked GovCloud signed redirect; bounded XML; stable UID and row projection; finite exact identifier types; exact normalized primary-name/alias candidates; source program and native locator |
+| OFAC Consolidated | Treasury Sanctions List Service comprehensive `CONSOLIDATED.XML` | same transport/parser/integrity boundary, retained as a distinct list kind and snapshot rather than merged into SDN |
+| Active source bundle | PostgreSQL migration `20260810_0007` | four content-addressed raw objects and typed row projections, immutable activation event, atomic active pointer, idempotent repeat activation, full reconstruction/re-hash on read, 48-hour freshness gate |
 
 The dual-use source is the current 2025 delegated update known on 2026-08-10. Unlike the daily sanctions catalogue discovery, its CELEX/CELLAR version is pinned. A later delegated regulation must be discovered, reviewed, tested, and activated before this connector can claim the new version.
 
 ## Input
 
 Pass a JSON file or `-` for standard input. The reader is limited to 1 MiB, requires UTF-8, rejects duplicate keys and validates a closed schema.
+
+A runnable public-source candidate example is committed at [`examples/requests/official-screening.json`](../../examples/requests/official-screening.json). It contains no customer transaction data.
 
 ```json
 {
@@ -38,9 +42,9 @@ Pass a JSON file or `-` for standard input. The reader is limited to 1 MiB, requ
 }
 ```
 
-Supported FSF identifier types are the finite source inventory: `birthcert`, `drivinglicence`, `electionid`, `euvat`, `fiscalcode`, `id`, `imo`, `nationcert`, `other`, `passport`, `regnumber`, `residentperm`, `ssn`, `swiftbic`, `taxid`, `tradelic`, `travelcardid`, and `unssn`.
+Supported request identifier types are the finite EU FSF inventory: `birthcert`, `drivinglicence`, `electionid`, `euvat`, `fiscalcode`, `id`, `imo`, `nationcert`, `other`, `passport`, `regnumber`, `residentperm`, `ssn`, `swiftbic`, `taxid`, `tradelic`, `travelcardid`, and `unssn`. A reviewed subset (`id`, `imo`, `passport`, `regnumber`, `swiftbic`, `taxid`) is also mapped to finite strong OFAC identifier types. Other OFAC `idType` facts are retained but never treated as strong merely because they occur in the XML.
 
-At least one `party_identifiers` or `party_names` entry is required. Names are Unicode NFKC-normalized, whitespace-collapsed, case-folded, and compared against official FSF aliases. A name result is only a candidate: `CANDIDATE`, `AMBIGUOUS`, or weak-alias `REVIEW_REQUIRED` always produces `RED` + `HOLD` for authorised human review. The current implementation does not perform fuzzy similarity, transliteration, token reordering, ownership/control propagation, or entity-resolution across corporate registries.
+At least one `party_identifiers` or `party_names` entry is required. Names are Unicode NFKC-normalized, whitespace-collapsed, case-folded, and compared separately against EU FSF and both OFAC list projections. A name result is only a candidate: any candidate/ambiguity or EU weak-alias review state produces `RED` + `HOLD` for authorised human review. The current implementation does not perform fuzzy similarity, transliteration, token reordering, ownership/control propagation, OFAC 50 Percent Rule evaluation, or entity resolution across corporate registries.
 
 `classification_verified` records whether a qualified classification step supplied the Annex I candidate. `technical_specification_available` records only document availability; it does not assert that every legal threshold in the entry has been satisfied. TradeSieve does not infer an Annex I code from an HS/CN/TARIC code.
 
@@ -54,6 +58,8 @@ docker compose run --rm --no-deps app \
 ```
 
 The output contains only bundle/snapshot hashes, safe counts, activation time, and `APPLIED` or `IDEMPOTENT`. Raw bytes, aliases, identifiers, control text, source URLs containing access tokens, and database details are not printed. A failed refresh never changes the active pointer.
+
+Migration from 0006 preserves old EU raw objects, projections and activation history. An upgraded EU-only active pointer is intentionally unavailable until the first successful four-source refresh; the service never represents that partial history as current OFAC coverage.
 
 ## Screen the active bundle
 
@@ -80,6 +86,8 @@ Authentication runs before business-body parsing. The endpoint requires JSON and
 
 This endpoint is an executable vertical slice, not the final tenant-scoped and idempotent `POST /v1/screenings` case API. It currently stores neither the request nor a screening/case record.
 
+The implemented request/result and Bearer security scheme are published in the versioned [OpenAPI artifact](../../api/openapi/tradesieve.v1.json) and [shared JSON Schema registry](../../api/schemas/tradesieve.contracts.v1.json).
+
 ## Stateless live diagnostic
 
 ```bash
@@ -101,15 +109,25 @@ Exit codes:
 | `2` | Required source, database, parser, persisted integrity, or freshness was unavailable/invalid; caller must hold |
 | `3` | Request file/JSON/schema was invalid |
 
+## Reproduce the isolated live acceptance
+
+With network access to the official publications and Docker available:
+
+```bash
+./scripts/test_official_screening_live.sh
+```
+
+The gate uses an isolated project and temporary evidence directory. It runs migration 0007, performs an applied refresh plus an idempotent replay, screens the committed public candidate through CLI and authenticated REST, invokes the fixed CRM official-source route, and proves all three interfaces bind the same four-source bundle. Output is reduced to counts and booleans; containers, networks, volumes and temporary evidence are removed.
+
 ## Output and decisions
 
-The JSON output contains only evidence needed to reproduce the source assertion: source generation/effective dates, file/snapshot hashes, EU reference, identifier assertion hash, source-native locator, status, missing facts, and the aggregate business action. It deliberately does not echo the queried identifier value or full Annex I legal text.
+The JSON output contains only evidence needed to reproduce the source assertion: source generation/publish/effective dates, file/snapshot hashes, EU reference or OFAC UID/list kind/program, assertion UID/hash, source-native locator, status, missing facts, and the aggregate business action. It deliberately does not echo the queried identifier value, source name value, address, remarks or full Annex I legal text.
 
-- An exact usable sanctions identifier, ambiguous identifier, unusable historical identifier, any normalized name candidate, or Annex I entry produces `RED` + `HOLD`.
+- An EU/OFAC exact sanctions identifier candidate, ambiguous/unusable EU identifier, any normalized name candidate, or Annex I entry produces `RED` + `HOLD`.
 - A missing classification or technical specification produces `YELLOW` + `REQUEST_EVIDENCE`.
 - No exact sanctions identifier and no Annex I entry produces at most `GREEN_CANDIDATE` + `MONITOR`; this is not clearance.
 
-Only an authorised human may clear or block a named transaction. Fuzzy/transliterated matching, ownership/control propagation, destination/end-use/catch-all rules, Russia Regulation `833/2014` goods annexes, formal technical-threshold evaluation, screening/case records, tenant/OIDC authorization, MCP, and webhooks remain outside this slice.
+Only an authorised human may clear or block a named transaction. OFAC list membership alone does not implement the 50 Percent Rule or determine program/legal effect. Fuzzy/transliterated matching, ownership/control propagation, destination/end-use/catch-all rules, Russia Regulation `833/2014` goods annexes, formal technical-threshold evaluation, screening/case records, tenant/OIDC authorization, MCP, and webhooks remain outside this slice.
 
 ## Safe evaluation data
 

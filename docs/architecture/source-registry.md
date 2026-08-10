@@ -27,6 +27,11 @@ effects. A spreadsheet or chat-derived fact enters the internal pool as attribut
 reviewable evidence; it does not enter the official pool merely because it resembles a
 regulator list.
 
+The implemented official technical-preview aggregate currently activates four members
+atomically: EU FSF, EU Annex I, OFAC SDN and OFAC Consolidated. This high-volume
+source-specific bundle complements the generic registry/snapshot lifecycle; it does
+not turn internal watchlist or case facts into regulator publications.
+
 PostgreSQL stores three separate records:
 
 | Record | Authority |

@@ -9,6 +9,7 @@ from typing import Literal, Protocol
 from tradesieve.application.contracts import ContractModel
 from tradesieve.domain.eu_dual_use import EuDualUseControlList
 from tradesieve.domain.eu_fsf import EuFsfSnapshot
+from tradesieve.domain.ofac_sls import OfacSlsListKind, OfacSnapshot
 from tradesieve.domain.official_sources import (
     OfficialSourceBundle,
     OfficialSourceWriteOutcome,
@@ -58,6 +59,31 @@ class _DualUseSource(Protocol):
     def retrieve_source(self) -> _RetrievedDualUse: ...
 
 
+class _RetrievedOfac(Protocol):
+    @property
+    def list_kind(self) -> OfacSlsListKind: ...
+
+    @property
+    def retrieved_at(self) -> datetime: ...
+
+    @property
+    def content_hash(self) -> str: ...
+
+    @property
+    def content_type(self) -> str: ...
+
+    @property
+    def content(self) -> bytes: ...
+
+
+class _OfacSource(Protocol):
+    def retrieve(self, list_kind: OfacSlsListKind) -> _RetrievedOfac: ...
+
+
+class _OfacParser(Protocol):
+    def parse(self, source: _RetrievedOfac) -> OfacSnapshot: ...
+
+
 class OfficialSourceRepository(Protocol):
     def activate(self, bundle: OfficialSourceBundle) -> OfficialSourceWriteOutcome: ...
 
@@ -75,6 +101,16 @@ class OfficialSourceRefreshResult(ContractModel):
     dual_use_snapshot_id: str
     dual_use_snapshot_content_hash: str
     dual_use_entry_count: int
+    ofac_sdn_snapshot_id: str
+    ofac_sdn_snapshot_content_hash: str
+    ofac_sdn_entry_count: int
+    ofac_sdn_alias_count: int
+    ofac_sdn_identifier_count: int
+    ofac_consolidated_snapshot_id: str
+    ofac_consolidated_snapshot_content_hash: str
+    ofac_consolidated_entry_count: int
+    ofac_consolidated_alias_count: int
+    ofac_consolidated_identifier_count: int
     activated_at: str
 
 
@@ -85,25 +121,33 @@ class OfficialSourceRefreshService:
         self,
         fsf_source: _FsfSource,
         dual_use_source: _DualUseSource,
+        ofac_source: _OfacSource,
         repository: OfficialSourceRepository,
         *,
         fsf_parser: _FsfParser,
+        ofac_parser: _OfacParser,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
         if not hasattr(fsf_source, "retrieve"):
             raise ValueError("FSF source must implement retrieve")
         if not hasattr(dual_use_source, "retrieve_source"):
             raise ValueError("dual-use source must implement retrieve_source")
+        if not hasattr(ofac_source, "retrieve"):
+            raise ValueError("OFAC source must implement retrieve")
         if not hasattr(repository, "activate"):
             raise ValueError("official source repository must implement activate")
         if not hasattr(fsf_parser, "parse"):
             raise ValueError("FSF parser must implement parse")
+        if not hasattr(ofac_parser, "parse"):
+            raise ValueError("OFAC parser must implement parse")
         if clock is not None and not callable(clock):
             raise ValueError("refresh clock must be callable")
         self._fsf_source = fsf_source
         self._dual_use_source = dual_use_source
+        self._ofac_source = ofac_source
         self._repository = repository
         self._fsf_parser = fsf_parser
+        self._ofac_parser = ofac_parser
         self._clock = clock or (lambda: datetime.now(UTC))
 
     def refresh(self) -> OfficialSourceRefreshResult:
@@ -117,6 +161,19 @@ class OfficialSourceRefreshService:
             != retrieved_dual_use.content_hash
         ):
             raise RuntimeError("official dual-use retrieval/parser integrity mismatch")
+        retrieved_sdn = self._ofac_source.retrieve(OfacSlsListKind.SDN)
+        ofac_sdn = self._ofac_parser.parse(retrieved_sdn)
+        retrieved_consolidated = self._ofac_source.retrieve(
+            OfacSlsListKind.CONSOLIDATED
+        )
+        ofac_consolidated = self._ofac_parser.parse(retrieved_consolidated)
+        if (
+            ofac_sdn.list_kind is not OfacSlsListKind.SDN
+            or ofac_sdn.raw_content_hash != retrieved_sdn.content_hash
+            or ofac_consolidated.list_kind is not OfacSlsListKind.CONSOLIDATED
+            or ofac_consolidated.raw_content_hash != retrieved_consolidated.content_hash
+        ):
+            raise RuntimeError("official OFAC retrieval/parser integrity mismatch")
         bundle = OfficialSourceBundle(
             fsf_raw_content=retrieved_fsf.content,
             fsf_content_type=retrieved_fsf.content_type.partition(";")[0]
@@ -127,6 +184,12 @@ class OfficialSourceRefreshService:
             dual_use_raw_content=retrieved_dual_use.content,
             dual_use_content_type=retrieved_dual_use.content_type,
             dual_use_control_list=retrieved_dual_use.control_list,
+            ofac_sdn_raw_content=retrieved_sdn.content,
+            ofac_sdn_content_type=retrieved_sdn.content_type,
+            ofac_sdn_snapshot=ofac_sdn,
+            ofac_consolidated_raw_content=retrieved_consolidated.content,
+            ofac_consolidated_content_type=retrieved_consolidated.content_type,
+            ofac_consolidated_snapshot=ofac_consolidated,
             activated_at=self._clock(),
         )
         outcome = self._repository.activate(bundle)
@@ -150,6 +213,22 @@ class OfficialSourceRefreshService:
                 retrieved_dual_use.control_list.content_hash
             ),
             dual_use_entry_count=len(retrieved_dual_use.control_list.entries),
+            ofac_sdn_snapshot_id=ofac_sdn.snapshot_id,
+            ofac_sdn_snapshot_content_hash=ofac_sdn.content_hash,
+            ofac_sdn_entry_count=len(ofac_sdn.entries),
+            ofac_sdn_alias_count=sum(len(item.aliases) for item in ofac_sdn.entries),
+            ofac_sdn_identifier_count=sum(
+                len(item.identifiers) for item in ofac_sdn.entries
+            ),
+            ofac_consolidated_snapshot_id=ofac_consolidated.snapshot_id,
+            ofac_consolidated_snapshot_content_hash=ofac_consolidated.content_hash,
+            ofac_consolidated_entry_count=len(ofac_consolidated.entries),
+            ofac_consolidated_alias_count=sum(
+                len(item.aliases) for item in ofac_consolidated.entries
+            ),
+            ofac_consolidated_identifier_count=sum(
+                len(item.identifiers) for item in ofac_consolidated.entries
+            ),
             activated_at=bundle.activated_at.isoformat(),
         )
 

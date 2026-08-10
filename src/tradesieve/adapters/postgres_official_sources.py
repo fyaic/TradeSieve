@@ -23,6 +23,18 @@ from tradesieve.domain.eu_fsf import (
     EuFsfSnapshot,
     EuFsfSubjectType,
 )
+from tradesieve.domain.ofac_sls import (
+    OfacAddress,
+    OfacAlias,
+    OfacEntry,
+    OfacFact,
+    OfacFactKind,
+    OfacIdentifier,
+    OfacSlsListKind,
+    OfacSnapshot,
+    OfacSubjectType,
+    OfacVesselInfo,
+)
 from tradesieve.domain.official_sources import (
     ActiveOfficialSources,
     OfficialSourceBundle,
@@ -40,7 +52,7 @@ def _fail() -> Never:
 
 
 class PostgresOfficialSourceRepository:
-    """Persist one verified pair and expose only the atomically active projections."""
+    """Persist one complete source set and expose only its active projections."""
 
     def __init__(self, connection: Connection[Any]) -> None:
         if not hasattr(connection, "execute") or not hasattr(connection, "transaction"):
@@ -53,6 +65,10 @@ class PostgresOfficialSourceRepository:
         try:
             fsf_snapshot_hash = bundle.fsf_snapshot.content_hash
             dual_use_snapshot_hash = bundle.dual_use_control_list.content_hash
+            ofac_sdn_snapshot_hash = bundle.ofac_sdn_snapshot.content_hash
+            ofac_consolidated_snapshot_hash = (
+                bundle.ofac_consolidated_snapshot.content_hash
+            )
             bundle_id = bundle.bundle_id
             bundle_hash = "sha256:" + bundle_id.removeprefix("official-bundle-")
             with self._connection.transaction():
@@ -68,14 +84,36 @@ class PostgresOfficialSourceRepository:
                     bundle.dual_use_content_type,
                     bundle.dual_use_control_list.retrieved_at,
                 )
+                self._persist_raw(
+                    bundle.ofac_sdn_snapshot.raw_content_hash,
+                    bundle.ofac_sdn_raw_content,
+                    bundle.ofac_sdn_content_type,
+                    bundle.ofac_sdn_snapshot.retrieved_at,
+                )
+                self._persist_raw(
+                    bundle.ofac_consolidated_snapshot.raw_content_hash,
+                    bundle.ofac_consolidated_raw_content,
+                    bundle.ofac_consolidated_content_type,
+                    bundle.ofac_consolidated_snapshot.retrieved_at,
+                )
                 self._persist_fsf(bundle, snapshot_hash=fsf_snapshot_hash)
                 self._persist_dual_use(bundle, snapshot_hash=dual_use_snapshot_hash)
+                self._persist_ofac(
+                    bundle.ofac_sdn_snapshot,
+                    snapshot_hash=ofac_sdn_snapshot_hash,
+                )
+                self._persist_ofac(
+                    bundle.ofac_consolidated_snapshot,
+                    snapshot_hash=ofac_consolidated_snapshot_hash,
+                )
                 self._persist_bundle(
                     bundle,
                     bundle_id=bundle_id,
                     bundle_hash=bundle_hash,
                     fsf_snapshot_hash=fsf_snapshot_hash,
                     dual_use_snapshot_hash=dual_use_snapshot_hash,
+                    ofac_sdn_snapshot_hash=ofac_sdn_snapshot_hash,
+                    ofac_consolidated_snapshot_hash=(ofac_consolidated_snapshot_hash),
                 )
                 self._connection.execute(
                     "LOCK TABLE official_screening_source_state "
@@ -94,11 +132,17 @@ class PostgresOfficialSourceRepository:
                         "UPDATE official_screening_source_state SET "
                         "fsf_observed_at = GREATEST(fsf_observed_at, %s), "
                         "dual_use_observed_at = GREATEST(dual_use_observed_at, %s), "
+                        "ofac_sdn_observed_at = "
+                        "GREATEST(ofac_sdn_observed_at, %s), "
+                        "ofac_consolidated_observed_at = "
+                        "GREATEST(ofac_consolidated_observed_at, %s), "
                         "updated_at = GREATEST(updated_at, %s) "
                         "WHERE singleton = TRUE",
                         (
                             bundle.fsf_retrieved_at,
                             bundle.dual_use_control_list.retrieved_at,
+                            bundle.ofac_sdn_snapshot.retrieved_at,
+                            bundle.ofac_consolidated_snapshot.retrieved_at,
                             bundle.activated_at,
                         ),
                     )
@@ -125,14 +169,19 @@ class PostgresOfficialSourceRepository:
                     self._connection.execute(
                         "INSERT INTO official_screening_source_state "
                         "(singleton, active_bundle_id, active_bundle_content_hash, "
-                        "fsf_observed_at, dual_use_observed_at, updated_at, sequence) "
-                        "VALUES (TRUE, %s, %s, %s, %s, %s, %s) "
+                        "fsf_observed_at, dual_use_observed_at, "
+                        "ofac_sdn_observed_at, ofac_consolidated_observed_at, "
+                        "updated_at, sequence) "
+                        "VALUES (TRUE, %s, %s, %s, %s, %s, %s, %s, %s) "
                         "ON CONFLICT (singleton) DO UPDATE SET "
                         "active_bundle_id = EXCLUDED.active_bundle_id, "
                         "active_bundle_content_hash = "
                         "EXCLUDED.active_bundle_content_hash, "
                         "fsf_observed_at = EXCLUDED.fsf_observed_at, "
                         "dual_use_observed_at = EXCLUDED.dual_use_observed_at, "
+                        "ofac_sdn_observed_at = EXCLUDED.ofac_sdn_observed_at, "
+                        "ofac_consolidated_observed_at = "
+                        "EXCLUDED.ofac_consolidated_observed_at, "
                         "updated_at = EXCLUDED.updated_at, "
                         "sequence = EXCLUDED.sequence",
                         (
@@ -140,6 +189,8 @@ class PostgresOfficialSourceRepository:
                             bundle_hash,
                             bundle.fsf_retrieved_at,
                             bundle.dual_use_control_list.retrieved_at,
+                            bundle.ofac_sdn_snapshot.retrieved_at,
+                            bundle.ofac_consolidated_snapshot.retrieved_at,
                             bundle.activated_at,
                             sequence_row[0],
                         ),
@@ -156,10 +207,16 @@ class PostgresOfficialSourceRepository:
             state = self._connection.execute(
                 "SELECT state.active_bundle_id, "
                 "state.active_bundle_content_hash, state.fsf_observed_at, "
-                "state.dual_use_observed_at, state.updated_at, "
+                "state.dual_use_observed_at, state.ofac_sdn_observed_at, "
+                "state.ofac_consolidated_observed_at, state.updated_at, "
                 "bundle.fsf_snapshot_id, bundle.fsf_snapshot_content_hash, "
                 "bundle.dual_use_snapshot_id, "
-                "bundle.dual_use_snapshot_content_hash, event.activated_at "
+                "bundle.dual_use_snapshot_content_hash, "
+                "bundle.ofac_sdn_snapshot_id, "
+                "bundle.ofac_sdn_snapshot_content_hash, "
+                "bundle.ofac_consolidated_snapshot_id, "
+                "bundle.ofac_consolidated_snapshot_content_hash, "
+                "event.activated_at "
                 "FROM official_screening_source_state AS state "
                 "JOIN official_screening_source_bundle AS bundle "
                 "ON bundle.bundle_id = state.active_bundle_id "
@@ -170,23 +227,31 @@ class PostgresOfficialSourceRepository:
                 "AND event.bundle_content_hash = state.active_bundle_content_hash "
                 "WHERE state.singleton = TRUE"
             ).fetchone()
-            if state is None or len(state) != 10:
+            if state is None or len(state) != 16:
                 _fail()
             (
                 bundle_id,
                 bundle_hash,
                 fsf_observed_at,
                 dual_observed_at,
+                ofac_sdn_observed_at,
+                ofac_consolidated_observed_at,
                 updated_at,
                 fsf_snapshot_id,
                 fsf_snapshot_hash,
                 dual_snapshot_id,
                 dual_snapshot_hash,
+                ofac_sdn_snapshot_id,
+                ofac_sdn_snapshot_hash,
+                ofac_consolidated_snapshot_id,
+                ofac_consolidated_snapshot_hash,
                 event_activated_at,
             ) = state
             for value in (
                 fsf_observed_at,
                 dual_observed_at,
+                ofac_sdn_observed_at,
+                ofac_consolidated_observed_at,
                 updated_at,
                 event_activated_at,
             ):
@@ -206,12 +271,24 @@ class PostgresOfficialSourceRepository:
                 dual_snapshot_hash,
                 retrieved_at=dual_observed_at,
             )
+            ofac_sdn = self._load_ofac(
+                ofac_sdn_snapshot_id,
+                ofac_sdn_snapshot_hash,
+                retrieved_at=ofac_sdn_observed_at,
+            )
+            ofac_consolidated = self._load_ofac(
+                ofac_consolidated_snapshot_id,
+                ofac_consolidated_snapshot_hash,
+                retrieved_at=ofac_consolidated_observed_at,
+            )
             return ActiveOfficialSources(
                 bundle_id=bundle_id,
                 bundle_content_hash=bundle_hash,
                 fsf_retrieved_at=fsf_observed_at,
                 fsf_snapshot=fsf_snapshot,
                 dual_use_control_list=dual_use,
+                ofac_sdn_snapshot=ofac_sdn,
+                ofac_consolidated_snapshot=ofac_consolidated,
                 activated_at=updated_at,
             )
         except OfficialSourcePersistenceError:
@@ -428,6 +505,218 @@ class PostgresOfficialSourceRepository:
             ),
         )
 
+    def _persist_ofac(self, snapshot: OfacSnapshot, *, snapshot_hash: str) -> None:
+        snapshot_id = snapshot.snapshot_id
+        counts = (
+            len(snapshot.entries),
+            sum(len(entry.programs) for entry in snapshot.entries),
+            sum(len(entry.aliases) for entry in snapshot.entries),
+            sum(len(entry.addresses) for entry in snapshot.entries),
+            sum(len(entry.identifiers) for entry in snapshot.entries),
+            sum(len(entry.facts) for entry in snapshot.entries),
+            sum(entry.vessel_info is not None for entry in snapshot.entries),
+        )
+        inserted = self._connection.execute(
+            "INSERT INTO ofac_sls_official_snapshot "
+            "(snapshot_id, snapshot_content_hash, list_kind, publish_date, "
+            "declared_record_count, retrieved_at, source_last_modified, "
+            "raw_content_hash, raw_byte_length, entry_count, program_count, "
+            "alias_count, address_count, identifier_count, fact_count, "
+            "vessel_count) VALUES ("
+            + ", ".join(["%s"] * 16)
+            + ") ON CONFLICT DO NOTHING RETURNING snapshot_id",
+            (
+                snapshot_id,
+                snapshot_hash,
+                snapshot.list_kind.value,
+                snapshot.publish_date,
+                snapshot.declared_record_count,
+                snapshot.retrieved_at,
+                snapshot.source_last_modified,
+                snapshot.raw_content_hash,
+                snapshot.raw_byte_length,
+                *counts,
+            ),
+        ).fetchone()
+        if inserted is None:
+            existing = self._connection.execute(
+                "SELECT snapshot_content_hash, list_kind, publish_date, "
+                "declared_record_count, source_last_modified, raw_content_hash, "
+                "raw_byte_length, entry_count, program_count, alias_count, "
+                "address_count, identifier_count, fact_count, vessel_count "
+                "FROM ofac_sls_official_snapshot WHERE snapshot_id = %s",
+                (snapshot_id,),
+            ).fetchone()
+            if existing != (
+                snapshot_hash,
+                snapshot.list_kind.value,
+                snapshot.publish_date,
+                snapshot.declared_record_count,
+                snapshot.source_last_modified,
+                snapshot.raw_content_hash,
+                snapshot.raw_byte_length,
+                *counts,
+            ):
+                _fail()
+            return
+        if inserted != (snapshot_id,):
+            _fail()
+        self._copy_many(
+            "COPY ofac_sls_official_entry (snapshot_id, "
+            "snapshot_content_hash, list_kind, entry_uid, first_name, last_name, "
+            "whole_name, normalized_name, title, subject_type, remarks, "
+            "entry_content_hash) FROM STDIN",
+            (
+                (
+                    snapshot_id,
+                    snapshot_hash,
+                    snapshot.list_kind.value,
+                    entry.uid,
+                    entry.first_name,
+                    entry.last_name,
+                    entry.whole_name,
+                    entry.normalized_name,
+                    entry.title,
+                    entry.subject_type.value,
+                    entry.remarks,
+                    entry.entry_hash,
+                )
+                for entry in snapshot.entries
+            ),
+        )
+        self._copy_many(
+            "COPY ofac_sls_official_program (snapshot_id, "
+            "snapshot_content_hash, list_kind, entry_uid, program_sequence, "
+            "program) FROM STDIN",
+            (
+                (
+                    snapshot_id,
+                    snapshot_hash,
+                    snapshot.list_kind.value,
+                    entry.uid,
+                    sequence,
+                    program,
+                )
+                for entry in snapshot.entries
+                for sequence, program in enumerate(entry.programs, start=1)
+            ),
+        )
+        self._copy_many(
+            "COPY ofac_sls_official_alias (snapshot_id, snapshot_content_hash, "
+            "list_kind, entry_uid, alias_uid, alias_type, category, whole_name, "
+            "normalized_name, native_locator) FROM STDIN",
+            (
+                (
+                    snapshot_id,
+                    snapshot_hash,
+                    snapshot.list_kind.value,
+                    entry.uid,
+                    alias.uid,
+                    alias.alias_type,
+                    alias.category,
+                    alias.whole_name,
+                    alias.normalized_name,
+                    alias.native_locator,
+                )
+                for entry in snapshot.entries
+                for alias in entry.aliases
+            ),
+        )
+        self._copy_many(
+            "COPY ofac_sls_official_address (snapshot_id, "
+            "snapshot_content_hash, list_kind, entry_uid, address_uid, "
+            "address1, address2, address3, city, state_or_province, postal_code, "
+            "country, region, native_locator) FROM STDIN",
+            (
+                (
+                    snapshot_id,
+                    snapshot_hash,
+                    snapshot.list_kind.value,
+                    entry.uid,
+                    address.uid,
+                    *(
+                        address.address_lines
+                        + (None,) * (3 - len(address.address_lines))
+                    ),
+                    address.city,
+                    address.state_or_province,
+                    address.postal_code,
+                    address.country,
+                    address.region,
+                    address.native_locator,
+                )
+                for entry in snapshot.entries
+                for address in entry.addresses
+            ),
+        )
+        self._copy_many(
+            "COPY ofac_sls_official_identifier (snapshot_id, "
+            "snapshot_content_hash, list_kind, entry_uid, identifier_uid, "
+            "type_code, number, normalized_number, country, issue_date, "
+            "expiration_date, native_locator) FROM STDIN",
+            (
+                (
+                    snapshot_id,
+                    snapshot_hash,
+                    snapshot.list_kind.value,
+                    entry.uid,
+                    identifier.uid,
+                    identifier.type_code,
+                    identifier.number,
+                    identifier.normalized_number,
+                    identifier.country,
+                    identifier.issue_date,
+                    identifier.expiration_date,
+                    identifier.native_locator,
+                )
+                for entry in snapshot.entries
+                for identifier in entry.identifiers
+            ),
+        )
+        self._copy_many(
+            "COPY ofac_sls_official_fact (snapshot_id, snapshot_content_hash, "
+            "list_kind, entry_uid, fact_uid, fact_kind, fact_value, main_entry, "
+            "native_locator) FROM STDIN",
+            (
+                (
+                    snapshot_id,
+                    snapshot_hash,
+                    snapshot.list_kind.value,
+                    entry.uid,
+                    fact.uid,
+                    fact.kind.value,
+                    fact.value,
+                    fact.main_entry,
+                    fact.native_locator,
+                )
+                for entry in snapshot.entries
+                for fact in entry.facts
+            ),
+        )
+        self._copy_many(
+            "COPY ofac_sls_official_vessel (snapshot_id, "
+            "snapshot_content_hash, list_kind, entry_uid, call_sign, "
+            "vessel_type, vessel_flag, vessel_owner, tonnage, "
+            "gross_registered_tonnage, native_locator) FROM STDIN",
+            (
+                (
+                    snapshot_id,
+                    snapshot_hash,
+                    snapshot.list_kind.value,
+                    entry.uid,
+                    entry.vessel_info.call_sign,
+                    entry.vessel_info.vessel_type,
+                    entry.vessel_info.vessel_flag,
+                    entry.vessel_info.vessel_owner,
+                    entry.vessel_info.tonnage,
+                    entry.vessel_info.gross_registered_tonnage,
+                    entry.vessel_info.native_locator,
+                )
+                for entry in snapshot.entries
+                if entry.vessel_info is not None
+            ),
+        )
+
     def _persist_bundle(
         self,
         bundle: OfficialSourceBundle,
@@ -436,13 +725,17 @@ class PostgresOfficialSourceRepository:
         bundle_hash: str,
         fsf_snapshot_hash: str,
         dual_use_snapshot_hash: str,
+        ofac_sdn_snapshot_hash: str,
+        ofac_consolidated_snapshot_hash: str,
     ) -> None:
         self._connection.execute(
             "INSERT INTO official_screening_source_bundle "
             "(bundle_id, bundle_content_hash, fsf_snapshot_id, "
             "fsf_snapshot_content_hash, dual_use_snapshot_id, "
-            "dual_use_snapshot_content_hash, first_activated_at) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
+            "dual_use_snapshot_content_hash, ofac_sdn_snapshot_id, "
+            "ofac_sdn_snapshot_content_hash, ofac_consolidated_snapshot_id, "
+            "ofac_consolidated_snapshot_content_hash, first_activated_at) "
+            "VALUES (" + ", ".join(["%s"] * 11) + ") ON CONFLICT DO NOTHING",
             (
                 bundle_id,
                 bundle_hash,
@@ -450,13 +743,19 @@ class PostgresOfficialSourceRepository:
                 fsf_snapshot_hash,
                 bundle.dual_use_control_list.snapshot_id,
                 dual_use_snapshot_hash,
+                bundle.ofac_sdn_snapshot.snapshot_id,
+                ofac_sdn_snapshot_hash,
+                bundle.ofac_consolidated_snapshot.snapshot_id,
+                ofac_consolidated_snapshot_hash,
                 bundle.activated_at,
             ),
         )
         existing = self._connection.execute(
             "SELECT bundle_content_hash, fsf_snapshot_id, "
             "fsf_snapshot_content_hash, dual_use_snapshot_id, "
-            "dual_use_snapshot_content_hash "
+            "dual_use_snapshot_content_hash, ofac_sdn_snapshot_id, "
+            "ofac_sdn_snapshot_content_hash, ofac_consolidated_snapshot_id, "
+            "ofac_consolidated_snapshot_content_hash "
             "FROM official_screening_source_bundle WHERE bundle_id = %s",
             (bundle_id,),
         ).fetchone()
@@ -466,6 +765,10 @@ class PostgresOfficialSourceRepository:
             fsf_snapshot_hash,
             bundle.dual_use_control_list.snapshot_id,
             dual_use_snapshot_hash,
+            bundle.ofac_sdn_snapshot.snapshot_id,
+            ofac_sdn_snapshot_hash,
+            bundle.ofac_consolidated_snapshot.snapshot_id,
+            ofac_consolidated_snapshot_hash,
         ):
             _fail()
 
@@ -641,6 +944,212 @@ class PostgresOfficialSourceRepository:
         ):
             _fail()
         return control_list
+
+    def _load_ofac(
+        self,
+        snapshot_id: object,
+        snapshot_hash: object,
+        *,
+        retrieved_at: datetime,
+    ) -> OfacSnapshot:
+        row = self._connection.execute(
+            "SELECT list_kind, publish_date, declared_record_count, "
+            "source_last_modified, raw_content_hash, raw_byte_length, "
+            "entry_count, program_count, alias_count, address_count, "
+            "identifier_count, fact_count, vessel_count "
+            "FROM ofac_sls_official_snapshot "
+            "WHERE snapshot_id = %s AND snapshot_content_hash = %s",
+            (snapshot_id, snapshot_hash),
+        ).fetchone()
+        if row is None or len(row) != 13:
+            _fail()
+        entry_rows = self._connection.execute(
+            "SELECT entry_uid, first_name, last_name, whole_name, "
+            "normalized_name, title, subject_type, remarks, entry_content_hash "
+            "FROM ofac_sls_official_entry WHERE snapshot_id = %s "
+            "ORDER BY CAST(entry_uid AS NUMERIC)",
+            (snapshot_id,),
+        ).fetchall()
+        program_rows = self._connection.execute(
+            "SELECT entry_uid, program_sequence, program "
+            "FROM ofac_sls_official_program WHERE snapshot_id = %s "
+            "ORDER BY CAST(entry_uid AS NUMERIC), program_sequence",
+            (snapshot_id,),
+        ).fetchall()
+        alias_rows = self._connection.execute(
+            "SELECT entry_uid, alias_uid, alias_type, category, whole_name, "
+            "normalized_name, native_locator FROM ofac_sls_official_alias "
+            "WHERE snapshot_id = %s ORDER BY CAST(entry_uid AS NUMERIC), "
+            "CAST(alias_uid AS NUMERIC)",
+            (snapshot_id,),
+        ).fetchall()
+        address_rows = self._connection.execute(
+            "SELECT entry_uid, address_uid, address1, address2, address3, city, "
+            "state_or_province, postal_code, country, region, native_locator "
+            "FROM ofac_sls_official_address WHERE snapshot_id = %s "
+            "ORDER BY CAST(entry_uid AS NUMERIC), CAST(address_uid AS NUMERIC)",
+            (snapshot_id,),
+        ).fetchall()
+        identifier_rows = self._connection.execute(
+            "SELECT entry_uid, identifier_uid, type_code, number, "
+            "normalized_number, country, issue_date, expiration_date, "
+            "native_locator FROM ofac_sls_official_identifier "
+            "WHERE snapshot_id = %s ORDER BY CAST(entry_uid AS NUMERIC), "
+            "CAST(identifier_uid AS NUMERIC)",
+            (snapshot_id,),
+        ).fetchall()
+        fact_rows = self._connection.execute(
+            "SELECT entry_uid, fact_uid, fact_kind, fact_value, main_entry, "
+            "native_locator FROM ofac_sls_official_fact WHERE snapshot_id = %s "
+            "ORDER BY CAST(entry_uid AS NUMERIC), CAST(fact_uid AS NUMERIC)",
+            (snapshot_id,),
+        ).fetchall()
+        vessel_rows = self._connection.execute(
+            "SELECT entry_uid, call_sign, vessel_type, vessel_flag, vessel_owner, "
+            "tonnage, gross_registered_tonnage, native_locator "
+            "FROM ofac_sls_official_vessel WHERE snapshot_id = %s "
+            "ORDER BY CAST(entry_uid AS NUMERIC)",
+            (snapshot_id,),
+        ).fetchall()
+        expected_counts = row[6:13]
+        actual_counts = (
+            len(entry_rows),
+            len(program_rows),
+            len(alias_rows),
+            len(address_rows),
+            len(identifier_rows),
+            len(fact_rows),
+            len(vessel_rows),
+        )
+        if expected_counts != actual_counts or row[2] != len(entry_rows):
+            _fail()
+        programs: dict[str, list[tuple[int, str]]] = {}
+        for item in program_rows:
+            if len(item) != 3:
+                _fail()
+            programs.setdefault(item[0], []).append((item[1], item[2]))
+        aliases: dict[str, list[OfacAlias]] = {}
+        for item in alias_rows:
+            if len(item) != 7:
+                _fail()
+            aliases.setdefault(item[0], []).append(
+                OfacAlias(
+                    uid=item[1],
+                    alias_type=item[2],
+                    category=item[3],
+                    whole_name=item[4],
+                    normalized_name=item[5],
+                    native_locator=item[6],
+                )
+            )
+        addresses: dict[str, list[OfacAddress]] = {}
+        for item in address_rows:
+            if len(item) != 11:
+                _fail()
+            addresses.setdefault(item[0], []).append(
+                OfacAddress(
+                    uid=item[1],
+                    address_lines=tuple(
+                        value for value in item[2:5] if value is not None
+                    ),
+                    city=item[5],
+                    state_or_province=item[6],
+                    postal_code=item[7],
+                    country=item[8],
+                    region=item[9],
+                    native_locator=item[10],
+                )
+            )
+        identifiers: dict[str, list[OfacIdentifier]] = {}
+        for item in identifier_rows:
+            if len(item) != 9:
+                _fail()
+            identifiers.setdefault(item[0], []).append(
+                OfacIdentifier(
+                    uid=item[1],
+                    type_code=item[2],
+                    number=item[3],
+                    normalized_number=item[4],
+                    country=item[5],
+                    issue_date=item[6],
+                    expiration_date=item[7],
+                    native_locator=item[8],
+                )
+            )
+        facts: dict[str, list[OfacFact]] = {}
+        for item in fact_rows:
+            if len(item) != 6:
+                _fail()
+            facts.setdefault(item[0], []).append(
+                OfacFact(
+                    kind=OfacFactKind(item[2]),
+                    uid=item[1],
+                    value=item[3],
+                    main_entry=item[4],
+                    native_locator=item[5],
+                )
+            )
+        vessels: dict[str, OfacVesselInfo] = {}
+        for item in vessel_rows:
+            if len(item) != 8 or item[0] in vessels:
+                _fail()
+            vessels[item[0]] = OfacVesselInfo(
+                call_sign=item[1],
+                vessel_type=item[2],
+                vessel_flag=item[3],
+                vessel_owner=item[4],
+                tonnage=item[5],
+                gross_registered_tonnage=item[6],
+                native_locator=item[7],
+            )
+        list_kind = OfacSlsListKind(row[0])
+        entries: list[OfacEntry] = []
+        for item in entry_rows:
+            if len(item) != 9:
+                _fail()
+            program_values = programs.pop(item[0], [])
+            if [sequence for sequence, _value in program_values] != list(
+                range(1, len(program_values) + 1)
+            ):
+                _fail()
+            entry = OfacEntry(
+                uid=item[0],
+                list_kind=list_kind,
+                first_name=item[1],
+                last_name=item[2],
+                whole_name=item[3],
+                normalized_name=item[4],
+                title=item[5],
+                subject_type=OfacSubjectType(item[6]),
+                remarks=item[7],
+                programs=tuple(value for _sequence, value in program_values),
+                aliases=tuple(aliases.pop(item[0], [])),
+                addresses=tuple(addresses.pop(item[0], [])),
+                identifiers=tuple(identifiers.pop(item[0], [])),
+                facts=tuple(facts.pop(item[0], [])),
+                vessel_info=vessels.pop(item[0], None),
+            )
+            if entry.entry_hash != item[8]:
+                _fail()
+            entries.append(entry)
+        if programs or aliases or addresses or identifiers or facts or vessels:
+            _fail()
+        snapshot = OfacSnapshot(
+            list_kind=list_kind,
+            publish_date=row[1],
+            declared_record_count=row[2],
+            retrieved_at=retrieved_at,
+            source_last_modified=row[3],
+            raw_content_hash=row[4],
+            raw_byte_length=row[5],
+            entries=tuple(entries),
+        )
+        if (
+            snapshot.snapshot_id != snapshot_id
+            or snapshot.content_hash != snapshot_hash
+        ):
+            _fail()
+        return snapshot
 
 
 __all__ = [

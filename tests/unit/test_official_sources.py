@@ -26,6 +26,12 @@ from tradesieve.domain.official_sources import (
     official_source_bundle_id,
 )
 
+from ..ofac_test_data import (
+    OFAC_CONSOLIDATED_RAW,
+    OFAC_SDN_RAW,
+    ofac_pair,
+)
+
 NOW = datetime(2026, 8, 10, 5, tzinfo=UTC)
 FSF_RAW = b"official fsf bytes"
 DUAL_RAW = b"official dual-use bytes"
@@ -86,6 +92,7 @@ def dual_list() -> EuDualUseControlList:
 
 
 def bundle() -> OfficialSourceBundle:
+    ofac_sdn, ofac_consolidated = ofac_pair(retrieved_at=NOW - timedelta(minutes=1))
     return OfficialSourceBundle(
         fsf_raw_content=FSF_RAW,
         fsf_content_type="application/xml",
@@ -94,6 +101,12 @@ def bundle() -> OfficialSourceBundle:
         dual_use_raw_content=DUAL_RAW,
         dual_use_content_type="application/zip",
         dual_use_control_list=dual_list(),
+        ofac_sdn_raw_content=OFAC_SDN_RAW,
+        ofac_sdn_content_type="text/xml",
+        ofac_sdn_snapshot=ofac_sdn,
+        ofac_consolidated_raw_content=OFAC_CONSOLIDATED_RAW,
+        ofac_consolidated_content_type="text/xml",
+        ofac_consolidated_snapshot=ofac_consolidated,
         activated_at=NOW,
     )
 
@@ -103,7 +116,10 @@ def test_bundle_binds_raw_bytes_projections_and_active_identity() -> None:
     assert value.bundle_id.startswith("official-bundle-")
     assert value.content_hash.startswith("sha256:")
     assert value.bundle_id == official_source_bundle_id(
-        value.fsf_snapshot, value.dual_use_control_list
+        value.fsf_snapshot,
+        value.dual_use_control_list,
+        value.ofac_sdn_snapshot,
+        value.ofac_consolidated_snapshot,
     )
     active = ActiveOfficialSources(
         bundle_id=value.bundle_id,
@@ -111,6 +127,8 @@ def test_bundle_binds_raw_bytes_projections_and_active_identity() -> None:
         fsf_retrieved_at=value.fsf_retrieved_at,
         fsf_snapshot=value.fsf_snapshot,
         dual_use_control_list=value.dual_use_control_list,
+        ofac_sdn_snapshot=value.ofac_sdn_snapshot,
+        ofac_consolidated_snapshot=value.ofac_consolidated_snapshot,
         activated_at=value.activated_at,
     )
     assert active.bundle_id == value.bundle_id
@@ -124,15 +142,31 @@ def test_bundle_and_active_projection_fail_closed_on_corruption() -> None:
         value.fsf_retrieved_at,
         value.fsf_snapshot,
         value.dual_use_control_list,
+        value.ofac_sdn_snapshot,
+        value.ofac_consolidated_snapshot,
         value.activated_at,
     )
     invalid = (
         lambda: official_source_bundle_id(
-            cast(Any, "bad"), value.dual_use_control_list
+            cast(Any, "bad"),
+            value.dual_use_control_list,
+            value.ofac_sdn_snapshot,
+            value.ofac_consolidated_snapshot,
         ),
-        lambda: official_source_bundle_id(value.fsf_snapshot, cast(Any, "bad")),
+        lambda: official_source_bundle_id(
+            value.fsf_snapshot,
+            cast(Any, "bad"),
+            value.ofac_sdn_snapshot,
+            value.ofac_consolidated_snapshot,
+        ),
         lambda: replace(value, fsf_snapshot=cast(Any, "bad")),
         lambda: replace(value, dual_use_control_list=cast(Any, "bad")),
+        lambda: replace(value, ofac_sdn_snapshot=cast(Any, "bad")),
+        lambda: replace(
+            value,
+            ofac_sdn_snapshot=value.ofac_consolidated_snapshot,
+            ofac_consolidated_snapshot=value.ofac_sdn_snapshot,
+        ),
         lambda: replace(value, fsf_retrieved_at=cast(Any, datetime(2026, 8, 10))),
         lambda: replace(value, activated_at=cast(Any, datetime(2026, 8, 10))),
         lambda: replace(value, fsf_content_type=""),
@@ -141,6 +175,8 @@ def test_bundle_and_active_projection_fail_closed_on_corruption() -> None:
         lambda: replace(value, fsf_raw_content=b"wrong"),
         lambda: replace(value, dual_use_raw_content=cast(Any, "bad")),
         lambda: replace(value, dual_use_raw_content=b"wrong"),
+        lambda: replace(value, ofac_sdn_raw_content=b"wrong"),
+        lambda: replace(value, ofac_consolidated_raw_content=b"wrong"),
         lambda: replace(
             value, activated_at=value.fsf_retrieved_at - timedelta(seconds=1)
         ),
@@ -157,6 +193,9 @@ def test_bundle_and_active_projection_fail_closed_on_corruption() -> None:
             activated_at=NOW - timedelta(minutes=1, seconds=1),
         ),
         lambda: replace(active, fsf_snapshot=cast(Any, "bad")),
+        lambda: replace(active, ofac_sdn_snapshot=cast(Any, "bad")),
+        lambda: replace(active, ofac_sdn_snapshot=active.ofac_consolidated_snapshot),
+        lambda: replace(active, ofac_consolidated_snapshot=active.ofac_sdn_snapshot),
         lambda: replace(active, bundle_content_hash="bad"),
         lambda: replace(active, bundle_id="bad"),
         lambda: replace(

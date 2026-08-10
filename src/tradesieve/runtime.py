@@ -112,7 +112,7 @@ from tradesieve.ports.source_snapshot import (
     SourceSnapshotRepository,
 )
 
-MIGRATION_REVISION = "20260810_0006"
+MIGRATION_REVISION = "20260810_0007"
 
 
 @dataclass(frozen=True, slots=True)

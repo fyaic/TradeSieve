@@ -1529,7 +1529,7 @@ def downgrade_reupgrade_probe() -> None:
     migrate_up("head")
     with admin_connect() as connection:
         assert scalar(connection, "SELECT version_num FROM alembic_version") == (
-            "20260810_0006"
+            "20260810_0007"
         )
         assert all(
             scalar(connection, "SELECT to_regclass(%s) IS NOT NULL", (table,)) is True

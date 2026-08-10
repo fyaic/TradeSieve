@@ -80,6 +80,32 @@ def official_result() -> OfficialScreeningResult:
                     }
                 ],
             },
+            "ofac": {
+                "source": "OFAC_SANCTIONS_LIST_SERVICE",
+                "lists": [
+                    {
+                        "list_kind": list_kind,
+                        "source_publish_date": "2026-08-07",
+                        "source_snapshot_id": (
+                            f"ofac-sls-{list_kind.lower()}-" + "1" * 64
+                        ),
+                        "source_snapshot_content_hash": "sha256:" + "1" * 64,
+                        "source_raw_content_hash": "sha256:" + "2" * 64,
+                        "source_retrieved_at": "2026-08-10T06:25:18+00:00",
+                        "identifier_query_count": 0,
+                        "identifier_statuses": [],
+                        "identifier_evidence": [],
+                        "name_query_count": 3,
+                        "name_statuses": [
+                            "NO_CANDIDATE",
+                            "NO_CANDIDATE",
+                            "NO_CANDIDATE",
+                        ],
+                        "name_evidence": [],
+                    }
+                    for list_kind in ("SDN", "CONSOLIDATED")
+                ],
+            },
             "dual_use": {
                 "source_effective_from": "2025-11-15",
                 "source_snapshot_id": "eu-dual-use-" + "d" * 64,

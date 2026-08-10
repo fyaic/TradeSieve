@@ -33,6 +33,12 @@ from tradesieve.domain.official_sources import (
     OfficialSourceWriteOutcome,
 )
 
+from ..ofac_test_data import (
+    OFAC_CONSOLIDATED_RAW,
+    OFAC_SDN_RAW,
+    ofac_pair,
+)
+
 NOW = datetime(2026, 8, 10, 7, tzinfo=UTC)
 FSF_RAW = b"official fsf raw"
 DUAL_RAW = b"official dual raw"
@@ -103,6 +109,7 @@ def dual_list(*, retrieved_at: datetime | None = None) -> EuDualUseControlList:
 
 
 def bundle() -> OfficialSourceBundle:
+    ofac_sdn, ofac_consolidated = ofac_pair(retrieved_at=NOW - timedelta(minutes=1))
     return OfficialSourceBundle(
         fsf_raw_content=FSF_RAW,
         fsf_content_type="application/xml",
@@ -111,6 +118,12 @@ def bundle() -> OfficialSourceBundle:
         dual_use_raw_content=DUAL_RAW,
         dual_use_content_type="application/zip",
         dual_use_control_list=dual_list(),
+        ofac_sdn_raw_content=OFAC_SDN_RAW,
+        ofac_sdn_content_type="text/xml",
+        ofac_sdn_snapshot=ofac_sdn,
+        ofac_consolidated_raw_content=OFAC_CONSOLIDATED_RAW,
+        ofac_consolidated_content_type="text/xml",
+        ofac_consolidated_snapshot=ofac_consolidated,
         activated_at=NOW,
     )
 
@@ -199,13 +212,56 @@ class FakeConnection:
         value = self.value
         fsf = value.fsf_snapshot
         dual = value.dual_use_control_list
+        ofac_snapshots = {
+            value.ofac_sdn_snapshot.snapshot_id: value.ofac_sdn_snapshot,
+            value.ofac_consolidated_snapshot.snapshot_id: (
+                value.ofac_consolidated_snapshot
+            ),
+        }
         if query.startswith("SELECT byte_length, media_type"):
             assert isinstance(params, tuple)
             if params[0] == fsf.raw_content_hash:
                 return FakeResult([(len(FSF_RAW), value.fsf_content_type)])
-            return FakeResult([(len(DUAL_RAW), value.dual_use_content_type)])
+            if params[0] == dual.source_archive_hash:
+                return FakeResult([(len(DUAL_RAW), value.dual_use_content_type)])
+            if params[0] == value.ofac_sdn_snapshot.raw_content_hash:
+                return FakeResult([(len(OFAC_SDN_RAW), value.ofac_sdn_content_type)])
+            return FakeResult(
+                [
+                    (
+                        len(OFAC_CONSOLIDATED_RAW),
+                        value.ofac_consolidated_content_type,
+                    )
+                ]
+            )
         if query.startswith("INSERT INTO eu_fsf_official_snapshot"):
             return FakeResult([] if self.existing else [(fsf.snapshot_id,)])
+        if query.startswith("SELECT snapshot_content_hash, list_kind"):
+            assert isinstance(params, tuple)
+            ofac = ofac_snapshots[cast(str, params[0])]
+            counts = (
+                len(ofac.entries),
+                sum(len(entry.programs) for entry in ofac.entries),
+                sum(len(entry.aliases) for entry in ofac.entries),
+                sum(len(entry.addresses) for entry in ofac.entries),
+                sum(len(entry.identifiers) for entry in ofac.entries),
+                sum(len(entry.facts) for entry in ofac.entries),
+                sum(entry.vessel_info is not None for entry in ofac.entries),
+            )
+            return FakeResult(
+                [
+                    (
+                        ofac.content_hash,
+                        ofac.list_kind.value,
+                        ofac.publish_date,
+                        ofac.declared_record_count,
+                        ofac.source_last_modified,
+                        ofac.raw_content_hash,
+                        ofac.raw_byte_length,
+                        *counts,
+                    )
+                ]
+            )
         if query.startswith("SELECT snapshot_content_hash, raw_content_hash"):
             if "eu_fsf" in query:
                 return FakeResult(
@@ -222,21 +278,26 @@ class FakeConnection:
                         )
                     ]
                 )
-            return FakeResult(
-                [
-                    (
-                        dual.content_hash,
-                        dual.source_archive_hash,
-                        dual.source_archive_bytes,
-                        dual.formex_document_hash,
-                        EU_DUAL_USE_CELEX,
-                        EU_DUAL_USE_EFFECTIVE_FROM,
-                        len(dual.entries),
-                    )
-                ]
-            )
+            if "eu_dual_use" in query:
+                return FakeResult(
+                    [
+                        (
+                            dual.content_hash,
+                            dual.source_archive_hash,
+                            dual.source_archive_bytes,
+                            dual.formex_document_hash,
+                            EU_DUAL_USE_CELEX,
+                            EU_DUAL_USE_EFFECTIVE_FROM,
+                            len(dual.entries),
+                        )
+                    ]
+                )
+            raise AssertionError("unexpected official snapshot query")
         if query.startswith("INSERT INTO eu_dual_use_official_snapshot"):
             return FakeResult([] if self.existing else [(dual.snapshot_id,)])
+        if query.startswith("INSERT INTO ofac_sls_official_snapshot"):
+            assert isinstance(params, tuple)
+            return FakeResult([] if self.existing else [(params[0],)])
         if query.startswith("SELECT bundle_content_hash"):
             return FakeResult(
                 [
@@ -246,6 +307,10 @@ class FakeConnection:
                         fsf.content_hash,
                         dual.snapshot_id,
                         dual.content_hash,
+                        value.ofac_sdn_snapshot.snapshot_id,
+                        value.ofac_sdn_snapshot.content_hash,
+                        value.ofac_consolidated_snapshot.snapshot_id,
+                        value.ofac_consolidated_snapshot.content_hash,
                     )
                 ]
             )
@@ -263,11 +328,17 @@ class FakeConnection:
                         value.content_hash,
                         value.fsf_retrieved_at,
                         dual.retrieved_at,
+                        value.ofac_sdn_snapshot.retrieved_at,
+                        value.ofac_consolidated_snapshot.retrieved_at,
                         value.activated_at,
                         fsf.snapshot_id,
                         fsf.content_hash,
                         dual.snapshot_id,
                         dual.content_hash,
+                        value.ofac_sdn_snapshot.snapshot_id,
+                        value.ofac_sdn_snapshot.content_hash,
+                        value.ofac_consolidated_snapshot.snapshot_id,
+                        value.ofac_consolidated_snapshot.content_hash,
                         value.activated_at,
                     )
                 ]
@@ -364,6 +435,154 @@ class FakeConnection:
                     for item in dual.entries
                 ]
             )
+        if query.startswith("SELECT list_kind"):
+            assert isinstance(params, tuple)
+            ofac = ofac_snapshots[cast(str, params[0])]
+            return FakeResult(
+                [
+                    (
+                        ofac.list_kind.value,
+                        ofac.publish_date,
+                        ofac.declared_record_count,
+                        ofac.source_last_modified,
+                        ofac.raw_content_hash,
+                        ofac.raw_byte_length,
+                        len(ofac.entries),
+                        sum(len(entry.programs) for entry in ofac.entries),
+                        sum(len(entry.aliases) for entry in ofac.entries),
+                        sum(len(entry.addresses) for entry in ofac.entries),
+                        sum(len(entry.identifiers) for entry in ofac.entries),
+                        sum(len(entry.facts) for entry in ofac.entries),
+                        sum(entry.vessel_info is not None for entry in ofac.entries),
+                    )
+                ]
+            )
+        if query.startswith("SELECT entry_uid, first_name"):
+            assert isinstance(params, tuple)
+            ofac = ofac_snapshots[cast(str, params[0])]
+            return FakeResult(
+                [
+                    (
+                        entry.uid,
+                        entry.first_name,
+                        entry.last_name,
+                        entry.whole_name,
+                        entry.normalized_name,
+                        entry.title,
+                        entry.subject_type.value,
+                        entry.remarks,
+                        entry.entry_hash,
+                    )
+                    for entry in ofac.entries
+                ]
+            )
+        if query.startswith("SELECT entry_uid, program_sequence"):
+            assert isinstance(params, tuple)
+            ofac = ofac_snapshots[cast(str, params[0])]
+            return FakeResult(
+                [
+                    (entry.uid, sequence, program)
+                    for entry in ofac.entries
+                    for sequence, program in enumerate(entry.programs, start=1)
+                ]
+            )
+        if query.startswith("SELECT entry_uid, alias_uid"):
+            assert isinstance(params, tuple)
+            ofac = ofac_snapshots[cast(str, params[0])]
+            return FakeResult(
+                [
+                    (
+                        entry.uid,
+                        alias.uid,
+                        alias.alias_type,
+                        alias.category,
+                        alias.whole_name,
+                        alias.normalized_name,
+                        alias.native_locator,
+                    )
+                    for entry in ofac.entries
+                    for alias in entry.aliases
+                ]
+            )
+        if query.startswith("SELECT entry_uid, address_uid"):
+            assert isinstance(params, tuple)
+            ofac = ofac_snapshots[cast(str, params[0])]
+            return FakeResult(
+                [
+                    (
+                        entry.uid,
+                        address.uid,
+                        *(
+                            address.address_lines
+                            + (None,) * (3 - len(address.address_lines))
+                        ),
+                        address.city,
+                        address.state_or_province,
+                        address.postal_code,
+                        address.country,
+                        address.region,
+                        address.native_locator,
+                    )
+                    for entry in ofac.entries
+                    for address in entry.addresses
+                ]
+            )
+        if query.startswith("SELECT entry_uid, identifier_uid"):
+            assert isinstance(params, tuple)
+            ofac = ofac_snapshots[cast(str, params[0])]
+            return FakeResult(
+                [
+                    (
+                        entry.uid,
+                        identifier.uid,
+                        identifier.type_code,
+                        identifier.number,
+                        identifier.normalized_number,
+                        identifier.country,
+                        identifier.issue_date,
+                        identifier.expiration_date,
+                        identifier.native_locator,
+                    )
+                    for entry in ofac.entries
+                    for identifier in entry.identifiers
+                ]
+            )
+        if query.startswith("SELECT entry_uid, fact_uid"):
+            assert isinstance(params, tuple)
+            ofac = ofac_snapshots[cast(str, params[0])]
+            return FakeResult(
+                [
+                    (
+                        entry.uid,
+                        fact.uid,
+                        fact.kind.value,
+                        fact.value,
+                        fact.main_entry,
+                        fact.native_locator,
+                    )
+                    for entry in ofac.entries
+                    for fact in entry.facts
+                ]
+            )
+        if query.startswith("SELECT entry_uid, call_sign"):
+            assert isinstance(params, tuple)
+            ofac = ofac_snapshots[cast(str, params[0])]
+            return FakeResult(
+                [
+                    (
+                        entry.uid,
+                        entry.vessel_info.call_sign,
+                        entry.vessel_info.vessel_type,
+                        entry.vessel_info.vessel_flag,
+                        entry.vessel_info.vessel_owner,
+                        entry.vessel_info.tonnage,
+                        entry.vessel_info.gross_registered_tonnage,
+                        entry.vessel_info.native_locator,
+                    )
+                    for entry in ofac.entries
+                    if entry.vessel_info is not None
+                ]
+            )
         return FakeResult([])
 
 
@@ -382,8 +601,10 @@ def test_applied_projection_write_and_verified_active_round_trip() -> None:
     assert active.bundle_id == value.bundle_id
     assert active.fsf_snapshot == value.fsf_snapshot
     assert active.dual_use_control_list == value.dual_use_control_list
+    assert active.ofac_sdn_snapshot == value.ofac_sdn_snapshot
+    assert active.ofac_consolidated_snapshot == value.ofac_consolidated_snapshot
     assert connection.transactions == 1
-    assert [len(rows) for _, rows in connection.many] == [1, 1, 1, 300]
+    assert [len(rows) for _, rows in connection.many] == [1, 1, 1, 300] + [1] * 14
     assert any("LOCK TABLE" in query for query, _ in connection.executed)
 
 
@@ -441,6 +662,7 @@ def test_existing_projection_and_raw_conflicts_fail_closed() -> None:
                 ("bad",)
             ]
         },
+        {"SELECT snapshot_content_hash, list_kind, publish_date": [("bad",)]},
         {"SELECT bundle_content_hash": [("bad",)]},
     )
     for faults in cases:
@@ -453,6 +675,7 @@ def test_insert_returning_shape_conflicts_fail_closed() -> None:
     cases: tuple[dict[str, object], ...] = (
         {"INSERT INTO eu_fsf_official_snapshot": [("bad",)]},
         {"INSERT INTO eu_dual_use_official_snapshot": [("bad",)]},
+        {"INSERT INTO ofac_sls_official_snapshot": [("bad",)]},
     )
     for faults in cases:
         connection = FakeConnection(bundle(), faults=faults)
@@ -461,7 +684,7 @@ def test_insert_returning_shape_conflicts_fail_closed() -> None:
 
 
 def test_active_read_rejects_missing_or_malformed_state() -> None:
-    for rows in ([], [("bad",)], [("x",) * 10]):
+    for rows in ([], [("bad",)], [("x",) * 16]):
         connection = FakeConnection(
             bundle(), faults={"SELECT state.active_bundle_id": rows}
         )
@@ -523,7 +746,7 @@ def test_active_read_rejects_time_hash_count_and_dependency_corruption() -> None
     fsf_metadata = list(connection.execute("SELECT generation_date").fetchone() or ())
 
     event_after_update = list(state)
-    event_after_update[9] = value.activated_at + timedelta(seconds=1)
+    event_after_update[15] = value.activated_at + timedelta(seconds=1)
     observation_before_generation = list(state)
     observation_before_generation[2] = value.fsf_snapshot.generation_date - timedelta(
         seconds=1
@@ -543,11 +766,11 @@ def test_active_read_rejects_time_hash_count_and_dependency_corruption() -> None
     ghost_alias = list(alias_rows[0])
     ghost_alias[0] = "2"
     wrong_fsf_hash_state = list(state)
-    wrong_fsf_hash_state[6] = "sha256:" + "f" * 64
+    wrong_fsf_hash_state[8] = "sha256:" + "f" * 64
     bad_entry_hash = list(entry_rows[0])
     bad_entry_hash[3] = "sha256:" + "f" * 64
     wrong_dual_hash_state = list(state)
-    wrong_dual_hash_state[8] = "sha256:" + "f" * 64
+    wrong_dual_hash_state[10] = "sha256:" + "f" * 64
 
     cases: tuple[dict[str, object], ...] = (
         {"SELECT state.active_bundle_id": [tuple(event_after_update)]},
@@ -605,3 +828,152 @@ def test_active_read_rejects_dual_snapshot_shape_and_entry_count_corruption() ->
                     faults={"SELECT raw_content_hash, raw_byte_length": rows},
                 )
             ).get_active()
+
+
+def test_active_read_rejects_every_ofac_projection_corruption_shape() -> None:
+    value = bundle()
+    connection = FakeConnection(value)
+    snapshot = value.ofac_sdn_snapshot
+    params = (snapshot.snapshot_id, snapshot.content_hash)
+    metadata = list(connection.execute("SELECT list_kind", params).fetchone() or ())
+    entry_rows = connection.execute(
+        "SELECT entry_uid, first_name", (snapshot.snapshot_id,)
+    ).fetchall()
+    program_rows = connection.execute(
+        "SELECT entry_uid, program_sequence", (snapshot.snapshot_id,)
+    ).fetchall()
+    alias_rows = connection.execute(
+        "SELECT entry_uid, alias_uid", (snapshot.snapshot_id,)
+    ).fetchall()
+    address_rows = connection.execute(
+        "SELECT entry_uid, address_uid", (snapshot.snapshot_id,)
+    ).fetchall()
+    identifier_rows = connection.execute(
+        "SELECT entry_uid, identifier_uid", (snapshot.snapshot_id,)
+    ).fetchall()
+    fact_rows = connection.execute(
+        "SELECT entry_uid, fact_uid", (snapshot.snapshot_id,)
+    ).fetchall()
+    vessel_rows = connection.execute(
+        "SELECT entry_uid, call_sign", (snapshot.snapshot_id,)
+    ).fetchall()
+    assert len(metadata) == 13
+    assert all(
+        rows
+        for rows in (
+            entry_rows,
+            program_rows,
+            alias_rows,
+            address_rows,
+            identifier_rows,
+            fact_rows,
+            vessel_rows,
+        )
+    )
+
+    count_mismatch = list(metadata)
+    count_mismatch[7] = 2
+    declared_count_mismatch = list(metadata)
+    declared_count_mismatch[2] = 2
+    duplicate_vessel_counts = list(metadata)
+    duplicate_vessel_counts[12] = 2
+    orphan_alias_counts = list(metadata)
+    orphan_alias_counts[8] = 2
+    bad_entry_hash = list(entry_rows[0])
+    bad_entry_hash[8] = "sha256:" + "f" * 64
+    orphan_alias = (
+        "999",
+        "998",
+        "a.k.a.",
+        "strong",
+        "Orphan Example",
+        "orphan example",
+        "/sdnList/sdnEntry[uid='999']/akaList/aka[1]",
+    )
+
+    cases: tuple[dict[str, object], ...] = (
+        {"SELECT list_kind": []},
+        {"SELECT list_kind": [("bad",)]},
+        {"SELECT list_kind": [tuple(count_mismatch)]},
+        {"SELECT list_kind": [tuple(declared_count_mismatch)]},
+        {"SELECT entry_uid, program_sequence": [("bad",)]},
+        {"SELECT entry_uid, alias_uid": [("bad",)]},
+        {"SELECT entry_uid, address_uid": [("bad",)]},
+        {"SELECT entry_uid, identifier_uid": [("bad",)]},
+        {"SELECT entry_uid, fact_uid": [("bad",)]},
+        {"SELECT entry_uid, call_sign": [("bad",)]},
+        {
+            "SELECT list_kind": [tuple(duplicate_vessel_counts)],
+            "SELECT entry_uid, call_sign": [vessel_rows[0], vessel_rows[0]],
+        },
+        {"SELECT entry_uid, first_name": [("bad",)]},
+        {
+            "SELECT entry_uid, program_sequence": [
+                (program_rows[0][0], 2, program_rows[0][2])
+            ]
+        },
+        {"SELECT entry_uid, first_name": [tuple(bad_entry_hash)]},
+        {
+            "SELECT list_kind": [tuple(orphan_alias_counts)],
+            "SELECT entry_uid, alias_uid": [alias_rows[0], orphan_alias],
+        },
+    )
+    for faults in cases:
+        with pytest.raises(OfficialSourcePersistenceError):
+            repository(FakeConnection(value, faults=faults)).get_active()
+
+
+def test_active_read_rejects_ofac_snapshot_identity_and_hash_mismatch() -> None:
+    value = bundle()
+    connection = FakeConnection(value)
+    snapshot = value.ofac_sdn_snapshot
+    params = (snapshot.snapshot_id, snapshot.content_hash)
+    query_rows = {
+        "SELECT list_kind": [connection.execute("SELECT list_kind", params).fetchone()],
+        "SELECT entry_uid, first_name": connection.execute(
+            "SELECT entry_uid, first_name", (snapshot.snapshot_id,)
+        ).fetchall(),
+        "SELECT entry_uid, program_sequence": connection.execute(
+            "SELECT entry_uid, program_sequence", (snapshot.snapshot_id,)
+        ).fetchall(),
+        "SELECT entry_uid, alias_uid": connection.execute(
+            "SELECT entry_uid, alias_uid", (snapshot.snapshot_id,)
+        ).fetchall(),
+        "SELECT entry_uid, address_uid": connection.execute(
+            "SELECT entry_uid, address_uid", (snapshot.snapshot_id,)
+        ).fetchall(),
+        "SELECT entry_uid, identifier_uid": connection.execute(
+            "SELECT entry_uid, identifier_uid", (snapshot.snapshot_id,)
+        ).fetchall(),
+        "SELECT entry_uid, fact_uid": connection.execute(
+            "SELECT entry_uid, fact_uid", (snapshot.snapshot_id,)
+        ).fetchall(),
+        "SELECT entry_uid, call_sign": connection.execute(
+            "SELECT entry_uid, call_sign", (snapshot.snapshot_id,)
+        ).fetchall(),
+    }
+    assert query_rows["SELECT list_kind"] != [None]
+    state = list(connection.execute("SELECT state.active_bundle_id").fetchone() or ())
+
+    wrong_hash_state = list(state)
+    wrong_hash_state[12] = "sha256:" + "f" * 64
+    with pytest.raises(OfficialSourcePersistenceError):
+        repository(
+            FakeConnection(
+                value,
+                faults={"SELECT state.active_bundle_id": [tuple(wrong_hash_state)]},
+            )
+        ).get_active()
+
+    wrong_id_state = list(state)
+    wrong_id_state[11] = "ofac-SDN-wrong"
+    with pytest.raises(OfficialSourcePersistenceError):
+        repository(
+            FakeConnection(
+                value,
+                faults={
+                    "SELECT state.active_bundle_id": [tuple(wrong_id_state)],
+                    **query_rows,
+                },
+            )
+        ).get_active()

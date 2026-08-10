@@ -25,6 +25,18 @@ from tradesieve.domain.eu_fsf import (
     EuFsfSnapshot,
     EuFsfSubjectType,
 )
+from tradesieve.domain.ofac_sls import (
+    OfacAddress,
+    OfacAlias,
+    OfacEntry,
+    OfacFact,
+    OfacFactKind,
+    OfacIdentifier,
+    OfacSlsListKind,
+    OfacSnapshot,
+    OfacSubjectType,
+    OfacVesselInfo,
+)
 from tradesieve.domain.official_sources import (
     OfficialSourceBundle,
     OfficialSourceWriteOutcome,
@@ -33,6 +45,87 @@ from tradesieve.domain.official_sources import (
 NOW = datetime(2026, 8, 10, 8, tzinfo=UTC)
 FSF_RAW = b"official-source-postgres-probe-fsf"
 DUAL_RAW = b"official-source-postgres-probe-dual"
+OFAC_SDN_RAW = b"official-source-postgres-probe-ofac-sdn"
+OFAC_CONSOLIDATED_RAW = b"official-source-postgres-probe-ofac-consolidated"
+
+
+def build_ofac_snapshot(
+    list_kind: OfacSlsListKind, raw_content: bytes, uid: str
+) -> OfacSnapshot:
+    entry = OfacEntry.create(
+        uid=uid,
+        list_kind=list_kind,
+        first_name="OFAC",
+        last_name="PROJECTION PROBE",
+        title="Synthetic vessel",
+        subject_type=OfacSubjectType.VESSEL,
+        remarks="Synthetic immutable projection probe",
+        programs=("RUSSIA-EO14024",),
+        aliases=(
+            OfacAlias.create(
+                uid=str(int(uid) + 1),
+                alias_type="a.k.a.",
+                category="strong",
+                whole_name="OFAC Probe Vessel",
+                native_locator=f"/sdnList/sdnEntry[uid='{uid}']/akaList/aka[1]",
+            ),
+        ),
+        addresses=(
+            OfacAddress(
+                uid=str(int(uid) + 2),
+                address_lines=("1 Projection Road", "Dock 2"),
+                city="Shanghai",
+                state_or_province="Shanghai",
+                postal_code="200000",
+                country="China",
+                region="Asia",
+                native_locator=(
+                    f"/sdnList/sdnEntry[uid='{uid}']/addressList/address[1]"
+                ),
+            ),
+        ),
+        identifiers=(
+            OfacIdentifier.create(
+                uid=str(int(uid) + 3),
+                type_code="Registration Number",
+                number="36-3823186",
+                country="United States",
+                issue_date="2020",
+                expiration_date="2030",
+                native_locator=f"/sdnList/sdnEntry[uid='{uid}']/idList/id[1]",
+            ),
+        ),
+        facts=(
+            OfacFact(
+                kind=OfacFactKind.NATIONALITY,
+                uid=str(int(uid) + 4),
+                value="Russia",
+                main_entry=True,
+                native_locator=(
+                    f"/sdnList/sdnEntry[uid='{uid}']/nationalityList/nationality[1]"
+                ),
+            ),
+        ),
+        vessel_info=OfacVesselInfo(
+            call_sign="PROBE",
+            vessel_type="Cargo",
+            vessel_flag="Russia",
+            vessel_owner="Synthetic Owner",
+            tonnage=10,
+            gross_registered_tonnage=20,
+            native_locator=f"/sdnList/sdnEntry[uid='{uid}']/vesselInfo",
+        ),
+    )
+    return OfacSnapshot(
+        list_kind=list_kind,
+        publish_date=date(2026, 8, 7),
+        declared_record_count=1,
+        retrieved_at=NOW - timedelta(minutes=1),
+        source_last_modified=datetime(2026, 8, 7, 18, 36, 56, tzinfo=UTC),
+        raw_content_hash=f"sha256:{hashlib.sha256(raw_content).hexdigest()}",
+        raw_byte_length=len(raw_content),
+        entries=(entry,),
+    )
 
 
 def build_bundle() -> OfficialSourceBundle:
@@ -96,6 +189,12 @@ def build_bundle() -> OfficialSourceBundle:
             for index in range(30)
         ),
     )
+    ofac_sdn = build_ofac_snapshot(OfacSlsListKind.SDN, OFAC_SDN_RAW, "100")
+    ofac_consolidated = build_ofac_snapshot(
+        OfacSlsListKind.CONSOLIDATED,
+        OFAC_CONSOLIDATED_RAW,
+        "200",
+    )
     return OfficialSourceBundle(
         fsf_raw_content=FSF_RAW,
         fsf_content_type="application/xml",
@@ -104,6 +203,12 @@ def build_bundle() -> OfficialSourceBundle:
         dual_use_raw_content=DUAL_RAW,
         dual_use_content_type="application/zip",
         dual_use_control_list=dual,
+        ofac_sdn_raw_content=OFAC_SDN_RAW,
+        ofac_sdn_content_type="text/xml",
+        ofac_sdn_snapshot=ofac_sdn,
+        ofac_consolidated_raw_content=OFAC_CONSOLIDATED_RAW,
+        ofac_consolidated_content_type="text/xml",
+        ofac_consolidated_snapshot=ofac_consolidated,
         activated_at=NOW,
     )
 
@@ -129,7 +234,7 @@ def main() -> None:
     bundle = build_bundle()
     with psycopg.connect(settings.database_url, autocommit=True) as connection:
         assert scalar(connection, "SELECT version_num FROM alembic_version") == (
-            "20260810_0006"
+            "20260810_0007"
         )
         repository = PostgresOfficialSourceRepository(connection)
         assert repository.activate(bundle) is OfficialSourceWriteOutcome.APPLIED
@@ -137,8 +242,10 @@ def main() -> None:
         active = repository.get_active()
         assert active.fsf_snapshot == bundle.fsf_snapshot
         assert active.dual_use_control_list == bundle.dual_use_control_list
+        assert active.ofac_sdn_snapshot == bundle.ofac_sdn_snapshot
+        assert active.ofac_consolidated_snapshot == bundle.ofac_consolidated_snapshot
         assert (
-            scalar(connection, "SELECT count(*) FROM official_source_raw_object") == 2
+            scalar(connection, "SELECT count(*) FROM official_source_raw_object") == 4
         )
         assert scalar(connection, "SELECT count(*) FROM eu_fsf_official_entity") == 1
         assert scalar(connection, "SELECT count(*) FROM eu_fsf_official_alias") == 1
@@ -148,6 +255,18 @@ def main() -> None:
         assert (
             scalar(connection, "SELECT count(*) FROM eu_dual_use_official_entry") == 300
         )
+        assert (
+            scalar(connection, "SELECT count(*) FROM ofac_sls_official_snapshot") == 2
+        )
+        assert scalar(connection, "SELECT count(*) FROM ofac_sls_official_entry") == 2
+        assert scalar(connection, "SELECT count(*) FROM ofac_sls_official_program") == 2
+        assert scalar(connection, "SELECT count(*) FROM ofac_sls_official_alias") == 2
+        assert scalar(connection, "SELECT count(*) FROM ofac_sls_official_address") == 2
+        assert (
+            scalar(connection, "SELECT count(*) FROM ofac_sls_official_identifier") == 2
+        )
+        assert scalar(connection, "SELECT count(*) FROM ofac_sls_official_fact") == 2
+        assert scalar(connection, "SELECT count(*) FROM ofac_sls_official_vessel") == 2
         assert (
             scalar(
                 connection,
@@ -172,6 +291,16 @@ def main() -> None:
             "('sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', "
             "1, 'application/octet-stream', decode('62', 'hex'), CURRENT_TIMESTAMP)",
         )
+        expect_check_violation(
+            connection,
+            "UPDATE ofac_sls_official_identifier SET normalized_number = 'CORRUPTED'",
+        )
+        expect_check_violation(
+            connection,
+            "INSERT INTO ofac_sls_official_program SELECT snapshot_id, "
+            "snapshot_content_hash, list_kind, entry_uid, 2, 'CORRUPTED' "
+            "FROM ofac_sls_official_program LIMIT 1",
+        )
     print(
         json.dumps(
             {
@@ -182,8 +311,10 @@ def main() -> None:
                 "fsf_entities": 1,
                 "fsf_identifiers": 1,
                 "idempotent_refresh": True,
-                "immutable_guards": 3,
-                "migration": "20260810_0006",
+                "immutable_guards": 5,
+                "migration": "20260810_0007",
+                "ofac_entries": 2,
+                "ofac_snapshots": 2,
                 "status": "PASS",
             },
             sort_keys=True,

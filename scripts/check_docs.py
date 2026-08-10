@@ -49,6 +49,7 @@ REQUIRED = (
     "docs/decisions/0004-phase-1-modular-python-service.md",
     "docs/decisions/0005-pydantic-canonical-contract-source.md",
     "docs/decisions/0006-verified-identity-and-deny-default-authorization.md",
+    "docs/decisions/0008-atomic-four-source-active-bundle.md",
     "docs/delivery/agile-operating-model.md",
     "docs/delivery/phase-1-plan.md",
     "docs/delivery/phase-1-backlog.md",
@@ -63,6 +64,7 @@ REQUIRED = (
     "examples/requests/customer-onboarding.incomplete.json",
     "examples/requests/invalid/transaction-screening.structural-error.json",
     "examples/requests/transaction-screening.json",
+    "examples/requests/official-screening.json",
     "examples/responses/transaction-screening.review-required.json",
     "research/sources.yaml",
 )
