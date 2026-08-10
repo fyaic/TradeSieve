@@ -32,6 +32,24 @@ sources:
     use: Regime orientation and official data entry points
     access: Public web page
 
+  - id: eu-fsf-dataeu
+    title: Consolidated list of persons, groups and entities subject to EU financial sanctions
+    category: official-data
+    authority: European Commission via data.europa.eu
+    jurisdiction: EU
+    url: https://data.europa.eu/data/datasets/consolidated-list-of-persons-groups-and-entities-subject-to-eu-financial-sanctions
+    use: Runtime discovery of the official Consolidated Financial Sanctions File 1.1 XML distribution
+    access: Public official dataset; COM_REUSE (Commission Decision 2011/833/EU); verified 2026-08-10
+
+  - id: eu-dual-use-2025-2003-cellar
+    title: Commission Delegated Regulation (EU) 2025/2003 — Annex I Formex manifestation
+    category: official-law-data
+    authority: Publications Office of the European Union (CELLAR)
+    jurisdiction: EU
+    url: https://publications.europa.eu/resource/cellar/ec080244-c0fa-11f0-a612-01aa75ed71a1.0006.02/DOC_1
+    use: Versioned machine-readable source for the 2025 EU dual-use Annex I control entries
+    access: Public official legal publication; CELEX 32025R2003; verified 2026-08-10
+
   - id: eu-dual-use-regulation-2021-821
     title: Regulation (EU) 2021/821
     category: official-law

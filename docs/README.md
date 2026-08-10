@@ -19,6 +19,7 @@ TradeSieve documentation is decision-oriented: requirements preserve what is nee
 - [Development setup and checks](getting-started/development.md)
 - [Docker reference deployment](getting-started/docker-reference.md)
 - [Synthetic international-logistics CRM demo](getting-started/demo-crm.md)
+- [Official EU source screening CLI technical preview](getting-started/official-screening-cli.md)
 - [Target MVP user experience](getting-started/mvp-user-experience.md)
 - [Draft OpenAPI contract](../api/openapi/tradesieve.v1.json)
 - [Shared JSON Schema registry](../api/schemas/tradesieve.contracts.v1.json)
@@ -49,6 +50,7 @@ TradeSieve documentation is decision-oriented: requirements preserve what is nee
 - [ADR-0004: Phase 1 modular Python service](decisions/0004-phase-1-modular-python-service.md)
 - [ADR-0005: Pydantic canonical contract source](decisions/0005-pydantic-canonical-contract-source.md)
 - [ADR-0006: Verified identity and deny-default authorization](decisions/0006-verified-identity-and-deny-default-authorization.md)
+- [ADR-0007: Official source-specific immutable projections](decisions/0007-official-source-specific-projections.md)
 
 ## Delivery
 

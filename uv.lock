@@ -1138,6 +1138,7 @@ version = "0.1.0.dev0"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
+    { name = "certifi" },
     { name = "fastapi" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic-settings" },
@@ -1160,6 +1161,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "alembic", specifier = "==1.19.0" },
+    { name = "certifi", specifier = "==2026.7.22" },
     { name = "fastapi", specifier = "==0.141.1" },
     { name = "psycopg", extras = ["binary"], specifier = "==3.3.4" },
     { name = "pydantic-settings", specifier = "==2.14.2" },

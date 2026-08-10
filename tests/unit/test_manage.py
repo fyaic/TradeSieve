@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import sys
 from contextlib import nullcontext
@@ -15,6 +16,7 @@ from alembic.config import Config
 
 from tradesieve import manage
 from tradesieve.application.auth import Operation
+from tradesieve.application.official_screening import OfficialScreeningRequest
 from tradesieve.application.source_snapshot_contracts import SourceSnapshotListing
 from tradesieve.config import Settings
 from tradesieve.demo_source_snapshot import DemoSourceActor
@@ -754,3 +756,144 @@ def test_main_routes_demo_submission_options_and_exit(
         manage.main()
     assert exc_info.value.code == 4
     assert called == [("synthetic-key", demo_fixture("changed"))]
+
+
+def official_request_bytes() -> bytes:
+    return json.dumps(
+        {
+            "schema_version": "1.0.0",
+            "party_identifiers": [
+                {"type": "regnumber", "value": "private-value", "country": "US"}
+            ],
+            "goods": {
+                "annex_i_code": "3A001",
+                "classification_verified": True,
+                "technical_specification_available": True,
+            },
+        }
+    ).encode()
+
+
+def test_official_request_reader_accepts_file_and_bounded_stdin(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    request_file = tmp_path / "request.json"
+    request_file.write_bytes(official_request_bytes())
+    from_file = manage._read_official_screening_request(str(request_file))
+    assert isinstance(from_file, OfficialScreeningRequest)
+    assert from_file.goods.annex_i_code == "3A001"
+
+    monkeypatch.setattr(
+        sys, "stdin", SimpleNamespace(buffer=io.BytesIO(official_request_bytes()))
+    )
+    from_stdin = manage._read_official_screening_request("-")
+    assert from_stdin == from_file
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        b"",
+        b"\xff",
+        b"not-json",
+        b'{"schema_version":"1.0.0","schema_version":"1.0.0"}',
+        b"{}",
+        b"x" * (1024 * 1024 + 1),
+    ],
+)
+def test_official_request_reader_rejects_invalid_bounded_stdin(
+    monkeypatch: pytest.MonkeyPatch, content: bytes
+) -> None:
+    monkeypatch.setattr(sys, "stdin", SimpleNamespace(buffer=io.BytesIO(content)))
+    with pytest.raises(ValueError, match="request input"):
+        manage._read_official_screening_request("-")
+
+
+def test_official_request_reader_rejects_missing_file(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="unavailable"):
+        manage._read_official_screening_request(str(tmp_path / "missing.json"))
+
+
+def test_screen_official_command_prints_canonical_result(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    request = OfficialScreeningRequest.model_validate_json(official_request_bytes())
+    calls: list[object] = []
+
+    class FakeResult:
+        def model_dump_json(self) -> str:
+            return '{"automatic_clearance":false,"business_action":"HOLD"}'
+
+    class FakeService:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            assert len(args) == 2
+            assert kwargs["fsf_parser"] is not None
+
+        def screen(self, value: object) -> FakeResult:
+            calls.append(value)
+            return FakeResult()
+
+    monkeypatch.setattr(
+        manage, "_read_official_screening_request", lambda path: request
+    )
+    monkeypatch.setattr(manage, "OfficialScreeningService", FakeService)
+    assert manage.screen_official_command(request_location="request.json") == 0
+    assert calls == [request]
+    assert json.loads(capsys.readouterr().out) == {
+        "automatic_clearance": False,
+        "business_action": "HOLD",
+    }
+
+
+def test_screen_official_command_redacts_input_and_source_failures(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        manage,
+        "_read_official_screening_request",
+        lambda path: (_ for _ in ()).throw(ValueError("private-input")),
+    )
+    assert manage.screen_official_command(request_location="private-path") == 3
+    assert json.loads(capsys.readouterr().out) == {"status": "INVALID_REQUEST"}
+
+    request = OfficialScreeningRequest.model_validate_json(official_request_bytes())
+    monkeypatch.setattr(
+        manage, "_read_official_screening_request", lambda path: request
+    )
+
+    class BrokenService:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        def screen(self, value: object) -> object:
+            raise RuntimeError("private-source")
+
+    monkeypatch.setattr(manage, "OfficialScreeningService", BrokenService)
+    assert manage.screen_official_command(request_location="private-path") == 2
+    output = capsys.readouterr().out
+    assert json.loads(output) == {"status": "OFFICIAL_SOURCE_UNAVAILABLE"}
+    assert "private" not in output
+
+
+def test_main_routes_official_screening_request_and_exit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["tradesieve-manage", "screen-official", "--request", "-"],
+    )
+    monkeypatch.setattr(manage, "get_settings", Settings)
+
+    def route(*, request_location: str) -> int:
+        calls.append(request_location)
+        return 2
+
+    monkeypatch.setattr(manage, "screen_official_command", route)
+    with pytest.raises(SystemExit) as caught:
+        manage.main()
+    assert caught.value.code == 2
+    assert calls == ["-"]

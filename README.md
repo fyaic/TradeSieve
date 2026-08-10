@@ -51,7 +51,7 @@ flowchart LR
 
 ## 项目进度
 
-**当前阶段：Phase 1 MVP 开发中。现在已有可运行的合成受理与基础设施演示，但还没有可供外部系统提交真实 screening 请求的公开接口。**
+**当前阶段：Phase 1 MVP 开发中。现在已有一条直接使用 EU 官方来源的本地 CLI 技术预览；正式 REST/MCP、持久化激活和完整案件闭环仍未完成。**
 
 截至 2026-08-10，进度如下：
 
@@ -65,19 +65,23 @@ flowchart LR
 | 原始来源快照 | ✅ 已完成 | 私有不可变对象、解析/验证证据、双人治理、PostgreSQL 持久化 |
 | 规范化受理与幂等 | ✅ 合成演示可用 | 严格 canonical intake、授权范围幂等、原子审计/outbox、PostgreSQL 18.4 持久化和 demo-only 运行入口；见 [TS-302](https://github.com/fyaic/TradeSieve/issues/21) / [PR #36](https://github.com/fyaic/TradeSieve/pull/36) |
 | 合成物流 CRM 门禁 | ✅ demo-only 可用 | 5 条中国货代风格合成询报价，演示红灯升级、黄灯补件/拦截和绿灯候选的人工确认边界；见 [使用指南](docs/getting-started/demo-crm.md) / [TS-505](https://github.com/fyaic/TradeSieve/issues/37) |
-| 确定性审查与证据 | ⏳ 下一步 | 受治理规则、来源快照和物化事实的确定性评估 |
+| EU 官方制裁名单 | 🧪 CLI 技术预览 | 每次调用从 data.europa.eu 发现并下载当前 EU FSF XML；安全解析、SHA-256 固定、强标识精确匹配与原生定位已可运行；尚未持久化/激活/定时刷新 |
+| EU 两用物项 Annex I | 🧪 CLI 技术预览 | 从 Publications Office CELLAR 读取现行 `32025R2003` Formex 法律附件，解析 384 个控制条目；只核验显式控制号和资料状态，不从 HS 自动归类 |
+| 统一官方来源审查 CLI | 🧪 可运行 | `screen-official` 同时执行主体强标识和 Annex I 审查，返回 `HOLD` / `REQUEST_EVIDENCE` / `MONITOR` 及精确来源证据；不自动放行 |
+| 持久化来源投影与定时更新 | ⏳ 进行中 | 将大体量官方记录写入可查询不可变快照、受控激活/回滚，并避免每次业务调用重新下载 |
+| 完整确定性审查与证据 | ⏳ 进行中 | 名称候选、所有权/控制、俄罗斯 `833/2014` 货物附件、路线/最终用途/catch-all 仍待接入 |
 | 案件/发现项/处置状态 | ⏳ 计划中 | 结构化 finding、evidence、hold 和人工决定 |
 | Screening REST API | ⏳ 计划中 | CRM/OMS 同步拦截与查询；当前 OpenAPI 仍是设计契约，不是已上线接口 |
 | Screening CLI 与 MCP | ⏳ 计划中 | 面向运营/CI 和 Agent 的同契约适配器；当前尚无 MCP Server |
 | Webhook 与可观测性 | ⏳ 计划中 | 签名事件、脱敏日志/指标/链路 |
 
-当前开发分支最近一次完整门禁为 **1,734 个测试通过，10,021 条语句和 2,806 个分支 100% 覆盖**；独立 PostgreSQL 18.4 门禁也已完成迁移、真实事务、双连接竞态、约束、破坏/修复、降级再升级和零残留验证。这些证据证明当前代码边界和回归集，不代表制裁数据覆盖率、法律正确率或生产可用性。
+当前开发分支最近一次完整门禁为 **1,869 个测试通过，11,217 条语句和 3,210 个分支 100% 覆盖**；独立 PostgreSQL 18.4 门禁也已完成迁移、真实事务、双连接竞态、约束、破坏/修复、降级再升级和零残留验证。另有一次 2026-08-10 的真实来源冒烟：EU FSF 生成时间 `2026-08-05T16:47:04.449+02:00`，解析 6,234 个主体、31,053 个别名和 3,007 个有效强标识；官方 Annex I 解析 384 个控制条目。这些证据证明当前代码边界和来源可达性，不代表全球名单覆盖、法律正确率或生产可用性。
 
 详细范围见 [MVP 定义](docs/product/mvp-scope.md)、[Phase 1 计划](docs/delivery/phase-1-plan.md) 和 [敏捷 backlog](docs/delivery/phase-1-backlog.md)。
 
 ## 现在可以怎样使用
 
-目前对外可用的是一个**合成数据、demo-only 的受理生命周期、运维检查面和物流 CRM 演示页**。它可以验证部署、数据库迁移、数据源/规则/快照治理、幂等受理、持久化和失败关闭行为，并用预置合成 finding/result 展示 CRM 拦截效果；不能提交真实客户或交易，CRM 演示也不是实时审查引擎。
+目前有两个严格分开的使用面：合成数据的 demo/治理演示，以及直接访问 EU 官方来源的本地 CLI 技术预览。CRM 页面仍是预置结果，不能把它当作实时审查；`screen-official` 才会真正访问官方来源，但目前不持久化输入/结果，也没有正式身份认证、REST 或 MCP 暴露面。
 
 ### 1. 启动参考环境
 
@@ -100,7 +104,40 @@ curl --fail http://127.0.0.1:8080/health/ready
 
 `/health/live` 只表示 HTTP 进程可响应；`/health/ready` 还会核验数据库迁移、来源清单、私有快照证据和已激活规则包。HTTP `200` 仅表示服务具备运行条件，绝不表示任何交易已获放行。
 
-### 2. 打开合成物流 CRM 演示
+### 2. 运行一次真实 EU 官方来源审查
+
+准备一个本地 JSON 文件；也可以使用 `--request -` 从有界标准输入读取，避免把主体标识写进 shell 历史：
+
+```json
+{
+  "schema_version": "1.0.0",
+  "party_identifiers": [
+    {"type": "regnumber", "value": "待审查登记号", "country": "RU"}
+  ],
+  "goods": {
+    "annex_i_code": "3A001",
+    "classification_verified": true,
+    "technical_specification_available": true
+  }
+}
+```
+
+在本地开发环境执行：
+
+```bash
+uv run tradesieve-manage screen-official --request screening.json
+```
+
+命令会在本次调用中：
+
+1. 经 data.europa.eu 官方元数据发现当前 EU FSF XML 分发并下载原始字节；
+2. 校验大小、URL、媒体类型、XML 结构与内容哈希，对输入强标识做类型保持的精确匹配；
+3. 从 EU Publications Office CELLAR 下载 `32025R2003` 官方 Formex 附件，校验并解析 Annex I 控制条目；
+4. 返回版本、哈希、原生定位、命中/缺失事实和保守业务动作，不回显输入标识。
+
+输入的 `annex_i_code` 必须来自合格的归类过程；TradeSieve 不会从 HS/CN/TARIC 或货描自动推导正式控制号。即使两个来源均无命中，结果也只是 `GREEN_CANDIDATE/MONITOR`，不是法律放行。来源不可用、格式漂移或完整性失败时命令退出 `2`；输入无效时退出 `3`。完整说明见 [官方来源 CLI 技术预览](docs/getting-started/official-screening-cli.md)。
+
+### 3. 打开合成物流 CRM 演示
 
 参考栈就绪后，在浏览器打开：
 
@@ -117,7 +154,7 @@ http://127.0.0.1:8080/demo/crm
 
 页面和接口只在 demo 模式注册，全部名称、登记号、金额、路线和单证均为固定合成 fixture。它使用真实规范输入校验与规范结果模型，但 finding 和处置结果是预置演示数据，不是实时名单或法律规则执行。完整说明见 [合成 CRM 使用指南](docs/getting-started/demo-crm.md)。
 
-### 3. 使用当前运维 CLI
+### 4. 使用当前运维 CLI
 
 ```bash
 # 总体就绪度与有限检查项
@@ -139,7 +176,7 @@ docker compose run --rm --no-deps app \
 
 这些命令只返回经过裁剪的运维安全字段，不导出原始来源字节、客户数据、凭据或私有规则文本。
 
-### 4. 演示一次可重放的合成受理
+### 5. 演示一次可重放的合成受理
 
 以下入口只使用仓库内置合成交易，不读取文件、标准输入或真实业务数据。先提交一个固定合成请求：
 
@@ -161,7 +198,7 @@ docker compose run --rm --no-deps app \
 
 这是用于架构评估、CI 和接入方理解受理语义的 operations demo，不是接收任意输入的正式 screening CLI。它只证明“请求被安全、可审计地受理”，不代表已经执行制裁/两用物项判断，更不代表可以放行。
 
-### 5. 停止并清理 demo
+### 6. 停止并清理 demo
 
 ```bash
 docker compose down --volumes --remove-orphans
@@ -175,20 +212,20 @@ docker compose down --volumes --remove-orphans
 
 | 使用者 | 现在可做什么 | 现在不能做什么 |
 | --- | --- | --- |
-| 架构/安全评估者 | 启动 Compose；检查健康、治理、幂等受理、重放/冲突、CRM 门禁和失败关闭行为 | 不能提交真实客户、货物或交易 |
-| 开发者 | 运行完整测试与合成收据生命周期；审查领域模型、OpenAPI/JSON Schema、CRM demo adapter 和合成示例 | 不应把 demo 命令、demo API 或草案 OpenAPI 当作正式在线 API |
-| CRM/OMS 团队 | 在浏览器观察字段映射、红黄绿候选状态、补件和外部引用；用合成命令验证幂等语义；依据 [集成设计](docs/architecture/integration-design.md) 准备拦截点 | 尚不能向正式 screening endpoint 提交任意业务请求或接收 webhook |
+| 架构/安全评估者 | 启动 Compose；检查治理、幂等、CRM 门禁；在隔离测试数据上运行真实官方来源 CLI | 不能把 CLI 技术预览当作生产服务或法律清关工具 |
+| 开发者 | 运行完整测试和官方连接器；审查哈希、定位、精确匹配与 Annex I 证据 | 不应把 demo API、CLI 技术预览或草案 OpenAPI 当作已上线 REST API |
+| CRM/OMS 团队 | 用 CLI 请求格式验证真实来源结果语义；依据 [集成设计](docs/architecture/integration-design.md) 准备拦截点 | 尚不能调用正式 screening REST endpoint、接收 webhook 或依赖持久结果 |
 | AI/Agent 团队 | 审查 [Agent 接口原则](docs/architecture/agent-interface-principles.md) 和共享 Schema | 尚不能连接 MCP Server |
 | 合规人员 | 审查产品范围、证据模型、规则治理和人工放行边界 | 尚没有完整案件复核工作台 |
 
-当前正式 HTTP 操作清单只实现：
+当前 HTTP 操作清单只实现：
 
 ```text
 GET /health/live
 GET /health/ready
 ```
 
-demo 模式另注册隐藏于 OpenAPI 的 `/demo/crm` 及固定 fixture API。它们不接收任意交易输入，也不会在 production 模式存在。
+demo 模式另注册隐藏于 OpenAPI 的 `/demo/crm` 及固定 fixture API。真实官方来源能力目前仅通过本地 `screen-official` CLI 暴露；它不经过 HTTP，也不会把结果写入当前 demo 数据库。
 
 仓库中的 [OpenAPI](api/openapi/tradesieve.v1.json)、[JSON Schema](api/schemas/tradesieve.contracts.v1.json) 和 `examples/` 是用于设计、评审和生成测试的版本化契约，尚不等于已实现的路由。
 

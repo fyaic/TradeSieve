@@ -193,6 +193,8 @@ Parsing and activation are separate. A connector can successfully retrieve and p
 
 Phase 1 begins with deterministic normalization, exact identifiers, and a matcher adapter. PostgreSQL `pg_trgm` can support an explainable baseline and candidate retrieval; yente/Watchman/Splink remain benchmark candidates rather than embedded legal authorities.
 
+The first live official-source slice is intentionally narrower: EU FSF strong typed identifiers are normalized only for formatting and queried exactly; aliases remain candidate evidence and cannot create an exact match. The current EU Annex I Formex projection supports exact reviewed control-code lookup and missing-fact detection, but does not infer legal classification from HS/CN/TARIC or free text. See [ADR-0007](../decisions/0007-official-source-specific-projections.md).
+
 The matcher returns candidate evidence:
 
 - candidate entity/snapshot record;

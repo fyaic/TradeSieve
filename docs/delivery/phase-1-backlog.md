@@ -18,7 +18,7 @@
 | --- | --- | --- | --- | --- |
 | [TS-201](https://github.com/fyaic/TradeSieve/issues/19) Runtime source registry | S1 | Source operator knows scope/owner/licence/freshness | Governance fields required; read API/CLI redacts credentials | TS-101/103 |
 | [TS-202](https://github.com/fyaic/TradeSieve/issues/20) Immutable snapshot lifecycle | S1/S2 | Operator can retrieve/quarantine/hash/validate/diff/activate/rollback | Durable synthetic lifecycle/rollback, private bytes, safe canonical DTOs, and corruption refusal; no REST/MCP/raw export | TS-201/104 |
-| [TS-203](https://github.com/fyaic/TradeSieve/issues/3) EU source connector proof | S2 | Team proves EU data lifecycle | Approved official endpoint, raw/hash/parser/diff/locator, access/licence record | TS-202 |
+| [TS-203](https://github.com/fyaic/TradeSieve/issues/3) EU source connector proof | S1/S2 | Team proves real EU data lifecycle | Live FSF discovery/retrieval/parser/exact evidence and Annex I CELLAR parser are implemented in-memory; durable projection, activation/diff/rollback and scheduled probe remain | TS-202 |
 | [TS-204](https://github.com/fyaic/TradeSieve/issues/4) OFAC SLS connector proof | S2 | Team proves delta-capable source lifecycle | Snapshot/delta, stable IDs, program fields, history boundary documented | TS-202 |
 | [TS-205](https://github.com/fyaic/TradeSieve/issues/27) Versioned rule bundle | S1/S2 | Result identifies cited rule/policy version | Source/scope/effective/owner/tests/activation/rollback stored | Issue #2, TS-202 |
 | TS-206 Impact analysis and rescreen jobs | S2 | Relevant open cases update after source/rule change | Test delta queues linked cases, produces events, invalidates affected decision only | TS-202/205/402 |
@@ -29,7 +29,7 @@
 | --- | --- | --- | --- | --- |
 | [TS-301](https://github.com/fyaic/TradeSieve/issues/7) Canonical request/result schemas | S1 | Integrator has one stable typed contract | OpenAPI plus examples cover action/parties/goods/route/end-use/payment/evidence/version/result | Issue #7 |
 | [TS-302](https://github.com/fyaic/TradeSieve/issues/21) Intake, canonical hash, and idempotency | S1 | Caller can retry safely | Same key/body returns same IDs; key/body conflict typed; original input preserved | TS-301/104 |
-| [TS-303](https://github.com/fyaic/TradeSieve/issues/22) Deterministic completeness and exact-identifier controls | S1 | User receives exact missing facts and strong-ID findings | Golden/incomplete/negative fixtures pass; missing facts never default green | TS-301/205 |
+| [TS-303](https://github.com/fyaic/TradeSieve/issues/22) Deterministic completeness and exact-identifier controls | S1 | User receives exact missing facts and strong-ID findings | Live EU FSF strong-ID and Annex I explicit-code technical preview works; canonical persisted screening/finding orchestration remains | TS-301/205 |
 | [TS-304](https://github.com/fyaic/TradeSieve/issues/5) Multilingual synthetic fixture set | S1/S2 | Matcher selection has an approved test basis | Chinese/Cyrillic/Latin, aliases, identifiers, weak/ambiguous negatives, ownership | Issue #5 |
 | [TS-305](https://github.com/fyaic/TradeSieve/issues/6) Matcher adapter and benchmark | S2 | Reviewer receives explainable candidates | Exact/pg_trgm/yente/Watchman/Splink candidates compared; active threshold/version approved | Issue #6, TS-304 |
 | TS-306 Goods/route/end-use/payment consistency controls | S2 | User sees non-party risk and required evidence | Golden case produces named facts/conflicts; HS/category never definitive | Issues #1/#2, TS-301/205 |
