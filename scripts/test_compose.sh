@@ -11,6 +11,7 @@ fresh_host_port="${TS202_D2B_FRESH_HOST_PORT:-18081}"
 pull_timeout_seconds="${TS102_PULL_TIMEOUT_SECONDS:-600}"
 build_timeout_seconds="${TS102_BUILD_TIMEOUT_SECONDS:-600}"
 production_probe_database_url="postgresql://service:strong_password@postgres:5432/tradesieve" # pragma: allowlist secret
+production_probe_official_token_sha256="sha256:1111111111111111111111111111111111111111111111111111111111111111"
 compose=(docker compose --env-file .env.example -p "$compose_project")
 fresh_compose=(docker compose --env-file .env.example -p "$fresh_project")
 
@@ -822,7 +823,7 @@ demo_crm_page="$(curl --fail --silent --show-error \
   "http://127.0.0.1:${host_port}/demo/crm")"
 if [[ "$demo_crm_page" != *"华舟国际货运"* \
   || "$demo_crm_page" != *"TradeSieve"* \
-  || "$demo_crm_page" != *"纯合成演示"* ]]; then
+  || "$demo_crm_page" != *"合成交易 / 真实官方来源"* ]]; then
   echo "demo CRM page is incomplete" >&2
   exit 1
 fi
@@ -1164,6 +1165,7 @@ if production_rule_output="$(
   TRADESIEVE_DEPLOYMENT_ID=production-1 \
   TRADESIEVE_REQUIRED_SOURCE_SET=approved-sources-v1 \
   TRADESIEVE_REQUIRED_RULE_SET=approved-rules-v1 \
+  TRADESIEVE_OFFICIAL_API_TOKEN_SHA256="$production_probe_official_token_sha256" \
   "${compose[@]}" run --rm --no-deps app \
   python -m tradesieve.manage list-rules
 )"; then
@@ -1187,6 +1189,7 @@ if production_snapshot_output="$(
   TRADESIEVE_DEPLOYMENT_ID=production-1 \
   TRADESIEVE_REQUIRED_SOURCE_SET=approved-sources-v1 \
   TRADESIEVE_REQUIRED_RULE_SET=approved-rules-v1 \
+  TRADESIEVE_OFFICIAL_API_TOKEN_SHA256="$production_probe_official_token_sha256" \
   "${compose[@]}" run --rm --no-deps app \
   python -m tradesieve.manage list-source-snapshots
 )"; then
@@ -1210,6 +1213,7 @@ if production_screening_output="$(
   TRADESIEVE_DEPLOYMENT_ID=production-1 \
   TRADESIEVE_REQUIRED_SOURCE_SET=approved-sources-v1 \
   TRADESIEVE_REQUIRED_RULE_SET=approved-rules-v1 \
+  TRADESIEVE_OFFICIAL_API_TOKEN_SHA256="$production_probe_official_token_sha256" \
   "${compose[@]}" run --rm --no-deps app \
   tradesieve-manage submit-demo-screening \
   --idempotency-key synthetic-production-probe --fixture baseline
