@@ -27,6 +27,37 @@ REQUEST = {
         "annex_i_code": "3A001",
         "classification_verified": True,
         "technical_specification_available": True,
+        "product_family": "ELECTROCHEMICAL_CELL",
+        "technical_facts": [
+            {
+                "fact_id": "is_battery",
+                "unit": "BOOLEAN",
+                "boolean_value": False,
+                "evidence_ref": "datasheet-1",
+                "verified": True,
+            },
+            {
+                "fact_id": "cell_type",
+                "unit": "CELL_TYPE",
+                "text_value": "SECONDARY",
+                "evidence_ref": "datasheet-1",
+                "verified": True,
+            },
+            {
+                "fact_id": "energy_density_wh_per_kg",
+                "unit": "WH_PER_KG",
+                "numeric_value": "380",
+                "evidence_ref": "datasheet-1",
+                "verified": True,
+            },
+            {
+                "fact_id": "measurement_temperature_celsius",
+                "unit": "CELSIUS",
+                "numeric_value": "20",
+                "evidence_ref": "datasheet-1",
+                "verified": True,
+            },
+        ],
     },
 }
 
@@ -168,6 +199,8 @@ def test_authenticated_route_uses_one_active_repository_and_documents_security(
     assert response.json()["source_bundle_id"].startswith("official-bundle-")
     assert len(Service.requests) == 1
     assert Service.requests[0].goods.annex_i_code == "3A001"
+    assert Service.requests[0].goods.product_family == "ELECTROCHEMICAL_CELL"
+    assert len(Service.requests[0].goods.technical_facts) == 4
     assert connection.closed is True
 
     schema = send(app, "GET", "/openapi.json").json()

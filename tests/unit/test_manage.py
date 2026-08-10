@@ -772,6 +772,30 @@ def official_request_bytes() -> bytes:
                 "annex_i_code": "3A001",
                 "classification_verified": True,
                 "technical_specification_available": True,
+                "product_family": "ADC_INTEGRATED_CIRCUIT",
+                "technical_facts": [
+                    {
+                        "fact_id": "resolution_bits",
+                        "unit": "BITS",
+                        "numeric_value": "12",
+                        "evidence_ref": "datasheet-1",
+                        "verified": True,
+                    },
+                    {
+                        "fact_id": "sample_rate_msps",
+                        "unit": "MSPS",
+                        "numeric_value": "401",
+                        "evidence_ref": "datasheet-1",
+                        "verified": True,
+                    },
+                    {
+                        "fact_id": "stores_or_processes_digitised_data",
+                        "unit": "BOOLEAN",
+                        "boolean_value": False,
+                        "evidence_ref": "datasheet-1",
+                        "verified": True,
+                    },
+                ],
             },
         }
     ).encode()
@@ -785,6 +809,7 @@ def test_official_request_reader_accepts_file_and_bounded_stdin(
     from_file = manage._read_official_screening_request(str(request_file))
     assert isinstance(from_file, OfficialScreeningRequest)
     assert from_file.goods.annex_i_code == "3A001"
+    assert from_file.goods.product_family == "ADC_INTEGRATED_CIRCUIT"
 
     monkeypatch.setattr(
         sys, "stdin", SimpleNamespace(buffer=io.BytesIO(official_request_bytes()))

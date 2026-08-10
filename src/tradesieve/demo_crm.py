@@ -41,12 +41,19 @@ from tradesieve.application.official_screening import (
     OfficialPartyName,
     OfficialScreeningRequest,
     OfficialScreeningResult,
+    OfficialTechnicalFact,
 )
 from tradesieve.application.screening_intake import (
     JSON_MEDIA_TYPE,
     CanonicalScreeningIntake,
 )
 from tradesieve.config import Settings
+from tradesieve.domain.eu_dual_use_technical import (
+    TechnicalCellType,
+    TechnicalFactId,
+    TechnicalFactUnit,
+    TechnicalProductFamily,
+)
 
 _CREATED_AT = datetime(2026, 8, 10, 1, 30, tzinfo=UTC)
 _HASH_ZERO = "sha256:" + "0" * 64
@@ -673,13 +680,14 @@ def _make_scenarios() -> dict[str, _Scenario]:
         origin="深圳",
         destination="法兰克福",
         route_summary="深圳宝安 - 香港 - 法兰克福",
-        goods_summary="锂离子电池模组，UN3480 候选",
-        shipment_summary="12 箱，386 kg，1.8 m³",
+        goods_summary="高能量密度锂离子二次电芯（非电池包）",
+        shipment_summary="12 箱，386 kg，1.8 m³；电芯单体运输",
         amount="42,780.00",
         currency="EUR",
         action_due_at="明天 12:00 前",
         documents=[
             ("商业发票", "AVAILABLE"),
+            ("制造商技术规格书", "AVAILABLE"),
             ("MSDS", "MISSING"),
             ("UN38.3 测试概要", "MISSING"),
             ("航空运输鉴定书", "PENDING"),
@@ -697,11 +705,30 @@ def _make_scenarios() -> dict[str, _Scenario]:
         bank_country="DE",
         goods={
             "line_ref": "line-1",
-            "description": "Lithium-ion battery modules, UN3480 candidate",
+            "description": (
+                "High-energy-density lithium-ion secondary cells; not assembled "
+                "batteries"
+            ),
             "manufacturer": "东莞恒芯能源（演示）有限公司",
             "model_or_part_number": "HX-4820-SYNTHETIC",
+            "technical_specification": (
+                "Synthetic reviewed manufacturer sheet: secondary cell; 380 Wh/kg "
+                "at 20 C; not a battery assembly."
+            ),
+            "classification_candidates": [
+                {
+                    "candidate_ref": "annex-i-1",
+                    "scheme": "EU_DUAL_USE_ANNEX_I",
+                    "code": "3A001",
+                    "candidate_only": True,
+                    "rationale": (
+                        "Synthetic qualified candidate for deterministic 3A001.e.1 "
+                        "technical-assertion acceptance."
+                    ),
+                }
+            ],
             "quantity": "120",
-            "quantity_unit": "modules",
+            "quantity_unit": "cells",
             "total_value": "42780.00",
             "currency": "EUR",
             "origin_country": "CN",
@@ -721,7 +748,7 @@ def _make_scenarios() -> dict[str, _Scenario]:
         documents=documents,
         amount="42780.00",
         currency="EUR",
-        purpose="Synthetic payment for lithium-ion battery modules.",
+        purpose="Synthetic payment for high-energy-density lithium-ion cells.",
     )
     scenarios.append(
         (
@@ -1199,17 +1226,60 @@ def official_request_for_demo_crm_record(
         scenario.request.goods
         and all(line.technical_specification for line in scenario.request.goods)
     )
+    if record_id == "crm-quote-260810-0039":
+        goods = OfficialGoodsCandidate(
+            annex_i_code=annex_code,
+            classification_verified=True,
+            technical_specification_available=True,
+            product_family=TechnicalProductFamily.ELECTROCHEMICAL_CELL,
+            technical_facts=[
+                OfficialTechnicalFact(
+                    fact_id=TechnicalFactId.IS_BATTERY,
+                    unit=TechnicalFactUnit.BOOLEAN,
+                    boolean_value=False,
+                    evidence_ref="manufacturer-datasheet-hx-4820",
+                    verified=True,
+                ),
+                OfficialTechnicalFact(
+                    fact_id=TechnicalFactId.CELL_TYPE,
+                    unit=TechnicalFactUnit.CELL_TYPE,
+                    text_value=TechnicalCellType.SECONDARY,
+                    evidence_ref="manufacturer-datasheet-hx-4820",
+                    verified=True,
+                ),
+                OfficialTechnicalFact.model_validate(
+                    {
+                        "fact_id": "energy_density_wh_per_kg",
+                        "unit": "WH_PER_KG",
+                        "numeric_value": "380",
+                        "evidence_ref": "manufacturer-datasheet-hx-4820",
+                        "verified": True,
+                    }
+                ),
+                OfficialTechnicalFact.model_validate(
+                    {
+                        "fact_id": "measurement_temperature_celsius",
+                        "unit": "CELSIUS",
+                        "numeric_value": "20",
+                        "evidence_ref": "manufacturer-datasheet-hx-4820",
+                        "verified": True,
+                    }
+                ),
+            ],
+        )
+    else:
+        goods = OfficialGoodsCandidate(
+            annex_i_code=annex_code,
+            classification_verified=False,
+            technical_specification_available=technical_specification_available,
+        )
     return OfficialScreeningRequest(
         party_names=[
             OfficialPartyName(name=party.legal_name)
             for party in scenario.request.parties
             if party.legal_name is not None
         ],
-        goods=OfficialGoodsCandidate(
-            annex_i_code=annex_code,
-            classification_verified=False,
-            technical_specification_available=technical_specification_available,
-        ),
+        goods=goods,
     )
 
 

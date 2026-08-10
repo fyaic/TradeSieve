@@ -51,6 +51,7 @@ TradeSieve documentation is decision-oriented: requirements preserve what is nee
 - [ADR-0005: Pydantic canonical contract source](decisions/0005-pydantic-canonical-contract-source.md)
 - [ADR-0006: Verified identity and deny-default authorization](decisions/0006-verified-identity-and-deny-default-authorization.md)
 - [ADR-0007: Official source-specific immutable projections](decisions/0007-official-source-specific-projections.md)
+- [ADR-0008: Source-bound technical assertions](decisions/0008-source-bound-technical-assertions.md)
 
 ## Delivery
 
