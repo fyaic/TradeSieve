@@ -136,6 +136,13 @@ class EuFsfExactMatchStatus(StrEnum):
     REVIEW_REQUIRED = "REVIEW_REQUIRED"
 
 
+class EuFsfNameCandidateStatus(StrEnum):
+    NO_CANDIDATE = "NO_CANDIDATE"
+    CANDIDATE = "CANDIDATE"
+    AMBIGUOUS = "AMBIGUOUS"
+    REVIEW_REQUIRED = "REVIEW_REQUIRED"
+
+
 @dataclass(frozen=True, slots=True)
 class EuFsfRegulation:
     programme: str
@@ -219,6 +226,10 @@ class EuFsfAlias:
             "strong": self.strong,
             "whole_name": self.whole_name,
         }
+
+    @property
+    def assertion_hash(self) -> str:
+        return _sha256(self.canonical_content())
 
 
 @dataclass(frozen=True, slots=True)
@@ -581,3 +592,112 @@ class EuFsfExactIndex:
             else:
                 status = EuFsfExactMatchStatus.AMBIGUOUS
         return EuFsfExactMatch(status=status, query=query, evidence=evidence)
+
+
+@dataclass(frozen=True, slots=True)
+class EuFsfNameQuery:
+    name: str
+
+    def __post_init__(self) -> None:
+        _require_bounded(self.name, "query name", MAX_EU_FSF_STRING_BYTES)
+
+    @property
+    def normalized_name(self) -> str:
+        return normalize_eu_fsf_name(self.name)
+
+
+@dataclass(frozen=True, slots=True)
+class EuFsfNameEvidence:
+    snapshot_id: str
+    snapshot_content_hash: str
+    entity_logical_id: str
+    eu_reference_number: str
+    subject_type: EuFsfSubjectType
+    alias: EuFsfAlias
+
+    def __post_init__(self) -> None:
+        if not self.snapshot_id.startswith("eu-fsf-"):
+            raise ValueError("name evidence snapshot_id is invalid")
+        if CONTENT_HASH.fullmatch(self.snapshot_content_hash) is None:
+            raise ValueError("name evidence snapshot hash is invalid")
+        if SAFE_LOGICAL_ID.fullmatch(self.entity_logical_id) is None:
+            raise ValueError("name evidence entity identity is invalid")
+        if SAFE_REFERENCE.fullmatch(self.eu_reference_number) is None:
+            raise ValueError("name evidence EU reference is invalid")
+        if not isinstance(self.subject_type, EuFsfSubjectType):
+            raise ValueError("name evidence subject_type must be typed")
+        if not isinstance(self.alias, EuFsfAlias):
+            raise ValueError("name evidence alias must be typed")
+
+
+@dataclass(frozen=True, slots=True)
+class EuFsfNameCandidates:
+    status: EuFsfNameCandidateStatus
+    query: EuFsfNameQuery
+    evidence: tuple[EuFsfNameEvidence, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.status, EuFsfNameCandidateStatus):
+            raise ValueError("name candidate status must be typed")
+        if not isinstance(self.query, EuFsfNameQuery):
+            raise ValueError("name query must be typed")
+        if not isinstance(self.evidence, tuple) or any(
+            not isinstance(item, EuFsfNameEvidence) for item in self.evidence
+        ):
+            raise ValueError("name candidate evidence must be a typed tuple")
+        if (self.status is EuFsfNameCandidateStatus.NO_CANDIDATE) != (
+            len(self.evidence) == 0
+        ):
+            raise ValueError("NO_CANDIDATE must correspond to empty evidence")
+
+
+class EuFsfNameIndex:
+    """Exact normalized-alias candidate index; it never produces legal clearance."""
+
+    def __init__(self, snapshot: EuFsfSnapshot) -> None:
+        if not isinstance(snapshot, EuFsfSnapshot):
+            raise ValueError("name index requires a typed snapshot")
+        self._snapshot = snapshot
+        index: dict[str, list[tuple[EuFsfEntity, EuFsfAlias]]] = {}
+        for entity in snapshot.entities:
+            for alias in entity.aliases:
+                index.setdefault(alias.normalized_name, []).append((entity, alias))
+        self._index = MappingProxyType(
+            {
+                key: tuple(
+                    sorted(
+                        value,
+                        key=lambda item: (
+                            int(item[0].logical_id),
+                            int(item[1].logical_id),
+                        ),
+                    )
+                )
+                for key, value in index.items()
+            }
+        )
+
+    def query(self, query: EuFsfNameQuery) -> EuFsfNameCandidates:
+        if not isinstance(query, EuFsfNameQuery):
+            raise ValueError("name query must be typed")
+        pairs = self._index.get(query.normalized_name, ())
+        evidence = tuple(
+            EuFsfNameEvidence(
+                snapshot_id=self._snapshot.snapshot_id,
+                snapshot_content_hash=self._snapshot.content_hash,
+                entity_logical_id=entity.logical_id,
+                eu_reference_number=entity.eu_reference_number,
+                subject_type=entity.subject_type,
+                alias=alias,
+            )
+            for entity, alias in pairs
+        )
+        if not evidence:
+            status = EuFsfNameCandidateStatus.NO_CANDIDATE
+        elif not any(item.alias.strong for item in evidence):
+            status = EuFsfNameCandidateStatus.REVIEW_REQUIRED
+        elif len({item.entity_logical_id for item in evidence}) == 1:
+            status = EuFsfNameCandidateStatus.CANDIDATE
+        else:
+            status = EuFsfNameCandidateStatus.AMBIGUOUS
+        return EuFsfNameCandidates(status=status, query=query, evidence=evidence)

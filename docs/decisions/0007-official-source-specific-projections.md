@@ -24,5 +24,5 @@ The first useful product slice must prove that official bytes—not synthetic fi
 - The source boundary is more code than a generic blob parser, but schema drift, URL policy, licensing, identifiers, and legal versions become explicit and independently testable.
 - PostgreSQL migrations and probes are required for row-level official projections and active-version selection.
 - Daily FSF retrieval can discover the current distribution; annual/ad hoc legal-list amendments require a monitored CELEX update workflow.
-- Full party screening still requires explainable name candidates and ownership/control. Full goods screening still requires technical-rule assertions, catch-all/end-use/destination controls, and Russia-specific annexes.
+- The first party-screening slice includes explainable exact normalized-alias candidates. Full party screening still requires fuzzy/transliterated entity resolution and ownership/control. Full goods screening still requires technical-rule assertions, catch-all/end-use/destination controls, and Russia-specific annexes.
 - No source or matcher response can bypass ADR-0002 human-only clearance.

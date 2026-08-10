@@ -65,17 +65,17 @@ flowchart LR
 | 原始来源快照 | ✅ 已完成 | 私有不可变对象、解析/验证证据、双人治理、PostgreSQL 持久化 |
 | 规范化受理与幂等 | ✅ 合成演示可用 | 严格 canonical intake、授权范围幂等、原子审计/outbox、PostgreSQL 18.4 持久化和 demo-only 运行入口；见 [TS-302](https://github.com/fyaic/TradeSieve/issues/21) / [PR #36](https://github.com/fyaic/TradeSieve/pull/36) |
 | 合成物流 CRM 门禁 | ✅ demo-only 可用 | 5 条中国货代风格合成询报价，演示红灯升级、黄灯补件/拦截和绿灯候选的人工确认边界；见 [使用指南](docs/getting-started/demo-crm.md) / [TS-505](https://github.com/fyaic/TradeSieve/issues/37) |
-| EU 官方制裁名单 | 🧪 CLI 技术预览 | 每次调用从 data.europa.eu 发现并下载当前 EU FSF XML；安全解析、SHA-256 固定、强标识精确匹配与原生定位已可运行；尚未持久化/激活/定时刷新 |
+| EU 官方制裁名单 | 🧪 CLI 技术预览 | 每次调用从 data.europa.eu 发现并下载当前 EU FSF XML；安全解析、SHA-256 固定、强标识精确匹配、官方别名精确规范化候选与原生定位已可运行；尚无模糊/音译/所有权匹配，也未持久化/激活/定时刷新 |
 | EU 两用物项 Annex I | 🧪 CLI 技术预览 | 从 Publications Office CELLAR 读取现行 `32025R2003` Formex 法律附件，解析 384 个控制条目；只核验显式控制号和资料状态，不从 HS 自动归类 |
 | 统一官方来源审查 CLI | 🧪 可运行 | `screen-official` 同时执行主体强标识和 Annex I 审查，返回 `HOLD` / `REQUEST_EVIDENCE` / `MONITOR` 及精确来源证据；不自动放行 |
 | 持久化来源投影与定时更新 | ⏳ 进行中 | 将大体量官方记录写入可查询不可变快照、受控激活/回滚，并避免每次业务调用重新下载 |
-| 完整确定性审查与证据 | ⏳ 进行中 | 名称候选、所有权/控制、俄罗斯 `833/2014` 货物附件、路线/最终用途/catch-all 仍待接入 |
+| 完整确定性审查与证据 | ⏳ 进行中 | 官方别名精确规范化候选已接入；模糊/音译实体解析、所有权/控制、俄罗斯 `833/2014` 货物附件、路线/最终用途/catch-all 仍待接入 |
 | 案件/发现项/处置状态 | ⏳ 计划中 | 结构化 finding、evidence、hold 和人工决定 |
 | Screening REST API | ⏳ 计划中 | CRM/OMS 同步拦截与查询；当前 OpenAPI 仍是设计契约，不是已上线接口 |
 | Screening CLI 与 MCP | ⏳ 计划中 | 面向运营/CI 和 Agent 的同契约适配器；当前尚无 MCP Server |
 | Webhook 与可观测性 | ⏳ 计划中 | 签名事件、脱敏日志/指标/链路 |
 
-当前开发分支最近一次完整门禁为 **1,869 个测试通过，11,217 条语句和 3,210 个分支 100% 覆盖**；独立 PostgreSQL 18.4 门禁也已完成迁移、真实事务、双连接竞态、约束、破坏/修复、降级再升级和零残留验证。另有一次 2026-08-10 的真实来源冒烟：EU FSF 生成时间 `2026-08-05T16:47:04.449+02:00`，解析 6,234 个主体、31,053 个别名和 3,007 个有效强标识；官方 Annex I 解析 384 个控制条目。这些证据证明当前代码边界和来源可达性，不代表全球名单覆盖、法律正确率或生产可用性。
+当前开发分支最近一次完整门禁为 **1,872 个测试通过，11,317 条语句和 3,246 个分支 100% 覆盖**；独立 PostgreSQL 18.4 门禁也已完成迁移、真实事务、双连接竞态、约束、破坏/修复、降级再升级和零残留验证。另有一次 2026-08-10 的真实来源冒烟：EU FSF 生成时间 `2026-08-05T16:47:04.449+02:00`，解析 6,234 个主体、31,053 个别名和 3,007 个有效强标识；官方 Annex I 解析 384 个控制条目。这些证据证明当前代码边界和来源可达性，不代表全球名单覆盖、法律正确率或生产可用性。
 
 详细范围见 [MVP 定义](docs/product/mvp-scope.md)、[Phase 1 计划](docs/delivery/phase-1-plan.md) 和 [敏捷 backlog](docs/delivery/phase-1-backlog.md)。
 
@@ -114,6 +114,9 @@ curl --fail http://127.0.0.1:8080/health/ready
   "party_identifiers": [
     {"type": "regnumber", "value": "待审查登记号", "country": "RU"}
   ],
+  "party_names": [
+    {"name": "待审查客户、承运人或最终用户名称"}
+  ],
   "goods": {
     "annex_i_code": "3A001",
     "classification_verified": true,
@@ -131,11 +134,11 @@ uv run tradesieve-manage screen-official --request screening.json
 命令会在本次调用中：
 
 1. 经 data.europa.eu 官方元数据发现当前 EU FSF XML 分发并下载原始字节；
-2. 校验大小、URL、媒体类型、XML 结构与内容哈希，对输入强标识做类型保持的精确匹配；
+2. 校验大小、URL、媒体类型、XML 结构与内容哈希，对输入强标识做类型保持的精确匹配，并对名称做 Unicode 规范化后的官方别名精确候选检索；
 3. 从 EU Publications Office CELLAR 下载 `32025R2003` 官方 Formex 附件，校验并解析 Annex I 控制条目；
 4. 返回版本、哈希、原生定位、命中/缺失事实和保守业务动作，不回显输入标识。
 
-输入的 `annex_i_code` 必须来自合格的归类过程；TradeSieve 不会从 HS/CN/TARIC 或货描自动推导正式控制号。即使两个来源均无命中，结果也只是 `GREEN_CANDIDATE/MONITOR`，不是法律放行。来源不可用、格式漂移或完整性失败时命令退出 `2`；输入无效时退出 `3`。完整说明见 [官方来源 CLI 技术预览](docs/getting-started/official-screening-cli.md)。
+名称候选不是精确身份结论：任一候选都会返回 `RED/HOLD` 等待授权人员复核；当前尚不支持模糊相似、音译、词序变体或所有权/控制传播。输入的 `annex_i_code` 必须来自合格的归类过程；TradeSieve 不会从 HS/CN/TARIC 或货描自动推导正式控制号。即使两个来源均无命中，结果也只是 `GREEN_CANDIDATE/MONITOR`，不是法律放行。来源不可用、格式漂移或完整性失败时命令退出 `2`；输入无效时退出 `3`。完整说明见 [官方来源 CLI 技术预览](docs/getting-started/official-screening-cli.md)。
 
 ### 3. 打开合成物流 CRM 演示
 

@@ -25,6 +25,9 @@ from tradesieve.domain.eu_fsf import (
     EuFsfExactIndex,
     EuFsfExactMatchStatus,
     EuFsfExactQuery,
+    EuFsfNameCandidateStatus,
+    EuFsfNameIndex,
+    EuFsfNameQuery,
     EuFsfSnapshot,
 )
 
@@ -63,6 +66,15 @@ class OfficialPartyIdentifier(ContractModel):
         return self
 
 
+class OfficialPartyName(ContractModel):
+    name: str
+
+    @model_validator(mode="after")
+    def validate_name(self) -> OfficialPartyName:
+        EuFsfNameQuery(self.name)
+        return self
+
+
 class OfficialGoodsCandidate(ContractModel):
     annex_i_code: str | None = None
     classification_verified: bool = False
@@ -78,9 +90,18 @@ class OfficialGoodsCandidate(ContractModel):
 class OfficialScreeningRequest(ContractModel):
     schema_version: Literal["1.0.0"] = "1.0.0"
     party_identifiers: Annotated[
-        list[OfficialPartyIdentifier], Field(min_length=1, max_length=64)
-    ]
+        list[OfficialPartyIdentifier], Field(max_length=64)
+    ] = Field(default_factory=list)
+    party_names: Annotated[list[OfficialPartyName], Field(max_length=64)] = Field(
+        default_factory=list
+    )
     goods: OfficialGoodsCandidate
+
+    @model_validator(mode="after")
+    def require_party_search_fact(self) -> OfficialScreeningRequest:
+        if not self.party_identifiers and not self.party_names:
+            raise ValueError("at least one party identifier or name is required")
+        return self
 
 
 class OfficialSanctionsEvidence(ContractModel):
@@ -94,6 +115,15 @@ class OfficialSanctionsEvidence(ContractModel):
     usable_for_exact_match: bool
 
 
+class OfficialSanctionsNameEvidence(ContractModel):
+    eu_reference_number: str
+    entity_logical_id: str
+    subject_type: str
+    alias_assertion_hash: str
+    source_native_locator: str
+    strong_alias: bool
+
+
 class OfficialSanctionsResult(ContractModel):
     source: Literal["EU_CONSOLIDATED_FINANCIAL_SANCTIONS_FILE"] = (
         "EU_CONSOLIDATED_FINANCIAL_SANCTIONS_FILE"
@@ -104,9 +134,12 @@ class OfficialSanctionsResult(ContractModel):
     source_snapshot_content_hash: str
     source_raw_content_hash: str
     source_retrieved_at: str
-    query_count: int
-    statuses: list[str]
-    evidence: list[OfficialSanctionsEvidence]
+    identifier_query_count: int
+    identifier_statuses: list[str]
+    identifier_evidence: list[OfficialSanctionsEvidence]
+    name_query_count: int
+    name_statuses: list[str]
+    name_evidence: list[OfficialSanctionsNameEvidence]
 
 
 class OfficialDualUseResult(ContractModel):
@@ -164,7 +197,7 @@ class OfficialScreeningService:
             fsf_index.query(EuFsfExactQuery(item.type, item.value, item.country))
             for item in request.party_identifiers
         ]
-        evidence = [
+        identifier_evidence = [
             OfficialSanctionsEvidence(
                 eu_reference_number=item.eu_reference_number,
                 entity_logical_id=item.entity_logical_id,
@@ -177,6 +210,22 @@ class OfficialScreeningService:
             )
             for match in matches
             for item in match.evidence
+        ]
+        name_index = EuFsfNameIndex(fsf_snapshot)
+        name_candidates = [
+            name_index.query(EuFsfNameQuery(item.name)) for item in request.party_names
+        ]
+        name_evidence = [
+            OfficialSanctionsNameEvidence(
+                eu_reference_number=item.eu_reference_number,
+                entity_logical_id=item.entity_logical_id,
+                subject_type=item.subject_type.value,
+                alias_assertion_hash=item.alias.assertion_hash,
+                source_native_locator=item.alias.native_locator,
+                strong_alias=item.alias.strong,
+            )
+            for candidates in name_candidates
+            for item in candidates.evidence
         ]
 
         dual_list = self._dual_use_source.retrieve()
@@ -195,8 +244,12 @@ class OfficialScreeningService:
                 EuFsfExactMatchStatus.REVIEW_REQUIRED,
             }
         )
+        name_candidate_signal = any(
+            candidates.status is not EuFsfNameCandidateStatus.NO_CANDIDATE
+            for candidates in name_candidates
+        )
         dual_entry_signal = dual_assessment.entry is not None
-        if strong_sanctions_signal or dual_entry_signal:
+        if strong_sanctions_signal or name_candidate_signal or dual_entry_signal:
             signal = Signal.RED
             action = BusinessAction.HOLD
         elif dual_assessment.status in {
@@ -220,9 +273,12 @@ class OfficialScreeningService:
                 source_snapshot_content_hash=fsf_snapshot.content_hash,
                 source_raw_content_hash=fsf_snapshot.raw_content_hash,
                 source_retrieved_at=retrieved_fsf.retrieved_at.isoformat(),
-                query_count=len(matches),
-                statuses=[match.status.value for match in matches],
-                evidence=evidence,
+                identifier_query_count=len(matches),
+                identifier_statuses=[match.status.value for match in matches],
+                identifier_evidence=identifier_evidence,
+                name_query_count=len(name_candidates),
+                name_statuses=[item.status.value for item in name_candidates],
+                name_evidence=name_evidence,
             ),
             dual_use=OfficialDualUseResult(
                 source_effective_from=EU_DUAL_USE_EFFECTIVE_FROM.isoformat(),
@@ -240,7 +296,8 @@ class OfficialScreeningService:
             ),
             caveats=[
                 "Exact source evidence is not legal clearance.",
-                "Name-only matching and ownership/control are outside this slice.",
+                "Name results are exact normalized-alias candidates, not fuzzy matches.",
+                "Transliteration, fuzzy matching and ownership/control remain required.",
                 "An Annex I code is not inferred from HS/CN/TARIC data.",
                 "Catch-all, destination, end-use and sanctions controls remain required.",
                 "Only an authorised human may clear or block the transaction.",
@@ -252,6 +309,7 @@ __all__ = [
     "EU_FSF_IDENTIFIER_TYPES",
     "OfficialGoodsCandidate",
     "OfficialPartyIdentifier",
+    "OfficialPartyName",
     "OfficialScreeningRequest",
     "OfficialScreeningResult",
     "OfficialScreeningService",

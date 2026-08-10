@@ -36,6 +36,11 @@ from tradesieve.domain.eu_fsf import (
     EuFsfExactMatchStatus,
     EuFsfExactQuery,
     EuFsfIdentifier,
+    EuFsfNameCandidates,
+    EuFsfNameCandidateStatus,
+    EuFsfNameEvidence,
+    EuFsfNameIndex,
+    EuFsfNameQuery,
     EuFsfRegulation,
     EuFsfSnapshot,
     EuFsfSubjectType,
@@ -297,6 +302,7 @@ def test_live_shaped_xml_parses_into_immutable_evidence_and_exact_match() -> Non
     assert item.designation_date == date(2002, 11, 21)
     assert item.regulation.programme == "TAQA"
     assert item.aliases[0].normalized_name == ("benevolence international foundation")
+    assert item.aliases[0].assertion_hash.startswith("sha256:")
     assert item.identifiers[0].normalized_number == "363823186"
     assert item.identifiers[0].assertion_hash.startswith("sha256:")
     assert item.entity_hash.startswith("sha256:")
@@ -372,6 +378,54 @@ def test_same_entity_multiple_exact_assertions_remains_one_entity_match() -> Non
     )
     assert result.status is EuFsfExactMatchStatus.MATCH
     assert len(result.evidence) == 2
+
+
+def test_name_index_returns_review_candidates_without_claiming_exact_match() -> None:
+    first = replace(
+        entity("1", reference="EU.1"),
+        aliases=(alias("1", "  北方  国际物流  "),),
+    )
+    second = replace(
+        entity("2", reference="EU.2"),
+        aliases=(replace(alias("2", "СЕВЕР ЛОГИСТИК"), strong=False),),
+    )
+    index = EuFsfNameIndex(snapshot((first, second)))
+
+    candidate = index.query(EuFsfNameQuery("北方 国际物流"))
+    assert candidate.status is EuFsfNameCandidateStatus.CANDIDATE
+    assert [item.eu_reference_number for item in candidate.evidence] == ["EU.1"]
+    assert candidate.evidence[0].alias.assertion_hash.startswith("sha256:")
+    assert index.query(EuFsfNameQuery("север логистик")).status is (
+        EuFsfNameCandidateStatus.REVIEW_REQUIRED
+    )
+    assert index.query(EuFsfNameQuery("not listed")).status is (
+        EuFsfNameCandidateStatus.NO_CANDIDATE
+    )
+
+
+def test_name_index_distinguishes_same_entity_aliases_from_ambiguous_entities() -> None:
+    first = replace(
+        entity("1", reference="EU.1"),
+        aliases=(
+            alias("1", "Listed Example"),
+            alias("2", "ＬＩＳＴＥＤ   EXAMPLE"),
+        ),
+    )
+    same_entity = EuFsfNameIndex(snapshot((first,))).query(
+        EuFsfNameQuery("listed example")
+    )
+    assert same_entity.status is EuFsfNameCandidateStatus.CANDIDATE
+    assert len(same_entity.evidence) == 2
+
+    second = replace(
+        entity("2", reference="EU.2"),
+        aliases=(alias("3", "Listed Example"),),
+    )
+    ambiguous = EuFsfNameIndex(snapshot((first, second))).query(
+        EuFsfNameQuery("Listed Example")
+    )
+    assert ambiguous.status is EuFsfNameCandidateStatus.AMBIGUOUS
+    assert [item.entity_logical_id for item in ambiguous.evidence] == ["1", "1", "2"]
 
 
 def test_normalization_is_bounded_typed_and_does_not_make_names_identifiers() -> None:
@@ -1117,6 +1171,20 @@ def test_defensive_typed_value_objects_reject_corruption() -> None:
         EuFsfExactQuery("regnumber", "36-3823186"),
         (base_evidence,),
     )
+    base_name_query = EuFsfNameQuery("Example Entity")
+    base_name_evidence = EuFsfNameEvidence(
+        snapshot_id=base_snapshot.snapshot_id,
+        snapshot_content_hash=base_snapshot.content_hash,
+        entity_logical_id="1",
+        eu_reference_number="EU.1",
+        subject_type=EuFsfSubjectType.ENTERPRISE,
+        alias=base_alias,
+    )
+    base_name_candidates = EuFsfNameCandidates(
+        EuFsfNameCandidateStatus.CANDIDATE,
+        base_name_query,
+        (base_name_evidence,),
+    )
 
     invalid_values = (
         lambda: corrupt(regulation(), publication_date=cast(Any, "bad")),
@@ -1157,6 +1225,26 @@ def test_defensive_typed_value_objects_reject_corruption() -> None:
             EuFsfExactMatchStatus.NO_MATCH, base_match.query, (base_evidence,)
         ),
         lambda: EuFsfExactMatch(EuFsfExactMatchStatus.MATCH, base_match.query, ()),
+        lambda: EuFsfNameQuery(""),
+        lambda: EuFsfNameIndex(cast(Any, "bad")),
+        lambda: EuFsfNameIndex(base_snapshot).query(cast(Any, "bad")),
+        lambda: corrupt(base_name_evidence, snapshot_id="bad"),
+        lambda: corrupt(base_name_evidence, snapshot_content_hash="bad"),
+        lambda: corrupt(base_name_evidence, entity_logical_id="bad"),
+        lambda: corrupt(base_name_evidence, eu_reference_number="bad value"),
+        lambda: corrupt(base_name_evidence, subject_type="bad"),
+        lambda: corrupt(base_name_evidence, alias="bad"),
+        lambda: corrupt(base_name_candidates, status="CANDIDATE"),
+        lambda: corrupt(base_name_candidates, query="bad"),
+        lambda: corrupt(base_name_candidates, evidence=[]),
+        lambda: EuFsfNameCandidates(
+            EuFsfNameCandidateStatus.NO_CANDIDATE,
+            base_name_query,
+            (base_name_evidence,),
+        ),
+        lambda: EuFsfNameCandidates(
+            EuFsfNameCandidateStatus.CANDIDATE, base_name_query, ()
+        ),
         lambda: EuFsfDistribution("", DOWNLOAD_URL, "x", "x"),
         lambda: EuFsfRetrievedSource(
             distribution(), NOW, "application/xml", "bad", b"x"

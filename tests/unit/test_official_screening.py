@@ -13,6 +13,7 @@ from tradesieve.application.contracts import BusinessAction, Signal
 from tradesieve.application.official_screening import (
     OfficialGoodsCandidate,
     OfficialPartyIdentifier,
+    OfficialPartyName,
     OfficialScreeningRequest,
     OfficialScreeningService,
 )
@@ -179,15 +180,19 @@ def test_exact_sanctions_and_annex_entry_hold_with_versioned_evidence() -> None:
     assert result.signal is Signal.RED
     assert result.business_action is BusinessAction.HOLD
     assert result.automatic_clearance is False
-    assert result.sanctions.statuses == ["MATCH"]
-    assert result.sanctions.evidence[0].eu_reference_number == "EU.1"
-    assert result.sanctions.evidence[0].identifier_assertion_hash.startswith("sha256:")
+    assert result.sanctions.identifier_statuses == ["MATCH"]
+    assert result.sanctions.identifier_evidence[0].eu_reference_number == "EU.1"
+    assert result.sanctions.identifier_evidence[0].identifier_assertion_hash.startswith(
+        "sha256:"
+    )
+    assert result.sanctions.name_statuses == []
+    assert result.sanctions.name_evidence == []
     assert "36-3823186" not in result.model_dump_json()
     assert result.dual_use.status == "CONTROL_ENTRY_FOUND"
     assert result.dual_use.requested_code == "0A000"
     assert result.dual_use.entry_content_hash is not None
     assert result.dual_use.source_native_locator == "/ANNEX/NP[NO.P='0A000']"
-    assert len(result.caveats) == 5
+    assert len(result.caveats) == 6
     assert fsf_source.calls == dual_source.calls == 1
     assert parser.contents == [b"source bytes"]
 
@@ -199,8 +204,8 @@ def test_missing_goods_classification_requests_evidence_after_no_match() -> None
     )
     assert result.signal is Signal.YELLOW
     assert result.business_action is BusinessAction.REQUEST_EVIDENCE
-    assert result.sanctions.statuses == ["NO_MATCH"]
-    assert result.sanctions.evidence == []
+    assert result.sanctions.identifier_statuses == ["NO_MATCH"]
+    assert result.sanctions.identifier_evidence == []
     assert result.dual_use.status == "MISSING_CLASSIFICATION"
     assert "annex_i_classification" in result.dual_use.missing_facts
 
@@ -221,8 +226,33 @@ def test_unusable_sanctions_identifier_is_fail_closed() -> None:
     result = subject.screen(request(code="0A999"))
     assert result.signal is Signal.RED
     assert result.business_action is BusinessAction.HOLD
-    assert result.sanctions.statuses == ["REVIEW_REQUIRED"]
-    assert result.sanctions.evidence[0].usable_for_exact_match is False
+    assert result.sanctions.identifier_statuses == ["REVIEW_REQUIRED"]
+    assert result.sanctions.identifier_evidence[0].usable_for_exact_match is False
+
+
+def test_exact_normalized_name_candidate_holds_without_echoing_queried_name() -> None:
+    subject, *_ = service()
+    result = subject.screen(
+        OfficialScreeningRequest(
+            party_names=[OfficialPartyName(name="  LISTED   EXAMPLE ")],
+            goods=OfficialGoodsCandidate(
+                annex_i_code="0A999",
+                classification_verified=True,
+                technical_specification_available=True,
+            ),
+        )
+    )
+
+    assert result.signal is Signal.RED
+    assert result.business_action is BusinessAction.HOLD
+    assert result.sanctions.identifier_query_count == 0
+    assert result.sanctions.name_query_count == 1
+    assert result.sanctions.name_statuses == ["CANDIDATE"]
+    evidence = result.sanctions.name_evidence[0]
+    assert evidence.eu_reference_number == "EU.1"
+    assert evidence.alias_assertion_hash.startswith("sha256:")
+    assert evidence.strong_alias is True
+    assert "LISTED   EXAMPLE" not in result.model_dump_json()
 
 
 def test_integrity_mismatch_and_untyped_dependencies_fail_closed() -> None:
