@@ -53,7 +53,7 @@ flowchart LR
 
 **当前阶段：Phase 1 MVP 开发中。现在已有可运行的合成受理与基础设施演示，但还没有可供外部系统提交真实 screening 请求的公开接口。**
 
-截至 2026-08-07，进度如下：
+截至 2026-08-10，进度如下：
 
 | 能力 | 状态 | 当前结果 |
 | --- | --- | --- |
@@ -64,19 +64,20 @@ flowchart LR
 | 规则包治理 | ✅ 已完成 | 有版本、有引用、可审批/激活/回滚的合成规则包 |
 | 原始来源快照 | ✅ 已完成 | 私有不可变对象、解析/验证证据、双人治理、PostgreSQL 持久化 |
 | 规范化受理与幂等 | ✅ 合成演示可用 | 严格 canonical intake、授权范围幂等、原子审计/outbox、PostgreSQL 18.4 持久化和 demo-only 运行入口；见 [TS-302](https://github.com/fyaic/TradeSieve/issues/21) / [PR #36](https://github.com/fyaic/TradeSieve/pull/36) |
+| 合成物流 CRM 门禁 | ✅ demo-only 可用 | 5 条中国货代风格合成询报价，演示红灯升级、黄灯补件/拦截和绿灯候选的人工确认边界；见 [使用指南](docs/getting-started/demo-crm.md) / [TS-505](https://github.com/fyaic/TradeSieve/issues/37) |
 | 确定性审查与证据 | ⏳ 下一步 | 受治理规则、来源快照和物化事实的确定性评估 |
 | 案件/发现项/处置状态 | ⏳ 计划中 | 结构化 finding、evidence、hold 和人工决定 |
 | Screening REST API | ⏳ 计划中 | CRM/OMS 同步拦截与查询；当前 OpenAPI 仍是设计契约，不是已上线接口 |
 | Screening CLI 与 MCP | ⏳ 计划中 | 面向运营/CI 和 Agent 的同契约适配器；当前尚无 MCP Server |
 | Webhook 与可观测性 | ⏳ 计划中 | 签名事件、脱敏日志/指标/链路 |
 
-当前开发分支最近一次完整门禁为 **1,721 个测试通过，9,780 条语句和 2,776 个分支 100% 覆盖**；独立 PostgreSQL 18.4 门禁也已完成迁移、真实事务、双连接竞态、约束、破坏/修复、降级再升级和零残留验证。这些证据证明当前代码边界和回归集，不代表制裁数据覆盖率、法律正确率或生产可用性。
+当前开发分支最近一次完整门禁为 **1,734 个测试通过，10,021 条语句和 2,806 个分支 100% 覆盖**；独立 PostgreSQL 18.4 门禁也已完成迁移、真实事务、双连接竞态、约束、破坏/修复、降级再升级和零残留验证。这些证据证明当前代码边界和回归集，不代表制裁数据覆盖率、法律正确率或生产可用性。
 
 详细范围见 [MVP 定义](docs/product/mvp-scope.md)、[Phase 1 计划](docs/delivery/phase-1-plan.md) 和 [敏捷 backlog](docs/delivery/phase-1-backlog.md)。
 
 ## 现在可以怎样使用
 
-目前对外可用的是一个**合成数据、demo-only 的受理生命周期和运维检查面**。它可以验证部署、数据库迁移、数据源/规则/快照治理、幂等受理、持久化和失败关闭行为；不能提交真实客户或交易，也不会生成风险判断、finding、case 或放行结论。
+目前对外可用的是一个**合成数据、demo-only 的受理生命周期、运维检查面和物流 CRM 演示页**。它可以验证部署、数据库迁移、数据源/规则/快照治理、幂等受理、持久化和失败关闭行为，并用预置合成 finding/result 展示 CRM 拦截效果；不能提交真实客户或交易，CRM 演示也不是实时审查引擎。
 
 ### 1. 启动参考环境
 
@@ -99,7 +100,24 @@ curl --fail http://127.0.0.1:8080/health/ready
 
 `/health/live` 只表示 HTTP 进程可响应；`/health/ready` 还会核验数据库迁移、来源清单、私有快照证据和已激活规则包。HTTP `200` 仅表示服务具备运行条件，绝不表示任何交易已获放行。
 
-### 2. 使用当前运维 CLI
+### 2. 打开合成物流 CRM 演示
+
+参考栈就绪后，在浏览器打开：
+
+```text
+http://127.0.0.1:8080/demo/crm
+```
+
+选择一条固定合成询报价并点击“发起合规审查”。页面会展示：
+
+- 上海到莫斯科工业控制设备的合成主体强标识符命中和红灯升级；
+- 锂电池运输文件、最终用户、转售路径或敏感参数不足时的黄灯补件/拦截；
+- 没有开放 P0/P1 时的绿灯候选，以及仍需授权人工确认的非放行边界；
+- CRM 到 TradeSieve 的字段映射、输入指纹、`screening_id`、`case_id` 和结果指纹。
+
+页面和接口只在 demo 模式注册，全部名称、登记号、金额、路线和单证均为固定合成 fixture。它使用真实规范输入校验与规范结果模型，但 finding 和处置结果是预置演示数据，不是实时名单或法律规则执行。完整说明见 [合成 CRM 使用指南](docs/getting-started/demo-crm.md)。
+
+### 3. 使用当前运维 CLI
 
 ```bash
 # 总体就绪度与有限检查项
@@ -121,7 +139,7 @@ docker compose run --rm --no-deps app \
 
 这些命令只返回经过裁剪的运维安全字段，不导出原始来源字节、客户数据、凭据或私有规则文本。
 
-### 3. 演示一次可重放的合成受理
+### 4. 演示一次可重放的合成受理
 
 以下入口只使用仓库内置合成交易，不读取文件、标准输入或真实业务数据。先提交一个固定合成请求：
 
@@ -143,7 +161,7 @@ docker compose run --rm --no-deps app \
 
 这是用于架构评估、CI 和接入方理解受理语义的 operations demo，不是接收任意输入的正式 screening CLI。它只证明“请求被安全、可审计地受理”，不代表已经执行制裁/两用物项判断，更不代表可以放行。
 
-### 4. 停止并清理 demo
+### 5. 停止并清理 demo
 
 ```bash
 docker compose down --volumes --remove-orphans
@@ -157,18 +175,20 @@ docker compose down --volumes --remove-orphans
 
 | 使用者 | 现在可做什么 | 现在不能做什么 |
 | --- | --- | --- |
-| 架构/安全评估者 | 启动 Compose；检查健康、治理、幂等受理、重放/冲突和失败关闭行为 | 不能提交真实客户、货物或交易 |
-| 开发者 | 运行完整测试与合成收据生命周期；审查领域模型、OpenAPI/JSON Schema 和合成示例 | 不应把 demo 命令或草案 OpenAPI 当作在线 API |
-| CRM/OMS 团队 | 用合成命令验证幂等 key、稳定引用和冲突语义；依据 [集成设计](docs/architecture/integration-design.md) 准备字段映射/拦截点 | 尚不能调用 screening endpoint 或接收 webhook |
+| 架构/安全评估者 | 启动 Compose；检查健康、治理、幂等受理、重放/冲突、CRM 门禁和失败关闭行为 | 不能提交真实客户、货物或交易 |
+| 开发者 | 运行完整测试与合成收据生命周期；审查领域模型、OpenAPI/JSON Schema、CRM demo adapter 和合成示例 | 不应把 demo 命令、demo API 或草案 OpenAPI 当作正式在线 API |
+| CRM/OMS 团队 | 在浏览器观察字段映射、红黄绿候选状态、补件和外部引用；用合成命令验证幂等语义；依据 [集成设计](docs/architecture/integration-design.md) 准备拦截点 | 尚不能向正式 screening endpoint 提交任意业务请求或接收 webhook |
 | AI/Agent 团队 | 审查 [Agent 接口原则](docs/architecture/agent-interface-principles.md) 和共享 Schema | 尚不能连接 MCP Server |
 | 合规人员 | 审查产品范围、证据模型、规则治理和人工放行边界 | 尚没有完整案件复核工作台 |
 
-当前 HTTP 运行时只实现：
+当前正式 HTTP 操作清单只实现：
 
 ```text
 GET /health/live
 GET /health/ready
 ```
+
+demo 模式另注册隐藏于 OpenAPI 的 `/demo/crm` 及固定 fixture API。它们不接收任意交易输入，也不会在 production 模式存在。
 
 仓库中的 [OpenAPI](api/openapi/tradesieve.v1.json)、[JSON Schema](api/schemas/tradesieve.contracts.v1.json) 和 `examples/` 是用于设计、评审和生成测试的版本化契约，尚不等于已实现的路由。
 

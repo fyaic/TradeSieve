@@ -16,6 +16,20 @@ The caller asks TradeSieve about a named proposed business action. TradeSieve re
 | Operator/batch | Analyst submits files or diagnostic batches | CLI over REST |
 | Agent-assisted | Authorized agent screens/reads/explains/requests review | MCP over the same application service |
 
+## Implemented demo CRM seam
+
+[TS-505](https://github.com/fyaic/TradeSieve/issues/37) now includes a demo-only browser workspace at `/demo/crm`. It accepts only five repository-owned synthetic fixture IDs, converts each fixed CRM record into the canonical `ScreeningRequest`, runs the strict intake decoder and returns a precomputed canonical `ScreeningResult`. The purpose is to make the original CRM interception requirement visible before the production screening path exists.
+
+The seam preserves the intended ownership split:
+
+- the demo CRM owns customers, quotes, routes, amounts and document-status display;
+- TradeSieve contracts own the screening request/result shape, state, action, findings, evidence requirements and opaque IDs;
+- the browser never evaluates sanctions, goods or route rules;
+- demo routes are registered only in explicit demo mode, accept no arbitrary business input and stay outside the formal OpenAPI inventory;
+- [TS-303](https://github.com/fyaic/TradeSieve/issues/22), [TS-401](https://github.com/fyaic/TradeSieve/issues/23) and [TS-501](https://github.com/fyaic/TradeSieve/issues/24) replace the precomputed fixture path with governed controls, durable cases and the formal REST adapter.
+
+See [the demo guide](../getting-started/demo-crm.md) for scenarios, startup and limitations.
+
 ## Synchronous gate sequence
 
 ```mermaid

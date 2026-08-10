@@ -1,6 +1,6 @@
 # Docker reference deployment
 
-**Status:** TS-201 source-registry, TS-202 immutable source snapshots, TS-205 rule-bundle governance, and the TS-302 synthetic screening-receipt lifecycle. This stack proves packaging, PostgreSQL migration, private immutable raw bytes, governed synthetic source/rule readiness, authorized idempotent intake, independent app/worker processes, persistence, and fail-closed health behavior. Deterministic screening decisions, review workflows, public screening REST/CLI, MCP, and production controls are not implemented yet.
+**Status:** TS-201 source-registry, TS-202 immutable source snapshots, TS-205 rule-bundle governance, the TS-302 synthetic screening-receipt lifecycle, and the TS-505 demo CRM seam. This stack proves packaging, PostgreSQL migration, private immutable raw bytes, governed synthetic source/rule readiness, authorized idempotent intake, a fixed browser demonstration, independent app/worker processes, persistence, and fail-closed health behavior. Deterministic live screening decisions, review workflows, public screening REST/CLI, MCP, and production controls are not implemented yet.
 
 ## Demo-only configuration
 
@@ -31,6 +31,14 @@ docker compose run --rm --no-deps app python -m tradesieve.manage inspect
 curl --fail http://127.0.0.1:8080/health/live
 curl --fail http://127.0.0.1:8080/health/ready
 ```
+
+The demo-only synthetic logistics CRM is available at:
+
+```text
+http://127.0.0.1:8080/demo/crm
+```
+
+It accepts only repository-owned fixture IDs and uses precomputed canonical results. See [the demo CRM guide](demo-crm.md) before evaluating it; it is not a live sanctions or export-control engine.
 
 `docker compose up` starts PostgreSQL, runs the real Alembic migrations, loads the governed synthetic registration, creates and verifies two immutable source snapshots through retrieve/parse/validate/approve/activate, and uses authorized application services to activate one immutable synthetic rule bundle. It then starts the non-root read-only app and worker containers. The app, worker, and PostgreSQL services each have a healthcheck. No `runtime_coverage` source/rule marker is written or trusted.
 
@@ -123,7 +131,8 @@ safe projections, idempotent bootstrap, database/raw identity across recreation,
 application rollbacks, append-only/audit constraints, missing and same-length-tampered
 raw failures, lifecycle/observation corruption refusal and controlled repair, a database
 outage, an APPLIED/REPLAY/CONFLICT screening receipt lifecycle with stable references
-across container recreation, and zero container/network/volume residue:
+across container recreation, the packaged CRM page plus one canonical red-light demo response,
+and zero container/network/volume residue:
 
 ```bash
 ./scripts/test_compose.sh

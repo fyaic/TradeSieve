@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta
+      name="description"
+      content="TradeSieve 合成国际物流 CRM 拦截演示，不处理真实客户数据。"
+    >
+    <title>华舟货运 CRM | TradeSieve 演示</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="/demo/crm/assets/app.css">
+    <script src="/demo/crm/assets/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#record-detail">跳到报价详情</a>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <span class="brand-mark" aria-hidden="true">华</span>
+          <div>
+            <p class="brand-name">华舟国际货运</p>
+            <p class="brand-subtitle">销售与订舱工作台</p>
+          </div>
+        </div>
+        <div class="topbar-context">
+          <span class="environment-label">纯合成演示</span>
+          <span class="operator">上海分公司 / 销售一组</span>
+        </div>
+      </header>
+
+      <aside class="sidebar" aria-label="主导航">
+        <nav>
+          <a class="nav-item" href="#" aria-current="page">询报价</a>
+          <a class="nav-item" href="#" tabindex="-1" aria-disabled="true">客户</a>
+          <a class="nav-item" href="#" tabindex="-1" aria-disabled="true">订舱</a>
+          <a class="nav-item" href="#" tabindex="-1" aria-disabled="true">应收</a>
+        </nav>
+        <div class="sidebar-boundary">
+          <p>独立合规边界</p>
+          <strong>TradeSieve</strong>
+          <span>CRM 只保存案件引用和业务动作，不内置制裁规则。</span>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <section class="queue-panel" aria-labelledby="queue-heading">
+          <div class="panel-heading">
+            <div>
+              <h1 id="queue-heading">待处理询报价</h1>
+              <p>5 条合成业务记录</p>
+            </div>
+            <button class="filter-button" type="button" disabled>全部</button>
+          </div>
+          <div id="queue-state" class="queue-state" aria-live="polite">
+            <div class="skeleton-row"></div>
+            <div class="skeleton-row"></div>
+            <div class="skeleton-row"></div>
+          </div>
+          <div id="record-list" class="record-list" role="list"></div>
+        </section>
+
+        <section
+          id="record-detail"
+          class="detail-panel"
+          aria-labelledby="detail-heading"
+          tabindex="-1"
+        >
+          <div id="detail-state" class="detail-state" aria-live="polite">
+            <div class="detail-skeleton">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+          <div id="detail-content" hidden>
+            <div class="detail-header">
+              <div>
+                <div class="quote-line">
+                  <h2 id="detail-heading"></h2>
+                  <span id="record-country" class="country-label"></span>
+                </div>
+                <p id="customer-name" class="customer-name"></p>
+              </div>
+              <div class="detail-actions">
+                <span id="record-owner" class="owner-label"></span>
+                <button id="screen-button" class="primary-button" type="button">
+                  发起合规审查
+                </button>
+              </div>
+            </div>
+
+            <div class="detail-grid">
+              <div class="business-column">
+                <section class="data-section" aria-labelledby="shipment-heading">
+                  <h3 id="shipment-heading">运输方案</h3>
+                  <dl class="fact-grid">
+                    <div><dt>运输方式</dt><dd id="service-mode"></dd></div>
+                    <div><dt>贸易条款</dt><dd id="incoterm"></dd></div>
+                    <div><dt>起运地</dt><dd id="origin"></dd></div>
+                    <div><dt>目的地</dt><dd id="destination"></dd></div>
+                    <div class="fact-wide"><dt>计划路线</dt><dd id="route-summary"></dd></div>
+                    <div class="fact-wide"><dt>货量</dt><dd id="shipment-summary"></dd></div>
+                  </dl>
+                </section>
+
+                <section class="data-section" aria-labelledby="goods-heading">
+                  <h3 id="goods-heading">货物与金额</h3>
+                  <dl class="fact-grid">
+                    <div class="fact-wide"><dt>申报品名</dt><dd id="goods-summary"></dd></div>
+                    <div><dt>报价金额</dt><dd id="quote-amount" class="number-value"></dd></div>
+                    <div><dt>业务节点</dt><dd id="action-label"></dd></div>
+                    <div class="fact-wide"><dt>最晚处理</dt><dd id="action-due-at"></dd></div>
+                  </dl>
+                </section>
+
+                <section class="data-section" aria-labelledby="documents-heading">
+                  <h3 id="documents-heading">随附单证</h3>
+                  <div id="document-list" class="document-list"></div>
+                </section>
+
+                <section class="mapping-section" aria-labelledby="mapping-heading">
+                  <div>
+                    <h3 id="mapping-heading">发送给 TradeSieve 的边界</h3>
+                    <p>CRM 映射规范字段，审查服务返回不透明案件引用。</p>
+                  </div>
+                  <dl id="mapping-list" class="mapping-list"></dl>
+                </section>
+              </div>
+
+              <aside class="screening-column" aria-labelledby="screening-heading">
+                <div class="screening-heading-row">
+                  <div>
+                    <h3 id="screening-heading">合规门禁</h3>
+                    <p>自动化只能收紧，不能放行</p>
+                  </div>
+                  <span id="screening-mode" class="demo-tag">预置合成规则</span>
+                </div>
+                <div id="screening-panel" aria-live="polite"></div>
+              </aside>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <template id="empty-screening-template">
+      <div class="empty-screening">
+        <div class="empty-symbol" aria-hidden="true">TS</div>
+        <h4>尚未发起审查</h4>
+        <p>点击“发起合规审查”，查看 CRM 如何根据业务动作执行拦截、补件或升级。</p>
+        <ul>
+          <li>主体与强标识符</li>
+          <li>货物、路线与最终用途</li>
+          <li>支付参与方与单证完整性</li>
+        </ul>
+      </div>
+    </template>
+  </body>
+</html>
