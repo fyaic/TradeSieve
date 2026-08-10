@@ -52,6 +52,7 @@ TradeSieve documentation is decision-oriented: requirements preserve what is nee
 - [ADR-0006: Verified identity and deny-default authorization](decisions/0006-verified-identity-and-deny-default-authorization.md)
 - [ADR-0007: Official source-specific immutable projections](decisions/0007-official-source-specific-projections.md)
 - [ADR-0008: Atomic four-source active screening bundle](decisions/0008-atomic-four-source-active-bundle.md)
+- [ADR-0009: Source-bound technical assertions](decisions/0009-source-bound-technical-assertions.md)
 
 ## Delivery
 

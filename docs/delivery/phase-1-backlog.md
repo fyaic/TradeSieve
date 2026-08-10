@@ -32,7 +32,8 @@
 | [TS-303](https://github.com/fyaic/TradeSieve/issues/22) Deterministic completeness and exact-identifier controls | S1 | User receives exact missing facts and strong-ID findings | Live EU FSF strong-ID and Annex I explicit-code technical preview works; canonical persisted screening/finding orchestration remains | TS-301/205 |
 | [TS-304](https://github.com/fyaic/TradeSieve/issues/5) Multilingual synthetic fixture set | S1/S2 | Matcher selection has an approved test basis | Chinese/Cyrillic/Latin, aliases, identifiers, weak/ambiguous negatives, ownership | Issue #5 |
 | [TS-305](https://github.com/fyaic/TradeSieve/issues/6) Matcher adapter and benchmark | S2 | Reviewer receives explainable candidates | Exact/pg_trgm/yente/Watchman/Splink candidates compared; active threshold/version approved | Issue #6, TS-304 |
-| TS-306 Goods/route/end-use/payment consistency controls | S2 | User sees non-party risk and required evidence | Golden case produces named facts/conflicts; HS/category never definitive | Issues #1/#2, TS-301/205 |
+| [TS-306A](https://github.com/fyaic/TradeSieve/issues/40) Versioned EU technical assertions | S2 | User sees deterministic source-bound parameter comparisons | Initial `3A001.a.5.a`/`.a.14`/`.e.1` numeric rules expose matched, not-matched, incomplete, source-drift and evidence states; never definitive classification | #3, TS-303 |
+| TS-306 Goods/route/end-use/payment consistency controls | S2 | User sees non-party risk and required evidence | Golden case produces named facts/conflicts; HS/category never definitive | Issues #1/#2, TS-301/205/306A |
 | TS-307 Reproducible screening orchestration | S1/S2 | Same input/version set replays | Result/version/input hashes stable; model suggestions isolated; coverage warnings visible | TS-302/303/305/306 |
 
 ## [E4 — Case, evidence, and human decision](https://github.com/fyaic/TradeSieve/issues/14)

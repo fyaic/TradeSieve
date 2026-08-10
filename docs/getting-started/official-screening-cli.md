@@ -14,6 +14,7 @@ The refresh workflow retrieves all four publications before it can advance the a
 | EU dual-use Annex I | Publications Office CELLAR item for CELEX `32025R2003` | bounded TLS retrieval, exact response length, ZIP safety, Formex schema/title checks, 384 unique entries across categories 0–9, immutable row projection, explicit-code lookup and missing-fact assessment |
 | OFAC SDN | Treasury Sanctions List Service comprehensive `SDN.XML` | fixed SLS entrypoint; one strictly checked GovCloud signed redirect; bounded XML; stable UID and row projection; finite exact identifier types; exact normalized primary-name/alias candidates; source program and native locator |
 | OFAC Consolidated | Treasury Sanctions List Service comprehensive `CONSOLIDATED.XML` | same transport/parser/integrity boundary, retained as a distinct list kind and snapshot rather than merged into SDN |
+| Technical assertions | Hand-reviewed bundle bound to the exact official `3A001` entry hash | deterministic ADC `3A001.a.5.a`/`.a.14` and cell `3A001.e.1` comparisons; canonical units, strict boundaries, evidence refs, explicit incomplete/unsupported/source-drift states; never classification or clearance |
 | Active source bundle | PostgreSQL migration `20260810_0007` | four content-addressed raw objects and typed row projections, immutable activation event, atomic active pointer, idempotent repeat activation, full reconstruction/re-hash on read, 48-hour freshness gate |
 
 The dual-use source is the current 2025 delegated update known on 2026-08-10. Unlike the daily sanctions catalogue discovery, its CELEX/CELLAR version is pinned. A later delegated regulation must be discovered, reviewed, tested, and activated before this connector can claim the new version.
@@ -37,7 +38,13 @@ A runnable public-source candidate example is committed at [`examples/requests/o
   "goods": {
     "annex_i_code": "3A001",
     "classification_verified": true,
-    "technical_specification_available": true
+    "technical_specification_available": true,
+    "product_family": "ADC_INTEGRATED_CIRCUIT",
+    "technical_facts": [
+      {"fact_id": "resolution_bits", "unit": "BITS", "numeric_value": "12", "evidence_ref": "datasheet-1", "verified": true},
+      {"fact_id": "sample_rate_msps", "unit": "MSPS", "numeric_value": "401", "evidence_ref": "datasheet-1", "verified": true},
+      {"fact_id": "stores_or_processes_digitised_data", "unit": "BOOLEAN", "boolean_value": false, "evidence_ref": "datasheet-1", "verified": true}
+    ]
   }
 }
 ```
@@ -46,7 +53,9 @@ Supported request identifier types are the finite EU FSF inventory: `birthcert`,
 
 At least one `party_identifiers` or `party_names` entry is required. Names are Unicode NFKC-normalized, whitespace-collapsed, case-folded, and compared separately against EU FSF and both OFAC list projections. A name result is only a candidate: any candidate/ambiguity or EU weak-alias review state produces `RED` + `HOLD` for authorised human review. The current implementation does not perform fuzzy similarity, transliteration, token reordering, ownership/control propagation, OFAC 50 Percent Rule evaluation, or entity resolution across corporate registries.
 
-`classification_verified` records whether a qualified classification step supplied the Annex I candidate. `technical_specification_available` records only document availability; it does not assert that every legal threshold in the entry has been satisfied. TradeSieve does not infer an Annex I code from an HS/CN/TARIC code.
+`classification_verified` records whether a qualified classification step supplied the Annex I candidate. `technical_specification_available` records document availability. `product_family` selects only a finite supported rule family; every `technical_facts` item supplies exactly one typed value, canonical unit, evidence reference, and verification flag. TradeSieve does not infer an Annex I code from an HS/CN/TARIC code or use free text/LLMs to create executable legal rules.
+
+The initial bundle supports `ADC_INTEGRATED_CIRCUIT` and `ELECTROCHEMICAL_CELL`. Its result is bound to CELEX `32025R2003`, the exact official `3A001` entry content hash, a rule-bundle hash, and an individual rule ID. An active-source hash change produces `SOURCE_MISMATCH`; missing/unverified facts produce `INCOMPLETE`. `NOT_MATCHED` means only that the evaluated branch did not meet its threshold and is never clearance.
 
 ## Refresh and activate
 
@@ -121,13 +130,13 @@ The gate uses an isolated project and temporary evidence directory. It runs migr
 
 ## Output and decisions
 
-The JSON output contains only evidence needed to reproduce the source assertion: source generation/publish/effective dates, file/snapshot hashes, EU reference or OFAC UID/list kind/program, assertion UID/hash, source-native locator, status, missing facts, and the aggregate business action. It deliberately does not echo the queried identifier value, source name value, address, remarks or full Annex I legal text.
+The JSON output contains only evidence needed to reproduce the source assertion: source generation/publish/effective dates, file/snapshot hashes, EU reference or OFAC UID/list kind/program, assertion UID/hash, source-native locator, technical rule/source identity, normalized comparisons, status, missing facts, and the aggregate business action. It deliberately does not echo the queried identifier value, source name value, address, remarks or full Annex I legal text.
 
 - An EU/OFAC exact sanctions identifier candidate, ambiguous/unusable EU identifier, any normalized name candidate, or Annex I entry produces `RED` + `HOLD`.
 - A missing classification or technical specification produces `YELLOW` + `REQUEST_EVIDENCE`.
 - No exact sanctions identifier and no Annex I entry produces at most `GREEN_CANDIDATE` + `MONITOR`; this is not clearance.
 
-Only an authorised human may clear or block a named transaction. OFAC list membership alone does not implement the 50 Percent Rule or determine program/legal effect. Fuzzy/transliterated matching, ownership/control propagation, destination/end-use/catch-all rules, Russia Regulation `833/2014` goods annexes, formal technical-threshold evaluation, screening/case records, tenant/OIDC authorization, MCP, and webhooks remain outside this slice.
+Only an authorised human may clear or block a named transaction. OFAC list membership alone does not implement the 50 Percent Rule or determine program/legal effect. Fuzzy/transliterated matching, ownership/control propagation, destination/end-use/catch-all rules, Russia Regulation `833/2014` goods annexes, technical rules outside the bounded `3A001` assertions, definitive classification, screening/case records, tenant/OIDC authorization, MCP, and webhooks remain outside this slice.
 
 ## Safe evaluation data
 

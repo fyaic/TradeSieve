@@ -11,6 +11,8 @@ from pydantic import Field, model_validator
 from tradesieve.application.contracts import (
     BusinessAction,
     ContractModel,
+    PositiveQuantity,
+    Reference,
     Signal,
 )
 from tradesieve.domain.eu_dual_use import (
@@ -20,6 +22,14 @@ from tradesieve.domain.eu_dual_use import (
     EuDualUseAssessmentStatus,
     EuDualUseControlList,
     normalize_control_code,
+)
+from tradesieve.domain.eu_dual_use_technical import (
+    EuDualUseTechnicalAssertionEngine,
+    EuDualUseTechnicalFact,
+    TechnicalCellType,
+    TechnicalFactId,
+    TechnicalFactUnit,
+    TechnicalProductFamily,
 )
 from tradesieve.domain.eu_fsf import (
     EU_FSF_IDENTIFIER_TYPES,
@@ -117,15 +127,70 @@ class OfficialPartyName(ContractModel):
         return self
 
 
+class OfficialTechnicalFact(ContractModel):
+    fact_id: TechnicalFactId
+    unit: TechnicalFactUnit
+    numeric_value: PositiveQuantity | None = None
+    boolean_value: bool | None = None
+    text_value: TechnicalCellType | None = None
+    evidence_ref: Reference
+    verified: bool = False
+
+    @model_validator(mode="after")
+    def validate_typed_fact(self) -> OfficialTechnicalFact:
+        EuDualUseTechnicalFact(
+            fact_id=self.fact_id,
+            unit=self.unit,
+            numeric_value=self.numeric_value,
+            boolean_value=self.boolean_value,
+            text_value=self.text_value,
+            evidence_ref=self.evidence_ref,
+            verified=self.verified,
+        )
+        return self
+
+    def to_domain(self) -> EuDualUseTechnicalFact:
+        return EuDualUseTechnicalFact(
+            fact_id=self.fact_id,
+            unit=self.unit,
+            numeric_value=self.numeric_value,
+            boolean_value=self.boolean_value,
+            text_value=self.text_value,
+            evidence_ref=self.evidence_ref,
+            verified=self.verified,
+        )
+
+
 class OfficialGoodsCandidate(ContractModel):
     annex_i_code: str | None = None
     classification_verified: bool = False
     technical_specification_available: bool = False
+    product_family: TechnicalProductFamily | None = None
+    technical_facts: Annotated[list[OfficialTechnicalFact], Field(max_length=16)] = (
+        Field(default_factory=list)
+    )
 
     @model_validator(mode="after")
     def validate_control_code(self) -> OfficialGoodsCandidate:
         if self.annex_i_code is not None:
             normalize_control_code(self.annex_i_code)
+        if len({item.fact_id for item in self.technical_facts}) != len(
+            self.technical_facts
+        ):
+            raise ValueError("technical fact identities must be unique")
+        has_technical_payload = self.product_family is not None or bool(
+            self.technical_facts
+        )
+        if has_technical_payload and (
+            self.annex_i_code is None
+            or self.product_family is None
+            or not self.technical_facts
+            or not self.technical_specification_available
+        ):
+            raise ValueError(
+                "technical evaluation requires an Annex I candidate, product family, "
+                "available specification and typed facts"
+            )
         return self
 
 
@@ -197,6 +262,34 @@ class OfficialDualUseResult(ContractModel):
     entry_content_hash: str | None
     source_native_locator: str | None
     missing_facts: list[str]
+    technical_assessment: OfficialTechnicalAssessmentResult | None = None
+
+
+class OfficialTechnicalComparisonResult(ContractModel):
+    clause_id: str
+    fact_id: TechnicalFactId
+    operator: str
+    actual_value: str
+    threshold_value: str
+    unit: TechnicalFactUnit
+    matched: bool
+
+
+class OfficialTechnicalAssessmentResult(ContractModel):
+    status: str
+    rule_id: str | None
+    rule_version: str
+    rule_bundle_id: str
+    rule_bundle_content_hash: str
+    source_celex: str
+    source_entry_code: str
+    source_entry_content_hash: str
+    source_native_locator: str | None
+    required_facts: list[TechnicalFactId]
+    missing_facts: list[str]
+    evidence_refs: list[str]
+    comparisons: list[OfficialTechnicalComparisonResult]
+    automatic_clearance: Literal[False] = False
 
 
 class OfficialOfacIdentifierEvidence(ContractModel):
@@ -450,6 +543,14 @@ class OfficialScreeningEngine:
             classification_verified=goods.classification_verified,
             technical_specification_available=(goods.technical_specification_available),
         )
+        technical_assessment = EuDualUseTechnicalAssertionEngine(
+            dual_use_control_list
+        ).assess(
+            annex_i_code=goods.annex_i_code,
+            classification_verified=goods.classification_verified,
+            product_family=goods.product_family,
+            facts=tuple(item.to_domain() for item in goods.technical_facts),
+        )
         sanctions_statuses = {match.status for match in matches}
         strong_sanctions_signal = bool(
             sanctions_statuses
@@ -483,6 +584,40 @@ class OfficialScreeningEngine:
             action = BusinessAction.MONITOR
 
         entry = dual_assessment.entry
+        technical_result = (
+            None
+            if technical_assessment is None
+            else OfficialTechnicalAssessmentResult(
+                status=technical_assessment.status.value,
+                rule_id=technical_assessment.rule_id,
+                rule_version=technical_assessment.rule_version,
+                rule_bundle_id=technical_assessment.rule_bundle_id,
+                rule_bundle_content_hash=(
+                    technical_assessment.rule_bundle_content_hash
+                ),
+                source_celex=technical_assessment.source_celex,
+                source_entry_code=technical_assessment.source_entry_code,
+                source_entry_content_hash=(
+                    technical_assessment.source_entry_content_hash
+                ),
+                source_native_locator=technical_assessment.source_native_locator,
+                required_facts=list(technical_assessment.required_facts),
+                missing_facts=list(technical_assessment.missing_facts),
+                evidence_refs=list(technical_assessment.evidence_refs),
+                comparisons=[
+                    OfficialTechnicalComparisonResult(
+                        clause_id=item.clause_id,
+                        fact_id=item.fact_id,
+                        operator=item.operator.value,
+                        actual_value=item.actual_value,
+                        threshold_value=item.threshold_value,
+                        unit=item.unit,
+                        matched=item.matched,
+                    )
+                    for item in technical_assessment.comparisons
+                ],
+            )
+        )
         return OfficialScreeningResult(
             signal=signal,
             business_action=action,
@@ -525,13 +660,15 @@ class OfficialScreeningEngine:
                     entry.native_locator if entry is not None else None
                 ),
                 missing_facts=list(dual_assessment.missing_facts),
+                technical_assessment=technical_result,
             ),
             caveats=[
                 "Exact source evidence is not legal clearance.",
                 "Name results are exact normalized-alias candidates, not fuzzy matches.",
                 "Transliteration, fuzzy matching and ownership/control remain required.",
                 "OFAC list membership does not implement the 50 Percent Rule.",
-                "An Annex I code is not inferred from HS/CN/TARIC data.",
+                "Neither an Annex I code nor a definitive classification is inferred "
+                "from HS/CN/TARIC data or a technical assertion result.",
                 "Catch-all, destination, end-use and sanctions controls remain required.",
                 "Only an authorised human may clear or block the transaction.",
             ],
@@ -601,6 +738,8 @@ __all__ = [
     "OfficialPartyName",
     "OfficialScreeningRequest",
     "OfficialScreeningResult",
+    "OfficialTechnicalAssessmentResult",
+    "OfficialTechnicalFact",
     "OfficialScreeningEngine",
     "OfficialScreeningService",
     "PersistedOfficialScreeningService",

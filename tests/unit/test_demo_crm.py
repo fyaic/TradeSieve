@@ -118,9 +118,20 @@ def test_demo_records_map_to_live_official_screening_facts_conservatively() -> N
     assert listed.goods.annex_i_code == "3A001"
     assert listed.goods.classification_verified is False
     assert listed.goods.technical_specification_available is False
+    cell = requests["crm-quote-260810-0039"].goods
+    assert cell.annex_i_code == "3A001"
+    assert cell.classification_verified is True
+    assert cell.technical_specification_available is True
+    assert cell.product_family == "ELECTROCHEMICAL_CELL"
+    assert {item.fact_id.value for item in cell.technical_facts} == {
+        "is_battery",
+        "cell_type",
+        "energy_density_wh_per_kg",
+        "measurement_temperature_celsius",
+    }
     assert all(request.party_names for request in requests.values())
-    assert all(
-        request.goods.classification_verified is False for request in requests.values()
+    assert (
+        sum(request.goods.classification_verified for request in requests.values()) == 1
     )
     assert any(
         request.goods.technical_specification_available for request in requests.values()

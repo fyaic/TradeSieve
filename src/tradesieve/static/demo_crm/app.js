@@ -205,6 +205,21 @@ function renderOfficialScreening(payload) {
         )
         .join("")
     : '<div class="no-open-risk">本次精确规范化名称没有官方名单候选；这不等于已完成模糊、音译或所有权审查。</div>';
+  const technicalAssessment = result.dual_use.technical_assessment;
+  const technicalComparisons = technicalAssessment
+    ? technicalAssessment.comparisons
+        .map(
+          (item) =>
+            `${escapeHtml(item.fact_id)}：${escapeHtml(item.actual_value)} ${escapeHtml(item.unit)} ` +
+            `${escapeHtml(item.operator)} ${escapeHtml(item.threshold_value)}；${item.matched ? "满足" : "不满足"}`,
+        )
+        .join("<br>")
+    : "未提交经审核的结构化技术事实";
+  const technicalDetail = technicalAssessment
+    ? `<p>技术规则：${escapeHtml(technicalAssessment.rule_id || "未选择")} / ${escapeHtml(technicalAssessment.status)}</p>
+       <p>参数比较：${technicalComparisons || "等待补充参数"}</p>
+       <p>规则包：${escapeHtml(technicalAssessment.rule_bundle_id)} @ ${escapeHtml(technicalAssessment.rule_version)}</p>`
+    : `<p>技术参数判定：${technicalComparisons}</p>`;
   const dualUse = `
     <article class="risk-item">
       <div class="risk-item-header">
@@ -214,6 +229,7 @@ function renderOfficialScreening(payload) {
       <p>控制号：${escapeHtml(result.dual_use.requested_code || "未提供")}</p>
       <p>缺失事实：${escapeHtml(result.dual_use.missing_facts.join("、") || "无")}</p>
       <p>证据定位：${escapeHtml(result.dual_use.source_native_locator || "未命中控制项")}</p>
+      ${technicalDetail}
     </article>`;
   const events = payload.integration_events
     .map(

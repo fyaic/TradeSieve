@@ -10,6 +10,7 @@ from typing import Any, cast
 import pytest
 from pydantic import ValidationError
 
+import tradesieve.domain.eu_dual_use_technical as technical
 from tradesieve.application.contracts import BusinessAction, Signal
 from tradesieve.application.official_screening import (
     OfficialGoodsCandidate,
@@ -18,11 +19,18 @@ from tradesieve.application.official_screening import (
     OfficialScreeningEngine,
     OfficialScreeningRequest,
     OfficialScreeningService,
+    OfficialTechnicalFact,
     PersistedOfficialScreeningService,
 )
 from tradesieve.domain.eu_dual_use import (
     EuDualUseControlEntry,
     EuDualUseControlList,
+)
+from tradesieve.domain.eu_dual_use_technical import (
+    TechnicalCellType,
+    TechnicalFactId,
+    TechnicalFactUnit,
+    TechnicalProductFamily,
 )
 from tradesieve.domain.eu_fsf import (
     EuFsfAlias,
@@ -244,6 +252,121 @@ def test_exact_sanctions_and_annex_entry_hold_with_versioned_evidence() -> None:
     assert parser.contents == [b"source bytes"]
     assert ofac_source.calls == [OfacSlsListKind.SDN, OfacSlsListKind.CONSOLIDATED]
     assert ofac_parser.calls == ofac_source.calls
+
+
+def test_source_bound_secondary_cell_threshold_is_exposed_in_canonical_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    listing = dual_list()
+    entry = next(item for item in listing.entries if item.code == "3A001")
+    monkeypatch.setattr(technical, "EU_DUAL_USE_3A001_ENTRY_HASH", entry.content_hash)
+    facts = [
+        OfficialTechnicalFact(
+            fact_id=TechnicalFactId.IS_BATTERY,
+            unit=TechnicalFactUnit.BOOLEAN,
+            boolean_value=False,
+            evidence_ref="manufacturer-datasheet-1",
+            verified=True,
+        ),
+        OfficialTechnicalFact(
+            fact_id=TechnicalFactId.CELL_TYPE,
+            unit=TechnicalFactUnit.CELL_TYPE,
+            text_value=TechnicalCellType.SECONDARY,
+            evidence_ref="manufacturer-datasheet-1",
+            verified=True,
+        ),
+        OfficialTechnicalFact.model_validate(
+            {
+                "fact_id": "energy_density_wh_per_kg",
+                "unit": "WH_PER_KG",
+                "numeric_value": "380",
+                "evidence_ref": "manufacturer-datasheet-1",
+                "verified": True,
+            }
+        ),
+        OfficialTechnicalFact.model_validate(
+            {
+                "fact_id": "measurement_temperature_celsius",
+                "unit": "CELSIUS",
+                "numeric_value": "20",
+                "evidence_ref": "manufacturer-datasheet-1",
+                "verified": True,
+            }
+        ),
+    ]
+    result = OfficialScreeningEngine().screen(
+        OfficialScreeningRequest(
+            party_names=[OfficialPartyName(name="Unlisted synthetic buyer")],
+            goods=OfficialGoodsCandidate(
+                annex_i_code="3A001",
+                classification_verified=True,
+                technical_specification_available=True,
+                product_family=TechnicalProductFamily.ELECTROCHEMICAL_CELL,
+                technical_facts=facts,
+            ),
+        ),
+        fsf_snapshot=fsf_snapshot(),
+        fsf_retrieved_at=NOW,
+        dual_use_control_list=listing,
+    )
+
+    assert result.signal is Signal.RED
+    assert result.business_action is BusinessAction.HOLD
+    assessment = result.dual_use.technical_assessment
+    assert assessment is not None
+    assert assessment.status == "MATCHED"
+    assert assessment.rule_id == "eu-3a001-e-1-secondary-cell"
+    assert assessment.source_entry_content_hash == entry.content_hash
+    assert assessment.evidence_refs == ["manufacturer-datasheet-1"]
+    assert [item.matched for item in assessment.comparisons] == [True, True]
+    assert assessment.automatic_clearance is False
+
+
+def test_technical_payload_contract_rejects_partial_and_duplicate_facts() -> None:
+    fact = {
+        "fact_id": "resolution_bits",
+        "unit": "BITS",
+        "numeric_value": "12",
+        "evidence_ref": "datasheet-1",
+        "verified": True,
+    }
+    invalid_goods = (
+        {
+            "annex_i_code": "3A001",
+            "technical_specification_available": True,
+            "product_family": "ADC_INTEGRATED_CIRCUIT",
+            "technical_facts": [],
+        },
+        {
+            "annex_i_code": "3A001",
+            "technical_specification_available": True,
+            "product_family": "ADC_INTEGRATED_CIRCUIT",
+            "technical_facts": [fact, fact],
+        },
+        {
+            "annex_i_code": "3A001",
+            "technical_specification_available": False,
+            "product_family": "ADC_INTEGRATED_CIRCUIT",
+            "technical_facts": [fact],
+        },
+        {
+            "annex_i_code": None,
+            "technical_specification_available": True,
+            "product_family": "ADC_INTEGRATED_CIRCUIT",
+            "technical_facts": [fact],
+        },
+    )
+    for payload in invalid_goods:
+        with pytest.raises(ValidationError):
+            OfficialGoodsCandidate.model_validate(payload)
+    with pytest.raises(ValidationError):
+        OfficialTechnicalFact.model_validate(
+            {
+                **fact,
+                "numeric_value": None,
+                "boolean_value": True,
+            }
+        )
 
 
 def test_missing_goods_classification_requests_evidence_after_no_match() -> None:

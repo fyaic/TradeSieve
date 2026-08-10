@@ -60,7 +60,7 @@ flowchart LR
 
 ## 项目进度
 
-**当前阶段：Phase 1 MVP 开发中。EU FSF、EU Annex I、OFAC SDN 和 OFAC Consolidated 已能经过验证后作为一个四源 bundle 原子写入 PostgreSQL，并由 CLI、认证 REST 和合成 CRM 调用同一个活跃版本审查服务；完整案件、人工作业、MCP、所有权/控制传播和俄罗斯专项货物/路线控制仍未完成。**
+**当前阶段：Phase 1 MVP 开发中。EU FSF、EU Annex I、OFAC SDN 和 OFAC Consolidated 已能经过验证后作为一个四源 bundle 原子写入 PostgreSQL，并由 CLI、认证 REST 和合成 CRM 调用同一个活跃版本审查服务；`3A001` 首批来源绑定技术参数规则已接入，完整案件、人工作业、MCP、所有权/控制传播和俄罗斯专项货物/路线控制仍未完成。**
 
 截至 2026-08-10，进度如下：
 
@@ -73,25 +73,25 @@ flowchart LR
 | 规则包治理 | ✅ 已完成 | 有版本、有引用、可审批/激活/回滚的合成规则包 |
 | 原始来源快照 | ✅ 已完成 | 私有不可变对象、解析/验证证据、双人治理、PostgreSQL 持久化 |
 | 规范化受理与幂等 | ✅ 合成演示可用 | 严格 canonical intake、授权范围幂等、原子审计/outbox、PostgreSQL 18.4 持久化和 demo-only 运行入口；见 [TS-302](https://github.com/fyaic/TradeSieve/issues/21) / [PR #36](https://github.com/fyaic/TradeSieve/pull/36) |
-| 合成物流 CRM 门禁 | 🧪 真实来源技术预览 | 5 条中国货代风格合成询报价；页面按钮调用 PostgreSQL 活跃官方来源，不再使用预置结论。首条记录以公开 FSF 企业别名和 `3A001` 验证 `RED/HOLD`；见 [使用指南](docs/getting-started/demo-crm.md) |
+| 合成物流 CRM 门禁 | 🧪 真实来源技术预览 | 5 条中国货代风格合成询报价；页面按钮调用 PostgreSQL 活跃官方来源，不再使用预置结论。名单场景验证公开 FSF 别名；高能量密度二次电芯场景执行真实 `3A001.e.1` 数字阈值；见 [使用指南](docs/getting-started/demo-crm.md) |
 | EU 官方制裁名单 | 🧪 活跃版本可用 | 经 data.europa.eu 发现当前 FSF XML；有界 gzip/identity 下载、安全解析、原始哈希、6,234 主体/31,053 别名/3,007 标识投影、不可变激活、强标识精确匹配和官方别名候选；尚无模糊/音译/所有权匹配 |
-| EU 两用物项 Annex I | 🧪 活跃版本可用 | 从 Publications Office CELLAR 读取 `32025R2003` 官方 Formex 附件并持久化 384 个控制条目；核验显式 Annex I 控制号和缺失事实，不从 HS 或货描自动归类 |
+| EU 两用物项 Annex I | 🧪 活跃版本 + 首批技术断言 | 从 Publications Office CELLAR 读取 `32025R2003` 官方 Formex 附件并持久化 384 个控制条目；首批手工复核规则覆盖 `3A001.a.5.a`、`.a.14`、`.e.1` 的 ADC/电芯数字阈值，绑定精确条目哈希；不从 HS 或货描自动归类 |
 | OFAC SLS 制裁名单 | 🧪 活跃版本可用 | 固定官方 SDN/Consolidated XML 入口、严格 GovCloud 跳转、安全解析、稳定 UID/哈希差分和来源专用不可变投影；精确强标识/名称候选已进入 CLI、REST、CRM；尚无 50 Percent Rule、所有权/控制传播或 program 法律效果引擎 |
 | 官方来源刷新与审查 CLI | ✅ 可运行 | `refresh-official-sources` 原子激活同一 FSF/Annex I/OFAC SDN/OFAC Consolidated bundle；`screen-active` 只使用 48 小时内的完整活跃版本；`screen-official` 保留为逐次联网诊断入口 |
 | 持久化来源投影与激活 | ✅ 四源垂直切片完成 | migration `20260810_0007` 在保留 0006 EU 历史证据的同时加入 OFAC 来源专用投影；新激活必须四源完整，重复刷新幂等，缺失/损坏/陈旧时失败关闭 |
-| 完整确定性审查与证据 | ⏳ 进行中 | 官方别名精确规范化候选已接入；模糊/音译实体解析、所有权/控制、俄罗斯 `833/2014` 货物附件、路线/最终用途/catch-all 仍待接入 |
+| 完整确定性审查与证据 | ⏳ 进行中 | 官方别名精确规范化候选和首批 `3A001` 技术事实比较已接入；完整 Annex I 规则、模糊/音译实体解析、所有权/控制、俄罗斯 `833/2014`、路线/最终用途/catch-all 仍待接入 |
 | 案件/发现项/处置状态 | ⏳ 计划中 | 结构化 finding、evidence、hold 和人工决定 |
 | Screening REST API | 🧪 官方来源技术预览 | `POST /v1/official-screenings` 使用部署级 Bearer token、1 MiB JSON 上限和活跃来源服务；尚无正式 OIDC/租户授权、幂等案件受理、查询和 webhook |
 | Screening CLI 与 MCP | ⏳ 计划中 | 面向运营/CI 和 Agent 的同契约适配器；当前尚无 MCP Server |
 | Webhook 与可观测性 | ⏳ 计划中 | 签名事件、脱敏日志/指标/链路 |
 
-当前分支已通过仓库级回归以及两个独立 PostgreSQL 18.4 门禁：migration `0007` 从空库完成四源激活/幂等/完整回读/不可变约束，也证明 0006 中已有 EU 活跃证据升级后逐条保留、但因缺少 OFAC 会失败关闭。2026-08-10 联网端到端验收解析并持久化 EU FSF 6,234 个主体、Annex I 384 个控制条目、OFAC SDN 19,199 条和 Consolidated 481 条；重复刷新返回 `IDEMPOTENT`。同一活跃 bundle 经 CLI 与认证 REST 返回完全一致结果，公开 SOVCOMFLOT 样本产生带 `RUSSIA-EO14024` program 证据的 `RED/HOLD`，合成 CRM 也绑定相同四源 snapshot。最终完整测试/覆盖率数字以本分支 PR 的 CI 门禁为准。这些证据证明当前代码边界和来源可达性，不代表全球名单覆盖、法律正确率或生产可用性。
+当前分支已通过仓库级回归以及两个独立 PostgreSQL 18.4 门禁：migration `0007` 从空库完成四源激活/幂等/完整回读/不可变约束，也证明 0006 中已有 EU 活跃证据升级后逐条保留、但因缺少 OFAC 会失败关闭。2026-08-10 联网端到端验收解析并持久化 EU FSF 6,234 个主体、Annex I 384 个控制条目、OFAC SDN 19,199 条和 Consolidated 481 条；重复刷新返回 `IDEMPOTENT`。同一活跃 bundle 经 CLI 与认证 REST 返回完全一致结果，公开 SOVCOMFLOT 样本产生带 `RUSSIA-EO14024` program 证据的 `RED/HOLD`，合成 CRM 也绑定相同四源 snapshot，并能对有限 `3A001` 产品族执行来源哈希绑定的技术阈值比较。最终完整测试/覆盖率数字以本交付分支的 CI 门禁为准。这些证据证明当前代码边界和来源可达性，不代表全球名单覆盖、法律正确率或生产可用性。
 
 详细范围见 [MVP 定义](docs/product/mvp-scope.md)、[Phase 1 计划](docs/delivery/phase-1-plan.md) 和 [敏捷 backlog](docs/delivery/phase-1-backlog.md)。
 
 ## 现在可以怎样使用
 
-当前主路径是“四份正式来源刷新并原子激活 → CLI/REST/CRM 读取同一活跃 bundle → 返回保守业务动作和可追溯证据”。合成 CRM 只提供测试交易，名单和 Annex I 证据来自真实活跃官方版本。该垂直切片仍是技术预览：不持久化任意 REST 请求/结果或案件，也没有正式 OIDC、模糊/音译实体解析、OFAC 50 Percent Rule、俄罗斯专项货物控制或 MCP。
+当前主路径是“四份正式来源刷新并原子激活 → CLI/REST/CRM 读取同一活跃 bundle → 对显式合格候选执行来源绑定技术断言 → 返回保守业务动作和可追溯证据”。合成 CRM 只提供测试交易，名单和 Annex I 证据来自真实活跃官方版本。该垂直切片仍是技术预览：不持久化任意 REST 请求/结果或案件，也没有正式 OIDC、模糊/音译实体解析、OFAC 50 Percent Rule、完整 Annex I/俄罗斯专项货物控制或 MCP。
 
 ### 1. 启动参考环境
 
@@ -141,7 +141,14 @@ docker compose run --rm --no-deps app \
   "goods": {
     "annex_i_code": "3A001",
     "classification_verified": true,
-    "technical_specification_available": true
+    "technical_specification_available": true,
+    "product_family": "ELECTROCHEMICAL_CELL",
+    "technical_facts": [
+      {"fact_id": "is_battery", "unit": "BOOLEAN", "boolean_value": false, "evidence_ref": "datasheet-1", "verified": true},
+      {"fact_id": "cell_type", "unit": "CELL_TYPE", "text_value": "SECONDARY", "evidence_ref": "datasheet-1", "verified": true},
+      {"fact_id": "energy_density_wh_per_kg", "unit": "WH_PER_KG", "numeric_value": "380", "evidence_ref": "datasheet-1", "verified": true},
+      {"fact_id": "measurement_temperature_celsius", "unit": "CELSIUS", "numeric_value": "20", "evidence_ref": "datasheet-1", "verified": true}
+    ]
   }
 }
 ```
@@ -159,9 +166,10 @@ docker compose run --rm --no-deps app \
 2. EU FSF 版本、原始文件哈希、强标识/名称候选状态和原生定位；
 3. OFAC SDN/Consolidated 的独立版本、program、强标识/名称候选和原生定位；
 4. Annex I CELEX、控制号命中、条目哈希、原生定位和缺失事实；
-5. `HOLD` / `REQUEST_EVIDENCE` / `MONITOR`，且 `automatic_clearance` 永远为 `false`。
+5. 已支持分支的技术规则 ID/版本、来源条目哈希、逐项单位化比较和证据引用；
+6. `HOLD` / `REQUEST_EVIDENCE` / `MONITOR`，且 `automatic_clearance` 永远为 `false`。
 
-名称候选不是精确身份结论：EU 或 OFAC 任一候选都会返回 `RED/HOLD` 等待授权人员复核；当前尚不支持模糊相似、音译、词序变体、所有权/控制传播或 OFAC 50 Percent Rule。输入的 `annex_i_code` 必须来自合格的归类过程；TradeSieve 不会从 HS/CN/TARIC 或货描自动推导正式控制号。即使四份来源均无候选，结果也只是 `GREEN_CANDIDATE/MONITOR`，不是法律放行。活跃来源不存在、陈旧或损坏时命令退出 `2`；输入无效时退出 `3`。需要逐次联网诊断时仍可运行 `screen-official`。完整说明见 [官方来源使用指南](docs/getting-started/official-screening-cli.md)。
+名称候选不是精确身份结论：EU 或 OFAC 任一候选都会返回 `RED/HOLD` 等待授权人员复核；当前尚不支持模糊相似、音译、词序变体、所有权/控制传播或 OFAC 50 Percent Rule。输入的 `annex_i_code` 必须来自合格的归类过程；TradeSieve 不会从 HS/CN/TARIC 或货描自动推导正式控制号。结构化技术事实只对已支持的规则分支作 `MATCHED/NOT_MATCHED/INCOMPLETE` 比较；它既不是完整归类也不是放行。即使四份来源均无候选，结果也只是 `GREEN_CANDIDATE/MONITOR`。活跃来源不存在、陈旧、损坏，或活跃条文哈希与已批准规则不一致时失败关闭。完整说明见 [官方来源使用指南](docs/getting-started/official-screening-cli.md)。
 
 ### 4. 从 CRM/OMS 调用认证 REST 技术预览
 
@@ -189,10 +197,11 @@ http://127.0.0.1:8080/demo/crm
 
 - 使用公开 EU FSF 企业别名的合成交易产生官方名称候选；
 - `3A001` 控制号命中当前 Annex I，并明确指出合格归类复核和技术规格缺口；
+- 高能量密度二次电芯以经审核的合成技术参数触发 `3A001.e.1` 严格阈值比较；
 - 其他合成交易在缺少 Annex I 归类时请求补充事实；
 - 同一 bundle 的 FSF/Annex I/OFAC SDN/OFAC Consolidated snapshot ID、内容哈希和原生证据定位。
 
-页面和接口只在 demo 模式注册。交易、金额、路线和单证是固定合成 fixture；首条记录的名单名称来自公开官方制裁文件，只用于可重复验收，不对应真实客户关系。审查证据不是预置结果，但当前只覆盖 FSF 精确规范化名称/强标识和显式 Annex I 控制号。完整说明见 [合成 CRM 使用指南](docs/getting-started/demo-crm.md)。
+页面和接口只在 demo 模式注册。交易、金额、路线、单证和技术参数是固定合成 fixture；首条记录的名单名称来自公开官方制裁文件，只用于可重复验收，不对应真实客户关系。审查证据不是预置结果；当前覆盖 FSF 精确规范化名称/强标识、显式 Annex I 控制号和首批 `3A001` 来源绑定技术断言。完整说明见 [合成 CRM 使用指南](docs/getting-started/demo-crm.md)。
 
 ### 6. 使用当前运维 CLI
 
