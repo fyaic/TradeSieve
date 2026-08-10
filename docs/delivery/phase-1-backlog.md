@@ -53,7 +53,7 @@
 | TS-502 CLI client | S3 | Analyst can validate/screen/read using files/stdin | Human/JSON output, stdout/stderr, safe exit codes, REST parity | TS-501 |
 | TS-503 MCP adapter | S3 | Agent can screen/read/explain/request review safely | Official SDK/target protocol, structured parity, narrow scopes, no clearance/bulk/arbitrary tools | Issue #9, TS-501 |
 | TS-504 Signed webhook delivery | S3 | Caller receives reliable state changes | Outbox, signature/timestamp/rotation, retry/dead-letter, at-least-once and dedupe tests | TS-401/104 |
-| TS-505 Sample CRM/OMS gate | S3 | Integrator sees exactly how to connect | Map/submit/store IDs/enforce hold/verify event/re-read/release named action; outage fail-closed | Issue #1, TS-501/504 |
+| [TS-505](https://github.com/fyaic/TradeSieve/issues/37) Sample CRM/OMS gate | S1 demo / S3 full | Integrator first sees a fixed synthetic CRM interception demo, then the complete integration | Demo maps fixed records to canonical contracts and enforces conservative results; full story later adds formal REST, webhook verification, re-read and named-action release | Issue #1, TS-501/504 |
 
 ## [E6 — Security, operations, and MVP acceptance](https://github.com/fyaic/TradeSieve/issues/16)
 

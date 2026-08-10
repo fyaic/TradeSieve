@@ -818,6 +818,45 @@ done
 
 curl --fail --silent --show-error "http://127.0.0.1:${host_port}/health/live" >/dev/null
 curl --fail --silent --show-error "http://127.0.0.1:${host_port}/health/ready" >/dev/null
+demo_crm_page="$(curl --fail --silent --show-error \
+  "http://127.0.0.1:${host_port}/demo/crm")"
+if [[ "$demo_crm_page" != *"华舟国际货运"* \
+  || "$demo_crm_page" != *"TradeSieve"* \
+  || "$demo_crm_page" != *"纯合成演示"* ]]; then
+  echo "demo CRM page is incomplete" >&2
+  exit 1
+fi
+demo_crm_records="$(curl --fail --silent --show-error \
+  "http://127.0.0.1:${host_port}/demo/api/crm/records")"
+demo_crm_record_id="$(python -c '
+import json
+import sys
+payload = json.load(sys.stdin)
+assert payload["demo_only"] is True, payload
+assert payload["data_classification"] == "SYNTHETIC", payload
+assert len(payload["records"]) == 5, payload
+assert all(item["screening_status"] == "NOT_SCREENED" for item in payload["records"])
+print(payload["records"][0]["record_id"])
+' <<<"$demo_crm_records")"
+demo_crm_screening="$(curl --fail --silent --show-error --request POST \
+  "http://127.0.0.1:${host_port}/demo/api/crm/records/${demo_crm_record_id}/screen")"
+python -c '
+import json
+import sys
+payload = json.load(sys.stdin)
+assert payload["demo_only"] is True, payload
+assert payload["precomputed_fixture"] is True, payload
+assert payload["data_classification"] == "SYNTHETIC", payload
+assert payload["canonical_input_hash"] == payload["result"]["version_set"]["input_hash"], payload
+assert payload["result"]["state"] == "ESCALATE", payload
+assert payload["result"]["signal"] == "RED", payload
+assert payload["result"]["highest_priority"] == "P0", payload
+assert payload["result"]["business_action"] == "ESCALATE", payload
+assert all(
+    payload["result"][key] for key in ("screening_id", "case_id", "result_hash")
+), payload
+assert "HUMAN_CLEARED" not in json.dumps(payload), payload
+' <<<"$demo_crm_screening"
 "${compose[@]}" run --rm --no-deps app python -m tradesieve.manage inspect
 assert_source_listing "CURRENT" "true" "0"
 assert_rule_counts "17"

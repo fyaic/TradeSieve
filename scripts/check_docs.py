@@ -52,6 +52,7 @@ REQUIRED = (
     "docs/delivery/agile-operating-model.md",
     "docs/delivery/phase-1-plan.md",
     "docs/delivery/phase-1-backlog.md",
+    "docs/getting-started/demo-crm.md",
     "docs/getting-started/mvp-user-experience.md",
     "docs/getting-started/docker-reference.md",
     "api/openapi/tradesieve.v1.json",
