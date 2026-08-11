@@ -24,7 +24,7 @@ dependencies = [
     "fastapi==0.141.1",
     "mcp==2.0.0",
     "psycopg[binary]==3.3.4",
-    "pydantic-settings==2.14.2",
+    "pydantic-settings==2.15.0",
     "sqlalchemy==2.0.51",
     "uvicorn==0.52.1",
 ]
