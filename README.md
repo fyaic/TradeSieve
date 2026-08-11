@@ -60,7 +60,7 @@ flowchart LR
 
 ## 项目进度
 
-**当前阶段：`0.1.0a3` 高保真工程原型。EU FSF、EU Annex I、OFAC SDN 和 OFAC Consolidated 已能经过验证后作为一个四源 bundle 原子写入 PostgreSQL，并由 CLI、认证 REST、只读 MCP 和合成 CRM 调用同一个活跃版本审查服务；BIS CHPL 的 50 个 HS-6 候选和 `3A001` 首批来源绑定技术参数规则已接入。完整案件、人工作业、远程 MCP/OAuth、所有权/控制传播和俄罗斯专项货物/路线法律效果仍未完成。**
+**当前阶段：`0.1.0a4` 高保真工程原型。EU FSF、EU Annex I、OFAC SDN 和 OFAC Consolidated 已能经过验证后作为一个四源 bundle 原子写入 PostgreSQL，并由 CLI、认证 REST、只读 MCP 和合成 CRM 调用同一个活跃版本审查服务；BIS CHPL 的 50 个 HS-6 候选和 `3A001` 首批来源绑定技术参数规则已接入。完整案件、人工作业、远程 MCP/OAuth、所有权/控制传播和俄罗斯专项货物/路线法律效果仍未完成。**
 
 截至 2026-08-11，进度如下：
 
@@ -86,7 +86,7 @@ flowchart LR
 | Screening CLI 与 MCP | 🧪 可运行切片 | `screen-active` 与本地 stdio `screen_transaction` 调用同一活跃来源服务；MCP 仅一个只读工具，远程 Streamable HTTP/OAuth 与案件工具尚未实现 |
 | Webhook 与可观测性 | ⏳ 计划中 | 签名事件、脱敏日志/指标/链路 |
 
-当前分支已通过 2,079 个仓库测试和 100% 语句/分支覆盖率，以及独立 PostgreSQL 18.4、完整 Compose 和联网官方来源门禁。migration `0007` 从空库完成四源激活/幂等/完整回读/不可变约束，也证明 0006 中已有 EU 活跃证据升级后逐条保留、但因缺少 OFAC 会失败关闭。2026-08-11 联网端到端验收解析并持久化 EU FSF 6,234 个主体、Annex I 384 个控制条目、OFAC SDN 19,199 条和 Consolidated 481 条；重复刷新返回 `IDEMPOTENT`。同一活跃 bundle 经 CLI、认证 REST 与 MCP 返回一致结果，公开 SOVCOMFLOT 样本产生带 `RUSSIA-EO14024` program 证据的 `RED/HOLD`，合成 CRM 也绑定相同四源 snapshot，并能识别 CHPL 候选及对有限 `3A001` 产品族执行来源哈希绑定的技术阈值比较。这些证据证明当前代码边界和来源可达性，不代表全球名单覆盖、法律正确率或生产可用性。
+当前分支已通过 2,081 个仓库测试和 100% 语句/分支覆盖率，以及独立 PostgreSQL 18.4、完整 Compose 和联网官方来源门禁。migration `0007` 从空库完成四源激活/幂等/完整回读/不可变约束，也证明 0006 中已有 EU 活跃证据升级后逐条保留、但因缺少 OFAC 会失败关闭。2026-08-11 联网端到端验收解析并持久化 EU FSF 6,234 个主体、Annex I 384 个控制条目、OFAC SDN 19,199 条和 Consolidated 481 条；重复刷新返回 `IDEMPOTENT`。同一活跃 bundle 经 CLI、认证 REST 与 MCP 返回一致结果，公开 SOVCOMFLOT 样本产生带 `RUSSIA-EO14024` program 证据的 `RED/HOLD`，合成 CRM 也绑定相同四源 snapshot，并能识别 CHPL 候选及对有限 `3A001` 产品族执行来源哈希绑定的技术阈值比较。这些证据证明当前代码边界和来源可达性，不代表全球名单覆盖、法律正确率或生产可用性。
 
 详细范围见 [MVP 定义](docs/product/mvp-scope.md)、[Phase 1 计划](docs/delivery/phase-1-plan.md) 和 [敏捷 backlog](docs/delivery/phase-1-backlog.md)。
 
@@ -158,8 +158,8 @@ docker compose run --rm --no-deps app \
 保存为 `screening.json` 后执行：
 
 ```bash
-docker compose run --rm --no-deps app \
-  python -m tradesieve.manage screen-active --request screening.json
+docker compose exec -T app \
+  tradesieve-manage screen-active --request - < screening.json
 ```
 
 该命令只读取 PostgreSQL 中完整、未损坏且不超过 48 小时的活跃 bundle，并在一个结果中返回：
