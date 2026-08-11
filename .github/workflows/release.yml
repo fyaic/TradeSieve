@@ -39,8 +39,8 @@ jobs:
           (
             cd dist
             shasum -a 256 tradesieve-*.whl tradesieve-*.tar.gz > ../SHA256SUMS
+            shasum -a 256 -c ../SHA256SUMS
           )
-          shasum -a 256 -c SHA256SUMS
 
       - name: Publish immutable prerelease assets
         env:

@@ -60,7 +60,7 @@ flowchart LR
 
 ## 项目进度
 
-**当前阶段：`0.1.0a2` 高保真工程原型。EU FSF、EU Annex I、OFAC SDN 和 OFAC Consolidated 已能经过验证后作为一个四源 bundle 原子写入 PostgreSQL，并由 CLI、认证 REST、只读 MCP 和合成 CRM 调用同一个活跃版本审查服务；BIS CHPL 的 50 个 HS-6 候选和 `3A001` 首批来源绑定技术参数规则已接入。完整案件、人工作业、远程 MCP/OAuth、所有权/控制传播和俄罗斯专项货物/路线法律效果仍未完成。**
+**当前阶段：`0.1.0a3` 高保真工程原型。EU FSF、EU Annex I、OFAC SDN 和 OFAC Consolidated 已能经过验证后作为一个四源 bundle 原子写入 PostgreSQL，并由 CLI、认证 REST、只读 MCP 和合成 CRM 调用同一个活跃版本审查服务；BIS CHPL 的 50 个 HS-6 候选和 `3A001` 首批来源绑定技术参数规则已接入。完整案件、人工作业、远程 MCP/OAuth、所有权/控制传播和俄罗斯专项货物/路线法律效果仍未完成。**
 
 截至 2026-08-11，进度如下：
 
