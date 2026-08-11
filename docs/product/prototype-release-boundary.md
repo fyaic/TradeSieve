@@ -1,12 +1,12 @@
 # Prototype release boundary
 
-**Release target:** `0.1.0a1`  
+**Release target:** `0.1.0a2`
 **Evidence date:** 2026-08-11  
 **Status:** demonstrable engineering prototype; not a production legal-clearance service.
 
 ## Product direction
 
-The leadership guidance is treated as a product constraint: TradeSieve should not merely collect another spreadsheet of names. Its value is keeping selected source evidence current, connecting it to everyday CRM/OMS decisions, and returning a bounded action that the business system can enforce. The project therefore delivers an independent control service and keeps regulatory facts, internal experience and business workflow responsibilities separate.
+The core product constraint is that TradeSieve must not merely collect another spreadsheet of names. Its value is keeping selected source evidence current, connecting it to everyday CRM/OMS decisions, and returning a bounded action that the business system can enforce. The project therefore delivers an independent control service and keeps regulatory facts, internal experience and business workflow responsibilities separate.
 
 This prototype is intentionally useful without pretending that the project team can replace qualified sanctions, export-control or customs professionals. It demonstrates repeatable retrieval, provenance, matching, candidate detection, conservative business actions and failure behavior. It does not approve legal interpretations.
 
@@ -20,7 +20,7 @@ This prototype is intentionally useful without pretending that the project team 
 | Sensitive-goods candidate | Compare an explicitly supplied HS candidate with the 50-item BIS Common High Priority List | A hit means enhanced due diligence; it is not an export prohibition or legal control classification |
 | CRM interaction | Five fixed, China international-logistics-style scenarios call the same active-source service used by CLI and REST | Transactions are synthetic; the page is a demonstration fixture, not a production CRM |
 | Business response | Return `HOLD`, `REQUEST_EVIDENCE` or `MONITOR`; stale, missing or corrupt active sources fail closed | `GREEN_CANDIDATE` and HTTP 200 never mean legal permission |
-| Distribution | Reproducible Python wheel/source archive plus Docker Compose reference stack, examples and versioned contracts | Reference deployment lacks production identity, tenancy, HA and operational ownership |
+| Distribution | Reproducible Python wheel/source archive, Docker Compose reference stack, REST/CLI and local stdio MCP examples, versioned contracts | Reference deployment lacks production identity, remote MCP OAuth, tenancy, HA and operational ownership |
 
 ## Two pools with different authority
 
@@ -34,7 +34,7 @@ flowchart LR
 ```
 
 - The **official/current source pool** stores regulator publications, immutable projections, content hashes, activation history and freshness. Its data can create screening evidence, but source membership alone does not implement every applicable legal effect.
-- The **internal case and experience pool** is intended for attributed historic interactions, human findings, documents and decisions. The supplied workbook and leadership chat belong here as research inputs. Internal experience never silently becomes an official list or an automatic clearance rule.
+- The **internal case and experience pool** is intended for attributed historic interactions, human findings, documents and decisions. The supplied workbook and internal interview notes belong here as research inputs. Internal experience never silently becomes an official list or an automatic clearance rule.
 - The **CRM/OMS** remains the business system of record. It sends explicit parties, goods, route, end-use and payment facts and must enforce the returned hold or evidence request.
 
 The current prototype has the official pool vertical slice and the underlying immutable intake/audit foundations. General workbook ingestion, experience search, case review and re-screening are not yet complete.

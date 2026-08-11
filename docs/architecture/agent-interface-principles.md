@@ -18,7 +18,24 @@ Business service
 
 No adapter owns matching thresholds, legal rules, release logic, or data-source parsing.
 
-## Proposed MCP surface
+## Implemented alpha MCP surface
+
+`tradesieve-mcp` currently runs over local stdio and exposes exactly one read-only
+tool: `screen_transaction`. Its nested input is `OfficialScreeningRequest`; its
+structured output is `OfficialScreeningResult`. Both schemas are generated directly
+from the canonical Pydantic models, and the implementation calls
+`PersistedOfficialScreeningService` against the same active official bundle as CLI,
+REST and the demo CRM.
+
+The tool declares read-only, non-destructive, idempotent and closed-world annotations.
+No clearance, case mutation, arbitrary search, raw-source export, filesystem, SQL or
+network tool is registered. The 2026-08-11 official-SDK smoke test negotiated MCP
+`2025-11-25`, rejected invalid input and returned a source-bound `RED/HOLD` result.
+
+stdio inherits the process/service identity of its trusted Agent host. It is not a
+remote authentication boundary and must not be published through a public relay.
+
+## Target MCP surface
 
 ### Read and screen tools
 
@@ -49,7 +66,12 @@ Large raw source files, unrestricted case search, and bulk personal-data export 
 
 ## MCP protocol target
 
-Target the MCP `2026-07-28` stateless protocol for remote deployments while retaining a compatibility strategy for clients on `2025-11-25`. The current protocol makes requests self-describing and routable and strengthens authorization; compatibility must be validated against official SDKs rather than assumed.
+The implemented local stdio acceptance negotiates MCP `2025-11-25` using the pinned
+official Python SDK `2.0.0`. A future remote deployment may target a later protocol
+only after Streamable HTTP, OAuth/OIDC discovery, audience/resource validation,
+tenant/tool authorization and compatibility tests are implemented. Protocol support
+is measured with official SDKs and target clients rather than inferred from a version
+declaration.
 
 Sources:
 

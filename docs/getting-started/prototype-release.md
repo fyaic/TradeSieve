@@ -1,6 +1,6 @@
 # Prototype release installation and handoff
 
-**Version:** `0.1.0a1`  
+**Version:** `0.1.0a2`
 **Audience:** evaluator, integration developer and internal demonstrator.  
 **Boundary:** synthetic demonstration and architecture evaluation; not production legal clearance.
 
@@ -11,7 +11,7 @@ Prerequisites are Git access to the private `fyaic/TradeSieve` repository and Do
 ```bash
 git clone git@github.com:fyaic/TradeSieve.git
 cd TradeSieve
-git checkout v0.1.0-alpha.1
+git checkout v0.1.0-alpha.2
 cp .env.example .env
 docker compose up -d --build --wait
 docker compose run --rm --no-deps app \
@@ -46,7 +46,7 @@ POST /v1/official-screenings
 
 Its request and response are defined by [OpenAPI](../../api/openapi/tradesieve.v1.json), the [shared schema registry](../../api/schemas/tradesieve.contracts.v1.json), and the [request example](../../examples/requests/official-screening.json). CRM/OMS callers must treat `HOLD`, `REQUEST_EVIDENCE`, `401`, `422`, `503`, timeouts and unparseable responses conservatively. Only `MONITOR` is possible for a green candidate, and it is not a release instruction.
 
-MCP is a documented target interface, not part of this alpha. Do not configure an Agent as if a TradeSieve MCP server already existed.
+This alpha includes one local read-only stdio MCP tool over the active official-source screening service. It is suitable for trusted-host demonstration and Agent integration tests; it is not a remote OAuth-protected production endpoint. See [MCP and Codex Agent integration](mcp-agent.md).
 
 ## Python distribution
 
@@ -54,11 +54,14 @@ Release assets contain a wheel and source archive. For an isolated engineering i
 
 ```bash
 python3.13 -m venv .venv
-.venv/bin/python -m pip install tradesieve-0.1.0a1-py3-none-any.whl
+.venv/bin/python -m pip install tradesieve-0.1.0a2-py3-none-any.whl
 .venv/bin/tradesieve-manage --help
 ```
 
-The package does not bundle PostgreSQL or official source data. Use the reference Compose stack for the complete demonstration.
+The wheel also installs `tradesieve-mcp`; start it through an MCP client because a
+normal shell invocation waits for protocol frames on stdin. The package does not
+bundle PostgreSQL or official source data. Use the reference Compose stack for the
+complete demonstration.
 
 Maintainers reproduce the artifacts with the pinned toolchain:
 
@@ -75,7 +78,8 @@ uv build
 3. Show the `850440` shipment receiving a BIS CHPL Tier 3A candidate and specific evidence requests.
 4. Show a bounded `3A001.e.1` technical comparison with synthetic manufacturer facts.
 5. Stop PostgreSQL or use a stale bundle and show that the CRM does not silently pass.
-6. End with the [prototype boundary](../product/prototype-release-boundary.md), especially the missing ownership, fuzzy matching, complete goods/legal-effect and human-case workflow capabilities.
+6. Run the MCP stdio probe or verified Codex Agent example and show the same active bundle and conservative action.
+7. End with the [prototype boundary](../product/prototype-release-boundary.md), especially the missing ownership, fuzzy matching, complete goods/legal-effect, remote MCP authentication and human-case workflow capabilities.
 
 ## Release contents and verification
 
@@ -84,7 +88,7 @@ uv build
 - Dockerfile and Docker Compose reference stack;
 - migration set through `20260810_0007`;
 - versioned OpenAPI, JSON Schema and synthetic examples;
-- fixed CRM demonstrator and source-refresh/CLI commands;
+- fixed CRM demonstrator, source-refresh/CLI commands and local read-only MCP server;
 - unit, contract, PostgreSQL, Compose and live-source acceptance scripts;
 - security, contributing, licence, changelog and known-boundary documentation.
 

@@ -1,0 +1,62 @@
+name: Bug report
+description: Report a reproducible non-security defect
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not report vulnerabilities or customer/transaction data here. Use private vulnerability reporting for security issues and synthetic data for reproduction.
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+      description: What happened? Include safe error codes or redacted output.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Use repository fixtures or obviously synthetic values only.
+      placeholder: |
+        1. Check out ...
+        2. Run ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: v0.1.0-alpha.1 or commit SHA
+    validations:
+      required: true
+  - type: dropdown
+    id: interface
+    attributes:
+      label: Interface or component
+      options:
+        - REST API
+        - CLI
+        - MCP
+        - Demo CRM
+        - Source refresh
+        - PostgreSQL/migrations
+        - Build/CI/docs
+        - Other
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Data safety
+      options:
+        - label: This report contains no production customer, shipment, payment, credential or private evidence data.
+          required: true

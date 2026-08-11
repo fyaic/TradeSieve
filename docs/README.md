@@ -17,10 +17,12 @@ TradeSieve documentation is decision-oriented: requirements preserve what is nee
 
 ## User and integration experience
 
+- [Alpha local demo and integration guide (CRM, REST, CLI, and Agent)](demo/tradesieve-alpha-local-demo-guide.md)
 - [Development setup and checks](getting-started/development.md)
 - [Docker reference deployment](getting-started/docker-reference.md)
 - [Synthetic international-logistics CRM over live official sources](getting-started/demo-crm.md)
 - [Four-source official refresh, CLI, and REST technical preview](getting-started/official-screening-cli.md)
+- [MCP and Codex Agent integration](getting-started/mcp-agent.md)
 - [Prototype release installation and handoff](getting-started/prototype-release.md)
 - [Target MVP user experience](getting-started/mvp-user-experience.md)
 - [Draft OpenAPI contract](../api/openapi/tradesieve.v1.json)
@@ -62,6 +64,12 @@ TradeSieve documentation is decision-oriented: requirements preserve what is nee
 - [Phase 1 delivery plan](delivery/phase-1-plan.md)
 - [Phase 1 backlog decomposition](delivery/phase-1-backlog.md)
 - [Product maturity roadmap](roadmap/discovery-plan.md)
+
+## Operations and evidence
+
+- [External services and outbound dependencies](operations/external-dependencies.md)
+- [MCP stdio smoke test](evidence/tradesieve-mcp-smoke-2026-08-11.md)
+- [Codex Agent MCP demonstration](evidence/codex-agent-mcp-demo-2026-08-11.md)
 
 ## Research
 

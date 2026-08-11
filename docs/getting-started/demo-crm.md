@@ -127,7 +127,7 @@ CRM 不应复制 TradeSieve 内部的制裁记录、规则表达式、相似度�
 - 俄罗斯 `833/2014` 货物附件、路线、最终用途、catch-all、金融/服务限制尚未接入；
 - 它不代表欧盟、美国、中国或任何其他法域的法律结论；
 - 它不证明任何主体、货物、路线、付款或交易可以放行；
-- 它没有案件持久化、证据提交、人工决定、webhook 或 MCP 闭环；当前官方来源 CLI 已可用，但不是完整案件客户端；
+- 它没有案件持久化、证据提交、人工决定或 webhook 闭环；当前官方来源 CLI 和只读 stdio MCP 已可用，但都不是完整案件客户端；
 - 红灯和黄灯用于演示拦截效果，绿灯候选仍不是人工放行；
 - 完整确定性控制、案件状态和生产 REST 路由分别由 [TS-303 / #22](https://github.com/fyaic/TradeSieve/issues/22)、[TS-401 / #23](https://github.com/fyaic/TradeSieve/issues/23) 和 [TS-501 / #24](https://github.com/fyaic/TradeSieve/issues/24) 继续交付。
 

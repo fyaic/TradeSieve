@@ -150,14 +150,23 @@ An embedded/demo mode may be implemented only for tests and must use the same ap
 
 ## MCP behavior
 
-Phase 1 tool set:
+Implemented alpha tool set:
+
+- local stdio `screen_transaction`, read-only, over the active official-source bundle;
+- canonical request/result schemas and fixed fail-closed error behavior;
+- no clearance, mutation, arbitrary search/export, file, SQL or network tool.
+
+Target Phase 1 tool set:
 
 - `screen_party`, `screen_goods`, `screen_transaction`;
 - `get_screening`, `get_screening_case`, `list_case_findings`, `list_required_evidence`;
 - `get_source_snapshot`, `explain_rule_evaluation`;
 - `submit_case_evidence`, `request_human_review`, `place_business_hold` under narrow scopes and confirmation.
 
-The remote server uses MCP Streamable HTTP behind the same identity boundary. An optional stdio launcher can connect a local MCP client to the configured REST service; it does not bypass service authorization.
+The current stdio server runs inside the trusted service environment and calls the
+application layer directly; it does not proxy REST and does not add a separate user
+authentication boundary. A future remote server will use MCP Streamable HTTP behind
+OIDC/OAuth and the same tenant/operation authorization boundary.
 
 MCP schemas and results are tested against the canonical contract. Human-clearance mutation is absent from the general tool inventory.
 

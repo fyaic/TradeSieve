@@ -1,0 +1,9 @@
+# Project-scoped Codex example for the local TradeSieve Compose demonstration.
+# Trust this repository, start the stack first, and do not use this Docker-socket
+# pattern as a remote production identity boundary.
+
+[mcp_servers.tradesieve]
+command = "docker"
+args = ["compose", "-p", "tradesieve-demo", "exec", "-T", "app", "tradesieve-mcp"]
+startup_timeout_sec = 20
+tool_timeout_sec = 120

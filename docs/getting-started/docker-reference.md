@@ -1,6 +1,6 @@
 # Docker reference deployment
 
-**Status:** The reference stack includes the source/rule/intake foundations plus migration `20260810_0007`, persisted EU FSF/Annex I and OFAC SDN/Consolidated projections, an authenticated official-screening REST technical preview, and a demo CRM that reads the active four-source bundle. Review workflows, full tenant/OIDC authorization, OFAC ownership propagation, Russia-specific goods/route controls, MCP, and production controls remain incomplete.
+**Status:** The reference stack includes the source/rule/intake foundations plus migration `20260810_0007`, persisted EU FSF/Annex I and OFAC SDN/Consolidated projections, an authenticated official-screening REST technical preview, a local read-only stdio MCP adapter, and a demo CRM that reads the active four-source bundle. Review workflows, full tenant/OIDC authorization, OFAC ownership propagation, Russia-specific goods/route controls, remote MCP/OAuth, and production controls remain incomplete.
 
 ## Demo-only configuration
 
