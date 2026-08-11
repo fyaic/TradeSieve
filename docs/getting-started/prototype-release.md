@@ -1,6 +1,6 @@
 # Prototype release installation and handoff
 
-**Version:** `0.1.0a3`
+**Version:** `0.1.0a4`
 **Audience:** evaluator, integration developer and internal demonstrator.  
 **Boundary:** synthetic demonstration and architecture evaluation; not production legal clearance.
 
@@ -11,7 +11,7 @@ Prerequisites are Git access to the private `fyaic/TradeSieve` repository and Do
 ```bash
 git clone git@github.com:fyaic/TradeSieve.git
 cd TradeSieve
-git checkout v0.1.0-alpha.3
+git checkout v0.1.0-alpha.4
 cp .env.example .env
 docker compose up -d --build --wait
 docker compose run --rm --no-deps app \
@@ -33,9 +33,9 @@ This deletes the demo database and private-source object volume.
 The same active official bundle can be screened with:
 
 ```bash
-docker compose run --rm --no-deps app \
-  tradesieve-manage screen-active \
-  --request examples/requests/official-screening.json
+docker compose exec -T app \
+  tradesieve-manage screen-active --request - \
+  < examples/requests/official-screening.json
 ```
 
 The authenticated technical-preview API is:
@@ -54,7 +54,7 @@ Release assets contain a wheel and source archive. For an isolated engineering i
 
 ```bash
 python3.13 -m venv .venv
-.venv/bin/python -m pip install tradesieve-0.1.0a3-py3-none-any.whl
+.venv/bin/python -m pip install tradesieve-0.1.0a4-py3-none-any.whl
 .venv/bin/tradesieve-manage --help
 ```
 

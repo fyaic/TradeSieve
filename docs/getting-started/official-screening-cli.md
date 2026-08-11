@@ -77,8 +77,8 @@ Migration from 0006 preserves old EU raw objects, projections and activation his
 ## Screen the active bundle
 
 ```bash
-docker compose run --rm --no-deps app \
-  python -m tradesieve.manage screen-active --request screening.json
+docker compose exec -T app \
+  tradesieve-manage screen-active --request - < screening.json
 ```
 
 `screen-active` fails with exit `2` if no bundle exists, any persisted row/hash/count/relationship is corrupt, a source retrieval or activation timestamp is in the future, or any source/bundle age exceeds 48 hours.

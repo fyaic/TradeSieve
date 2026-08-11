@@ -1,6 +1,6 @@
 # Prototype release boundary
 
-**Release target:** `0.1.0a3`
+**Release target:** `0.1.0a4`
 **Evidence date:** 2026-08-11  
 **Status:** demonstrable engineering prototype; not a production legal-clearance service.
 

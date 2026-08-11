@@ -1,7 +1,7 @@
 {
   "name": "tradesieve-repository-tools",
   "private": true,
-  "version": "0.1.0-alpha.3",
+  "version": "0.1.0-alpha.4",
   "description": "Pinned documentation tooling for TradeSieve",
   "devDependencies": {
     "@redocly/cli": "2.44.2"
