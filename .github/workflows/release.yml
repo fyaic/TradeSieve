@@ -36,7 +36,11 @@ jobs:
         run: |
           uv build
           uv run python -c "from importlib.metadata import version; from os import environ; from packaging.version import Version; assert Version(environ['GITHUB_REF_NAME'].removeprefix('v')) == Version(version('tradesieve'))"
-          shasum -a 256 dist/* > SHA256SUMS
+          (
+            cd dist
+            shasum -a 256 tradesieve-*.whl tradesieve-*.tar.gz > ../SHA256SUMS
+          )
+          shasum -a 256 -c SHA256SUMS
 
       - name: Publish immutable prerelease assets
         env:
