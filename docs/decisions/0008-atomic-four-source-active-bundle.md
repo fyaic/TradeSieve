@@ -18,7 +18,7 @@ The regulator/current-source pool must remain distinct from the internal case/ex
 5. Runtime reads fail closed on an upgraded EU-only active pointer, missing rows, kind swaps, count/sequence/hash mismatch, future timestamps or source age over 48 hours.
 6. EU and OFAC evidence remain source-separated in the result. A candidate can tighten the result to `RED/HOLD`; no source can set `automatic_clearance=true`.
 7. OFAC list membership does not implement the 50 Percent Rule, ownership/control propagation, program legal effect, licence analysis or transaction legality. Those require separately governed rules and human/legal review.
-8. `screen-active`, authenticated REST and demo CRM invoke the same persisted application service. The versioned OpenAPI/JSON Schema publishes this technical-preview contract; MCP remains a later adapter over the same application boundary.
+8. `screen-active`, authenticated REST, local stdio MCP and demo CRM invoke the same persisted application service. The versioned OpenAPI/JSON Schema publishes this technical-preview contract, and the MCP tool derives its input/output schemas from the same Pydantic models. Remote MCP/OAuth remains a later boundary.
 
 ## Consequences
 

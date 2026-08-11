@@ -55,4 +55,4 @@ The importer should quarantine unknown schemas, preserve the original file priva
 
 ## Decision for the prototype
 
-Use the workbook to improve field coverage, source backlog and the internal experience-pool design. Use official regulator publications for current executable source facts. This preserves the leadership objective—current, workflow-integrated controls—without overstating what a manually maintained spreadsheet can prove.
+Use the workbook to improve field coverage, source backlog and the internal experience-pool design. Use official regulator publications for current executable source facts. This preserves the product objective—current, workflow-integrated controls—without overstating what a manually maintained spreadsheet can prove.

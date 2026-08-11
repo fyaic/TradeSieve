@@ -81,4 +81,4 @@ It is an operations inspection surface, not REST/MCP screening parity. It omits 
 
 - TS-202 must provide immutable official-source snapshot/provision resolution and broader version-ledger behavior.
 - TS-303 must turn missing facts into canonical findings/evidence requests/holds and integrate these evaluators into screening orchestration.
-- REST, public screening CLI, and MCP adapters must later prove canonical contract parity; TS-205 does not claim those interfaces exist.
+- REST, public screening CLI, and MCP adapters must prove canonical contract parity. The later official-source vertical slice proves this for `OfficialScreeningRequest`/`OfficialScreeningResult`; TS-205 itself remains only the rule-bundle inspection proof.

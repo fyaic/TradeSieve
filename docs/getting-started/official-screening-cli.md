@@ -141,7 +141,7 @@ The JSON output contains only evidence needed to reproduce the source assertion:
 - A CHPL HS-6 candidate produces at least `YELLOW` + `REQUEST_EVIDENCE`; it does not prove that the goods are controlled.
 - No exact sanctions identifier and no Annex I entry produces at most `GREEN_CANDIDATE` + `MONITOR`; this is not clearance.
 
-Only an authorised human may clear or block a named transaction. OFAC list membership alone does not implement the 50 Percent Rule or determine program/legal effect. Fuzzy/transliterated matching, ownership/control propagation, destination/end-use/catch-all rules, Russia Regulation `833/2014` goods annexes, technical rules outside the bounded `3A001` assertions, definitive classification, screening/case records, tenant/OIDC authorization, MCP, and webhooks remain outside this slice.
+Only an authorised human may clear or block a named transaction. OFAC list membership alone does not implement the 50 Percent Rule or determine program/legal effect. Fuzzy/transliterated matching, ownership/control propagation, destination/end-use/catch-all rules, Russia Regulation `833/2014` goods annexes, technical rules outside the bounded `3A001` assertions, definitive classification, screening/case records, tenant/OIDC authorization, remote MCP/OAuth and webhooks remain outside this slice. A local read-only stdio MCP adapter over this same service is documented in [MCP and Codex Agent integration](mcp-agent.md).
 
 ## Safe evaluation data
 

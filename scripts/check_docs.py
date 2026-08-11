@@ -18,6 +18,8 @@ IGNORED_PARTS = {
     ".venv",
     "build",
     "dist",
+    "node_modules",
+    "output",
 }
 REQUIRED = (
     "AGENTS.md",
@@ -56,6 +58,7 @@ REQUIRED = (
     "docs/delivery/phase-1-backlog.md",
     "docs/getting-started/demo-crm.md",
     "docs/getting-started/official-screening-cli.md",
+    "docs/getting-started/mcp-agent.md",
     "docs/getting-started/prototype-release.md",
     "docs/getting-started/mvp-user-experience.md",
     "docs/getting-started/docker-reference.md",
@@ -70,6 +73,7 @@ REQUIRED = (
     "examples/requests/official-screening.json",
     "examples/responses/transaction-screening.review-required.json",
     "docs/research/user-workbook-assessment.md",
+    "docs/operations/external-dependencies.md",
     "CHANGELOG.md",
     "research/sources.yaml",
 )

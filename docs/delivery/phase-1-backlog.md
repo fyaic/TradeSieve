@@ -53,7 +53,7 @@
 | --- | --- | --- | --- | --- |
 | [TS-501](https://github.com/fyaic/TradeSieve/issues/24) Versioned REST API and typed errors | S1/S2 | CRM/OMS can screen/read/submit/request safely | Official-source-only `POST /v1/official-screenings` technical preview has hashed Bearer auth, byte/media limits, safe errors and versioned OpenAPI/JSON Schema; full tenant/OIDC, idempotent cases, reads and rate limits remain | TS-301/307/401 |
 | TS-502 CLI client | S3 | Analyst can validate/screen/read using files/stdin | Human/JSON output, stdout/stderr, safe exit codes, REST parity | TS-501 |
-| TS-503 MCP adapter | S3 | Agent can screen/read/explain/request review safely | Official SDK/target protocol, structured parity, narrow scopes, no clearance/bulk/arbitrary tools | Issue #9, TS-501 |
+| [TS-503 MCP adapter](https://github.com/fyaic/TradeSieve/issues/47) | S3 | Agent can screen through the alpha stdio slice; later read/explain/request-review tools remain bounded | Official SDK/target protocol, structured parity, narrow scopes, no clearance/bulk/arbitrary tools | Issue #9, TS-501 |
 | TS-504 Signed webhook delivery | S3 | Caller receives reliable state changes | Outbox, signature/timestamp/rotation, retry/dead-letter, at-least-once and dedupe tests | TS-401/104 |
 | [TS-505](https://github.com/fyaic/TradeSieve/issues/37) Sample CRM/OMS gate | S1 demo / S3 full | Integrator first sees a fixed synthetic CRM interception demo, then the complete integration | Visible demo maps fixed synthetic transactions to the real active EU/OFAC/Annex I service and enforces failure-closed actions; full story still needs formal case REST, webhook verification, re-read and named-action release | Issue #1, TS-501/504 |
 

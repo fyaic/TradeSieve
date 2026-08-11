@@ -16,7 +16,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Install locked documentation tooling
+        run: npm ci --ignore-scripts
       - name: Validate documentation and contracts
         run: ./scripts/check_docs.sh
       - name: Lint OpenAPI contract
-        run: npx --yes @redocly/cli@2.44.2 lint api/openapi/tradesieve.v1.json
+        run: npx --no-install redocly lint api/openapi/tradesieve.v1.json
