@@ -116,10 +116,12 @@ def test_demo_records_map_to_live_official_screening_facts_conservatively() -> N
         for item in listed.party_names
     )
     assert listed.goods.annex_i_code == "3A001"
+    assert listed.goods.hs_code == "853710"
     assert listed.goods.classification_verified is False
     assert listed.goods.technical_specification_available is False
     cell = requests["crm-quote-260810-0039"].goods
     assert cell.annex_i_code == "3A001"
+    assert cell.hs_code is None
     assert cell.classification_verified is True
     assert cell.technical_specification_available is True
     assert cell.product_family == "ELECTROCHEMICAL_CELL"
@@ -137,6 +139,8 @@ def test_demo_records_map_to_live_official_screening_facts_conservatively() -> N
         request.goods.technical_specification_available for request in requests.values()
     )
     assert any(request.goods.annex_i_code is None for request in requests.values())
+    assert requests["crm-quote-260809-0186"].goods.hs_code == "850440"
+    assert requests["crm-quote-260810-0052"].goods.hs_code == "400921"
 
 
 def test_demo_functions_reject_production_mode_and_unknown_records() -> None:

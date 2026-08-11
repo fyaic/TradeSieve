@@ -1222,12 +1222,20 @@ def official_request_for_demo_crm_record(
         if candidate.scheme is ClassificationScheme.EU_DUAL_USE_ANNEX_I
     ]
     annex_code = annex_candidates[0] if len(annex_candidates) == 1 else None
+    hs_candidates = [
+        candidate.code
+        for line in scenario.request.goods
+        for candidate in line.classification_candidates
+        if candidate.scheme is ClassificationScheme.HS
+    ]
+    hs_code = hs_candidates[0] if len(hs_candidates) == 1 else None
     technical_specification_available = bool(
         scenario.request.goods
         and all(line.technical_specification for line in scenario.request.goods)
     )
     if record_id == "crm-quote-260810-0039":
         goods = OfficialGoodsCandidate(
+            hs_code=hs_code,
             annex_i_code=annex_code,
             classification_verified=True,
             technical_specification_available=True,
@@ -1269,6 +1277,7 @@ def official_request_for_demo_crm_record(
         )
     else:
         goods = OfficialGoodsCandidate(
+            hs_code=hs_code,
             annex_i_code=annex_code,
             classification_verified=False,
             technical_specification_available=technical_specification_available,

@@ -2,7 +2,7 @@
 
 **Planning window:** 2026-08-10 through 2026-09-18 (three two-week sprints)
 **Planning assumption:** dates are a baseline until team capacity and source access are confirmed.
-**Current repository state:** implementation foundation, not a screening MVP. The source registry, synthetic immutable snapshot lifecycle/durable demo, rule bundle, health stack, and generated safe snapshot DTO schemas are implemented. The transaction/reviewer REST, public CLI, and MCP commands in the target-experience document remain acceptance targets.
+**Current repository state:** `0.1.0a1` engineering prototype. A real-source screening vertical slice, active-source CLI, authenticated technical-preview REST endpoint and synthetic CRM are implemented. Full transaction/case persistence, reviewer workflow, webhook and MCP commands in the target experience remain acceptance targets.
 
 ## Phase 1 outcome
 

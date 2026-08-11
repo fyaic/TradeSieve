@@ -31,6 +31,7 @@ REQUIRED = (
     "docs/requirements/original-request.md",
     "docs/requirements/problem-and-scope.md",
     "docs/product/service-definition.md",
+    "docs/product/prototype-release-boundary.md",
     "docs/product/personas-and-journeys.md",
     "docs/product/requirements.md",
     "docs/product/mvp-scope.md",
@@ -54,6 +55,8 @@ REQUIRED = (
     "docs/delivery/phase-1-plan.md",
     "docs/delivery/phase-1-backlog.md",
     "docs/getting-started/demo-crm.md",
+    "docs/getting-started/official-screening-cli.md",
+    "docs/getting-started/prototype-release.md",
     "docs/getting-started/mvp-user-experience.md",
     "docs/getting-started/docker-reference.md",
     "api/openapi/tradesieve.v1.json",
@@ -66,6 +69,8 @@ REQUIRED = (
     "examples/requests/transaction-screening.json",
     "examples/requests/official-screening.json",
     "examples/responses/transaction-screening.review-required.json",
+    "docs/research/user-workbook-assessment.md",
+    "CHANGELOG.md",
     "research/sources.yaml",
 )
 MARKDOWN_LINK = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")

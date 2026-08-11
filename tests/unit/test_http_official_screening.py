@@ -24,6 +24,7 @@ REQUEST = {
     "schema_version": "1.0.0",
     "party_names": [{"name": "Benevolence International Foundation"}],
     "goods": {
+        "hs_code": "854231",
         "annex_i_code": "3A001",
         "classification_verified": True,
         "technical_specification_available": True,
@@ -220,6 +221,7 @@ def test_authenticated_route_uses_one_active_repository_and_documents_security(
     assert response.json()["business_action"] == "HOLD"
     assert response.json()["source_bundle_id"].startswith("official-bundle-")
     assert len(Service.requests) == 1
+    assert Service.requests[0].goods.hs_code == "854231"
     assert Service.requests[0].goods.annex_i_code == "3A001"
     assert Service.requests[0].goods.product_family == "ELECTROCHEMICAL_CELL"
     assert len(Service.requests[0].goods.technical_facts) == 4

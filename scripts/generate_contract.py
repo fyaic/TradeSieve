@@ -85,6 +85,7 @@ def render_artifacts() -> dict[Path, bytes]:
             "party_identifiers": [],
             "party_names": [{"name": "JOINT STOCK COMPANY SOVCOMFLOT"}],
             "goods": {
+                "hs_code": "854231",
                 "annex_i_code": "3A001",
                 "classification_verified": True,
                 "technical_specification_available": True,

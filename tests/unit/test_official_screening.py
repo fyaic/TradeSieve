@@ -22,6 +22,7 @@ from tradesieve.application.official_screening import (
     OfficialTechnicalFact,
     PersistedOfficialScreeningService,
 )
+from tradesieve.domain.common_high_priority import ChplTier
 from tradesieve.domain.eu_dual_use import (
     EuDualUseControlEntry,
     EuDualUseControlList,
@@ -180,12 +181,14 @@ def request(
     code: str | None = "0A000",
     verified: bool = True,
     specification: bool = True,
+    hs_code: str | None = "999999",
 ) -> OfficialScreeningRequest:
     return OfficialScreeningRequest(
         party_identifiers=[
             OfficialPartyIdentifier(type="regnumber", value=number, country="US")
         ],
         goods=OfficialGoodsCandidate(
+            hs_code=hs_code,
             annex_i_code=code,
             classification_verified=verified,
             technical_specification_available=specification,
@@ -247,7 +250,11 @@ def test_exact_sanctions_and_annex_entry_hold_with_versioned_evidence() -> None:
     assert result.dual_use.requested_code == "0A000"
     assert result.dual_use.entry_content_hash is not None
     assert result.dual_use.source_native_locator == "/ANNEX/NP[NO.P='0A000']"
-    assert len(result.caveats) == 7
+    assert result.sensitive_goods is not None
+    assert result.sensitive_goods.status == "NO_CANDIDATE"
+    assert result.sensitive_goods.normalized_hs6 == "999999"
+    assert result.sensitive_goods.automatic_clearance is False
+    assert len(result.caveats) == 8
     assert fsf_source.calls == dual_source.calls == 1
     assert parser.contents == [b"source bytes"]
     assert ofac_source.calls == [OfacSlsListKind.SDN, OfacSlsListKind.CONSOLIDATED]
@@ -258,6 +265,7 @@ def test_source_bound_secondary_cell_threshold_is_exposed_in_canonical_result(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     listing = dual_list()
+    ofac_sdn, ofac_consolidated = ofac_pair(retrieved_at=NOW)
     entry = next(item for item in listing.entries if item.code == "3A001")
     monkeypatch.setattr(technical, "EU_DUAL_USE_3A001_ENTRY_HASH", entry.content_hash)
     facts = [
@@ -308,6 +316,8 @@ def test_source_bound_secondary_cell_threshold_is_exposed_in_canonical_result(
         fsf_snapshot=fsf_snapshot(),
         fsf_retrieved_at=NOW,
         dual_use_control_list=listing,
+        ofac_sdn_snapshot=ofac_sdn,
+        ofac_consolidated_snapshot=ofac_consolidated,
     )
 
     assert result.signal is Signal.RED
@@ -331,6 +341,7 @@ def test_technical_payload_contract_rejects_partial_and_duplicate_facts() -> Non
         "verified": True,
     }
     invalid_goods = (
+        {"hs_code": "not-an-hs-code"},
         {
             "annex_i_code": "3A001",
             "technical_specification_available": True,
@@ -391,6 +402,44 @@ def test_verified_unlisted_candidate_is_monitor_only_never_clearance() -> None:
     assert result.dual_use.status == "ENTRY_NOT_FOUND"
     assert result.dual_use.entry_content_hash is None
     assert result.dual_use.source_native_locator is None
+
+
+def test_chpl_hs6_candidate_requests_evidence_without_claiming_control() -> None:
+    subject, *_ = service()
+    result = subject.screen(
+        request(number="not-listed", code="0A999", hs_code="8504.40.00")
+    )
+
+    assert result.signal is Signal.YELLOW
+    assert result.business_action is BusinessAction.REQUEST_EVIDENCE
+    assert result.sensitive_goods is not None
+    assert result.sensitive_goods.status == "CANDIDATE"
+    assert result.sensitive_goods.normalized_hs6 == "850440"
+    assert result.sensitive_goods.tier == ChplTier.TIER_3_A.value
+    assert result.sensitive_goods.candidate_only is True
+    assert result.sensitive_goods.missing_facts == [
+        "manufacturer_model",
+        "technical_specification",
+        "end_user",
+        "end_use",
+        "route",
+    ]
+    assert result.sensitive_goods.automatic_clearance is False
+    assert result.dual_use.status == "ENTRY_NOT_FOUND"
+
+
+def test_missing_hs_candidate_requests_evidence_without_inventing_a_match() -> None:
+    subject, *_ = service()
+    result = subject.screen(request(number="not-listed", code="0A999", hs_code=None))
+
+    assert result.signal is Signal.YELLOW
+    assert result.business_action is BusinessAction.REQUEST_EVIDENCE
+    assert result.sensitive_goods is not None
+    assert result.sensitive_goods.status == "NOT_PROVIDED"
+    assert result.sensitive_goods.requested_hs_code is None
+    assert result.sensitive_goods.normalized_hs6 is None
+    assert result.sensitive_goods.tier is None
+    assert result.sensitive_goods.missing_facts == ["hs_code"]
 
 
 def test_unusable_sanctions_identifier_is_fail_closed() -> None:

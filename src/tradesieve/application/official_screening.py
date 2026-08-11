@@ -15,6 +15,14 @@ from tradesieve.application.contracts import (
     Reference,
     Signal,
 )
+from tradesieve.domain.common_high_priority import (
+    CHPL_CONTENT_HASH,
+    CHPL_PUBLICATION_DATE,
+    CHPL_SOURCE_CHECKED_ON,
+    CHPL_SOURCE_URL,
+    find_chpl_candidate,
+    normalize_hs6,
+)
 from tradesieve.domain.eu_dual_use import (
     EU_DUAL_USE_CELEX,
     EU_DUAL_USE_EFFECTIVE_FROM,
@@ -162,6 +170,7 @@ class OfficialTechnicalFact(ContractModel):
 
 
 class OfficialGoodsCandidate(ContractModel):
+    hs_code: str | None = None
     annex_i_code: str | None = None
     classification_verified: bool = False
     technical_specification_available: bool = False
@@ -172,6 +181,8 @@ class OfficialGoodsCandidate(ContractModel):
 
     @model_validator(mode="after")
     def validate_control_code(self) -> OfficialGoodsCandidate:
+        if self.hs_code is not None:
+            normalize_hs6(self.hs_code)
         if self.annex_i_code is not None:
             normalize_control_code(self.annex_i_code)
         if len({item.fact_id for item in self.technical_facts}) != len(
@@ -331,6 +342,23 @@ class OfficialOfacResult(ContractModel):
     lists: list[OfficialOfacListResult]
 
 
+class OfficialSensitiveGoodsResult(ContractModel):
+    source: Literal["US_BIS_COMMON_HIGH_PRIORITY_ITEMS_GUIDANCE"] = (
+        "US_BIS_COMMON_HIGH_PRIORITY_ITEMS_GUIDANCE"
+    )
+    source_publication_date: str
+    source_checked_on: str
+    source_url: str
+    source_content_hash: str
+    status: Literal["NOT_PROVIDED", "NO_CANDIDATE", "CANDIDATE"]
+    requested_hs_code: str | None
+    normalized_hs6: str | None
+    tier: str | None
+    candidate_only: Literal[True] = True
+    missing_facts: list[str]
+    automatic_clearance: Literal[False] = False
+
+
 class OfficialScreeningResult(ContractModel):
     schema_version: Literal["1.0.0"] = "1.0.0"
     signal: Signal
@@ -342,6 +370,7 @@ class OfficialScreeningResult(ContractModel):
     sanctions: OfficialSanctionsResult
     ofac: OfficialOfacResult
     dual_use: OfficialDualUseResult
+    sensitive_goods: OfficialSensitiveGoodsResult | None = None
     caveats: list[str]
 
 
@@ -538,6 +567,9 @@ class OfficialScreeningEngine:
             )
 
         goods = request.goods
+        chpl_item = (
+            None if goods.hs_code is None else find_chpl_candidate(goods.hs_code)
+        )
         dual_assessment = EuDualUseAssessmentEngine(dual_use_control_list).assess(
             goods.annex_i_code,
             classification_verified=goods.classification_verified,
@@ -573,10 +605,15 @@ class OfficialScreeningEngine:
         ):
             signal = Signal.RED
             action = BusinessAction.HOLD
-        elif dual_assessment.status in {
-            EuDualUseAssessmentStatus.MISSING_CLASSIFICATION,
-            EuDualUseAssessmentStatus.TECHNICAL_REVIEW_REQUIRED,
-        }:
+        elif (
+            goods.hs_code is None
+            or chpl_item is not None
+            or dual_assessment.status
+            in {
+                EuDualUseAssessmentStatus.MISSING_CLASSIFICATION,
+                EuDualUseAssessmentStatus.TECHNICAL_REVIEW_REQUIRED,
+            }
+        ):
             signal = Signal.YELLOW
             action = BusinessAction.REQUEST_EVIDENCE
         else:
@@ -662,6 +699,37 @@ class OfficialScreeningEngine:
                 missing_facts=list(dual_assessment.missing_facts),
                 technical_assessment=technical_result,
             ),
+            sensitive_goods=OfficialSensitiveGoodsResult(
+                source_publication_date=CHPL_PUBLICATION_DATE.isoformat(),
+                source_checked_on=CHPL_SOURCE_CHECKED_ON.isoformat(),
+                source_url=CHPL_SOURCE_URL,
+                source_content_hash=CHPL_CONTENT_HASH,
+                status=(
+                    "NOT_PROVIDED"
+                    if goods.hs_code is None
+                    else "NO_CANDIDATE"
+                    if chpl_item is None
+                    else "CANDIDATE"
+                ),
+                requested_hs_code=goods.hs_code,
+                normalized_hs6=(
+                    None if goods.hs_code is None else normalize_hs6(goods.hs_code)
+                ),
+                tier=chpl_item.tier.value if chpl_item is not None else None,
+                missing_facts=(
+                    ["hs_code"]
+                    if goods.hs_code is None
+                    else []
+                    if chpl_item is None
+                    else [
+                        "manufacturer_model",
+                        "technical_specification",
+                        "end_user",
+                        "end_use",
+                        "route",
+                    ]
+                ),
+            ),
             caveats=[
                 "Exact source evidence is not legal clearance.",
                 "Name results are exact normalized-alias candidates, not fuzzy matches.",
@@ -670,6 +738,8 @@ class OfficialScreeningEngine:
                 "Neither an Annex I code nor a definitive classification is inferred "
                 "from HS/CN/TARIC data or a technical assertion result.",
                 "Catch-all, destination, end-use and sanctions controls remain required.",
+                "A CHPL HS-6 candidate requires enhanced due diligence; it is not "
+                "classification, prohibition or clearance.",
                 "Only an authorised human may clear or block the transaction.",
             ],
         )
@@ -738,6 +808,7 @@ __all__ = [
     "OfficialPartyName",
     "OfficialScreeningRequest",
     "OfficialScreeningResult",
+    "OfficialSensitiveGoodsResult",
     "OfficialTechnicalAssessmentResult",
     "OfficialTechnicalFact",
     "OfficialScreeningEngine",

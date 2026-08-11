@@ -1,5 +1,5 @@
 schema_version: 1
-accessed_at: "2026-08-10"
+accessed_at: "2026-08-11"
 policy:
   primary_sources_control: true
   production_use_requires_licence_review: true
@@ -58,6 +58,15 @@ sources:
     url: https://eur-lex.europa.eu/eli/reg/2021/821
     use: Dual-use legal framework and versioned Annex I controls
     access: Public legal publication
+
+  - id: eu-dual-use-controls-overview
+    title: Exporting dual-use items
+    category: official-guidance
+    authority: European Commission
+    jurisdiction: EU
+    url: https://policy.trade.ec.europa.eu/help-exporters-and-importers/exporting-dual-use-items_en
+    use: Official scope, control-list, end-use-control and correlation-table limitations
+    access: Public official guidance; verified 2026-08-11
 
   - id: eu-taric
     title: EU customs tariff (TARIC)
@@ -157,6 +166,15 @@ sources:
     url: https://www.trade.gov/consolidated-screening-list
     use: Consolidated export-screening data and API discovery
     access: Public data and API; underlying source publications remain authoritative
+
+  - id: us-bis-common-high-priority-items
+    title: Common High Priority Items List
+    category: official-guidance
+    authority: U.S. Department of Commerce, Bureau of Industry and Security
+    jurisdiction: US
+    url: https://www.bis.gov/licensing/country-guidance/common-high-priority-items-list-chpl
+    use: Exact HS-6 candidate flag for enhanced diversion-risk due diligence; never definitive classification, prohibition or clearance
+    access: Public official guidance; 50-item tier inventory verified 2026-08-11
 
   - id: uk-sanctions-list
     title: UK Sanctions List

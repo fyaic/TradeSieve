@@ -55,7 +55,10 @@ def test_request_is_bounded_public_candidate_input() -> None:
     assert payload["schema_version"] == "1.0.0"
     assert payload["party_names"] == [{"name": "JOINT STOCK COMPANY SOVCOMFLOT"}]
     assert payload["goods"] == {
+        "hs_code": "854231",
         "annex_i_code": "3A001",
         "classification_verified": True,
         "technical_specification_available": True,
+        "product_family": None,
+        "technical_facts": [],
     }

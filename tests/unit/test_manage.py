@@ -769,6 +769,7 @@ def official_request_bytes() -> bytes:
                 {"type": "regnumber", "value": "private-value", "country": "US"}
             ],
             "goods": {
+                "hs_code": "854231",
                 "annex_i_code": "3A001",
                 "classification_verified": True,
                 "technical_specification_available": True,

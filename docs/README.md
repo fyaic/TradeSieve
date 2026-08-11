@@ -10,6 +10,7 @@ TradeSieve documentation is decision-oriented: requirements preserve what is nee
 ## Product
 
 - [Service definition](product/service-definition.md)
+- [Prototype release boundary](product/prototype-release-boundary.md)
 - [Personas and user journeys](product/personas-and-journeys.md)
 - [Detailed product requirements](product/requirements.md)
 - [Phase 1 service MVP](product/mvp-scope.md)
@@ -20,6 +21,7 @@ TradeSieve documentation is decision-oriented: requirements preserve what is nee
 - [Docker reference deployment](getting-started/docker-reference.md)
 - [Synthetic international-logistics CRM over live official sources](getting-started/demo-crm.md)
 - [Four-source official refresh, CLI, and REST technical preview](getting-started/official-screening-cli.md)
+- [Prototype release installation and handoff](getting-started/prototype-release.md)
 - [Target MVP user experience](getting-started/mvp-user-experience.md)
 - [Draft OpenAPI contract](../api/openapi/tradesieve.v1.json)
 - [Shared JSON Schema registry](../api/schemas/tradesieve.contracts.v1.json)
@@ -62,6 +64,8 @@ TradeSieve documentation is decision-oriented: requirements preserve what is nee
 - [Product maturity roadmap](roadmap/discovery-plan.md)
 
 ## Research
+
+- [Assessment of the user-provided Russia sanctions workbook](research/user-workbook-assessment.md)
 
 - [Landscape synthesis](research/landscape.md)
 - [Regulatory and official data sources](research/regulatory-and-data-sources.md)

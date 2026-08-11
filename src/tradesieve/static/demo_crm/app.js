@@ -231,6 +231,17 @@ function renderOfficialScreening(payload) {
       <p>证据定位：${escapeHtml(result.dual_use.source_native_locator || "未命中控制项")}</p>
       ${technicalDetail}
     </article>`;
+  const sensitiveGoods = result.sensitive_goods
+    ? `<article class="risk-item">
+        <div class="risk-item-header">
+          <strong>BIS 高优先级物项 HS-6 候选</strong>
+          <span class="risk-priority priority-p1">${escapeHtml(result.sensitive_goods.status)}</span>
+        </div>
+        <p>HS-6：${escapeHtml(result.sensitive_goods.normalized_hs6 || "未提供")}；层级：${escapeHtml(result.sensitive_goods.tier || "未命中")}</p>
+        <p>待补事实：${escapeHtml(result.sensitive_goods.missing_facts.join("、") || "无")}</p>
+        <p>仅为增强尽调候选，不构成分类、禁止结论或放行依据。</p>
+      </article>`
+    : '<div class="no-open-risk">当前结果未包含 CHPL 候选信息。</div>';
   const events = payload.integration_events
     .map(
       (event) => `
@@ -259,6 +270,10 @@ function renderOfficialScreening(payload) {
     <section class="result-section">
       <h4 class="subsection-title">官方两用物项证据</h4>
       <div class="risk-list">${dualUse}</div>
+    </section>
+    <section class="result-section">
+      <h4 class="subsection-title">敏感货物候选提示</h4>
+      <div class="risk-list">${sensitiveGoods}</div>
     </section>
     <section class="result-section">
       <h4 class="subsection-title">CRM 与 TradeSieve 交互</h4>
