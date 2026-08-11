@@ -11,6 +11,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEMO_PASSWORD_MARKER = "local_demo_only"  # pragma: allowlist secret
 DEMO_COVERAGE_PREFIXES = ("demo", "synthetic")
+DEMO_OFFICIAL_API_TOKEN_SHA256 = (
+    "sha256:982e0f3d6aad33e5ce4096715983c786ffda1a4efcc78b003e23653bf8efd458"
+)
 Port = Annotated[int, Field(ge=1, le=65535)]
 PositiveSeconds = Annotated[int, Field(gt=0)]
 RuntimeId = Annotated[
@@ -20,6 +23,10 @@ RuntimeId = Annotated[
         max_length=128,
         pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]*$",
     ),
+]
+Sha256Digest = Annotated[
+    str,
+    StringConstraints(pattern=r"^sha256:[a-f0-9]{64}$"),
 ]
 
 
@@ -48,6 +55,7 @@ class Settings(BaseSettings):
     database_connect_timeout_seconds: PositiveSeconds = 2
     worker_heartbeat_seconds: PositiveSeconds = 2
     worker_stale_after_seconds: PositiveSeconds = 10
+    official_api_token_sha256: Sha256Digest = DEMO_OFFICIAL_API_TOKEN_SHA256
 
     @model_validator(mode="after")
     def reject_unsafe_non_demo_configuration(self) -> Self:
@@ -80,6 +88,8 @@ class Settings(BaseSettings):
             unsafe.append("synthetic/demo required source coverage")
         if self.required_rule_set.lower().startswith(DEMO_COVERAGE_PREFIXES):
             unsafe.append("synthetic/demo required rule coverage")
+        if self.official_api_token_sha256 == DEMO_OFFICIAL_API_TOKEN_SHA256:
+            unsafe.append("default demo official API credential")
         if unsafe:
             raise ValueError(
                 "non-demo mode refuses unsafe settings: " + ", ".join(unsafe)

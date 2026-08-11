@@ -17,6 +17,7 @@
 | --- | --- | --- |
 | `Source` | Governance metadata and runtime freshness policy for an external/internal source | Stable deployment/source-set/source ID; incomplete records remain inactive |
 | `SourceSnapshot` | Immutable retrieved/accepted source version | Hash, retrieval/effective time, parser version, activation event |
+| `ActiveOfficialSourceBundle` | Exact official versions used by the real-time technical-preview engine | One content-addressed aggregate containing EU FSF, EU Annex I, OFAC SDN and OFAC Consolidated; incomplete/stale/corrupt reads fail closed |
 | `RuleBundle` | Immutable governed set of cited, fixture-backed rule versions | Tenant/deployment/rule-set namespace plus bundle/version/content hash; lifecycle events select the active version |
 | `Assertion` | Source-native and normalized fact with locator | Cannot exist without provenance/snapshot |
 | `Entity` | Canonical person/organization/vessel/etc. candidate | Merges are versioned assertions, never destructive source edits |

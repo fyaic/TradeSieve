@@ -20,6 +20,7 @@ def production_settings(**overrides: object) -> Settings:
         "deployment_id": "production-eu-1",
         "required_source_set": "approved-sources-v1",
         "required_rule_set": "approved-rules-v1",
+        "official_api_token_sha256": "sha256:" + "a" * 64,
     }
     values.update(overrides)
     return Settings.model_validate(values)
@@ -32,6 +33,7 @@ def test_demo_configuration_is_explicit() -> None:
     assert settings.rule_bundle_tenant_id == "demo-tenant"
     assert settings.required_source_set.startswith("synthetic")
     assert settings.raw_object_root == Path("/var/lib/tradesieve/raw")
+    assert settings.official_api_token_sha256.startswith("sha256:")
 
 
 @pytest.mark.parametrize(
@@ -76,6 +78,12 @@ def test_worker_stale_threshold_must_exceed_heartbeat(stale_after: int) -> None:
         {"deployment_id": "demo-eu-1"},
         {"required_source_set": "synthetic-source"},
         {"required_rule_set": "demo-rule"},
+        {
+            "official_api_token_sha256": (
+                "sha256:982e0f3d6aad33e5ce4096715983c786"
+                "ffda1a4efcc78b003e23653bf8efd458"  # pragma: allowlist secret
+            )
+        },
     ],
 )
 def test_production_rejects_each_unsafe_demo_setting(

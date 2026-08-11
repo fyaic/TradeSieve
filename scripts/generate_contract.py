@@ -18,12 +18,26 @@ from tradesieve.application.contract_examples import (
     transaction_review_required_result,
     transaction_screening_request,
 )
-from tradesieve.application.contracts import CONTRACT_MODELS
+from tradesieve.application.contracts import CONTRACT_MODELS, ContractModel
+from tradesieve.application.official_screening import (
+    OfficialScreeningRequest,
+    OfficialScreeningResult,
+)
+from tradesieve.application.official_source_refresh import OfficialSourceRefreshResult
 from tradesieve.application.source_snapshot_contracts import (
     SOURCE_SNAPSHOT_CONTRACT_MODELS,
 )
 
-CANONICAL_CONTRACT_MODELS = (*CONTRACT_MODELS, *SOURCE_SNAPSHOT_CONTRACT_MODELS)
+OFFICIAL_SCREENING_CONTRACT_MODELS: tuple[type[ContractModel], ...] = (
+    OfficialScreeningRequest,
+    OfficialScreeningResult,
+    OfficialSourceRefreshResult,
+)
+CANONICAL_CONTRACT_MODELS: tuple[type[ContractModel], ...] = (
+    *CONTRACT_MODELS,
+    *SOURCE_SNAPSHOT_CONTRACT_MODELS,
+    *OFFICIAL_SCREENING_CONTRACT_MODELS,
+)
 
 ROOT = Path(
     os.environ.get("TRADESIEVE_CONTRACT_ROOT", Path(__file__).resolve().parents[1])
@@ -31,6 +45,7 @@ ROOT = Path(
 OPENAPI_PATH = ROOT / "api/openapi/tradesieve.v1.json"
 SCHEMA_PATH = ROOT / "api/schemas/tradesieve.contracts.v1.json"
 REQUEST_PATH = ROOT / "examples/requests/transaction-screening.json"
+OFFICIAL_REQUEST_PATH = ROOT / "examples/requests/official-screening.json"
 INCOMPLETE_REQUEST_PATH = ROOT / "examples/requests/customer-onboarding.incomplete.json"
 INVALID_REQUEST_PATH = (
     ROOT / "examples/requests/invalid/transaction-screening.structural-error.json"
@@ -64,6 +79,19 @@ def render_artifacts() -> dict[Path, bytes]:
     invalid_request = structurally_invalid_request(incomplete_request)
     response = transaction_review_required_result(request)
     events = event_examples(response)
+    official_request = OfficialScreeningRequest.model_validate(
+        {
+            "schema_version": "1.0.0",
+            "party_identifiers": [],
+            "party_names": [{"name": "JOINT STOCK COMPANY SOVCOMFLOT"}],
+            "goods": {
+                "hs_code": "854231",
+                "annex_i_code": "3A001",
+                "classification_verified": True,
+                "technical_specification_available": True,
+            },
+        }
+    )
 
     openapi = json.loads(OPENAPI_PATH.read_text(encoding="utf-8"))
     components = openapi["components"]
@@ -95,6 +123,10 @@ def render_artifacts() -> dict[Path, bytes]:
             "summary": "Minimal human-decision notification",
             "value": events["human_decision.recorded"].model_dump(mode="json"),
         },
+        "OfficialScreeningRequest": {
+            "summary": "Public-source candidate input for the technical preview",
+            "value": official_request.model_dump(mode="json"),
+        },
     }
     screening_content = openapi["paths"]["/v1/screenings"]["post"]["requestBody"][
         "content"
@@ -112,6 +144,57 @@ def render_artifacts() -> dict[Path, bytes]:
         "review_required": {
             "$ref": "#/components/examples/TransactionReviewRequiredResult"
         }
+    }
+    openapi["paths"]["/v1/official-screenings"] = {
+        "post": {
+            "summary": "Screen against the fresh active official-source bundle",
+            "description": (
+                "Technical preview over EU FSF, EU Annex I, OFAC SDN, and OFAC "
+                "Consolidated. Candidate evidence can only hold or escalate; it "
+                "never provides legal clearance. Requests and cases are not yet "
+                "persisted by this route."
+            ),
+            "operationId": "officialScreeningTechnicalPreview",
+            "security": [{"OfficialScreeningBearer": []}],
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/OfficialScreeningRequest"
+                        },
+                        "examples": {
+                            "public_source_candidate": {
+                                "$ref": "#/components/examples/OfficialScreeningRequest"
+                            }
+                        },
+                    }
+                },
+            },
+            "responses": {
+                "200": {
+                    "description": "Conservative official-source screening result",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": ("#/components/schemas/OfficialScreeningResult")
+                            }
+                        }
+                    },
+                },
+                "401": {"description": "Missing or invalid workload bearer token"},
+                "411": {"description": "A bounded Content-Length is required"},
+                "415": {"description": "Only application/json is accepted"},
+                "422": {"description": "The request contract is invalid"},
+                "503": {"description": "No fresh verified official-source bundle"},
+            },
+            "x-tradesieve-implementation-status": "technical-preview",
+        }
+    }
+    components.setdefault("securitySchemes", {})["OfficialScreeningBearer"] = {
+        "type": "http",
+        "description": "Deployment-scoped workload bearer token.",
+        "scheme": "bearer",
     }
     openapi["webhooks"] = {
         "tradeSieveEvent": {
@@ -157,13 +240,20 @@ def render_artifacts() -> dict[Path, bytes]:
     }
     openapi["x-tradesieve-canonical-source"] = {
         "model": "tradesieve.application.contracts",
-        "additional_models": ["tradesieve.application.source_snapshot_contracts"],
+        "additional_models": [
+            "tradesieve.application.source_snapshot_contracts",
+            "tradesieve.application.official_screening",
+            "tradesieve.application.official_source_refresh",
+        ],
         "generator": "scripts/generate_contract.py",
         "drift_check": "uv run --locked python scripts/generate_contract.py --check",
     }
     openapi["x-tradesieve-schema-entrypoints"] = {
         model.__name__: {"$ref": f"#/components/schemas/{model.__name__}"}
-        for model in SOURCE_SNAPSHOT_CONTRACT_MODELS
+        for model in (
+            *SOURCE_SNAPSHOT_CONTRACT_MODELS,
+            *OFFICIAL_SCREENING_CONTRACT_MODELS,
+        )
     }
 
     shared_schema = {
@@ -185,6 +275,9 @@ def render_artifacts() -> dict[Path, bytes]:
             "SourceSnapshotListing",
             "SourceSnapshotDetail",
             "SourceSnapshotHistory",
+            "OfficialScreeningRequest",
+            "OfficialScreeningResult",
+            "OfficialSourceRefreshResult",
         ],
     }
 
@@ -192,6 +285,7 @@ def render_artifacts() -> dict[Path, bytes]:
         OPENAPI_PATH: json_bytes(openapi),
         SCHEMA_PATH: json_bytes(shared_schema),
         REQUEST_PATH: json_bytes(request.model_dump(mode="json")),
+        OFFICIAL_REQUEST_PATH: json_bytes(official_request.model_dump(mode="json")),
         INCOMPLETE_REQUEST_PATH: json_bytes(incomplete_request.model_dump(mode="json")),
         INVALID_REQUEST_PATH: json_bytes(invalid_request),
         RESPONSE_PATH: json_bytes(response.model_dump(mode="json")),

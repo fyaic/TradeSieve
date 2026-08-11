@@ -22,6 +22,11 @@ from tradesieve.application.contract_examples import (
     transaction_screening_request,
 )
 from tradesieve.application.contracts import EventEnvelope, ScreeningRequest
+from tradesieve.application.official_screening import (
+    OfficialScreeningRequest,
+    OfficialScreeningResult,
+)
+from tradesieve.application.official_source_refresh import OfficialSourceRefreshResult
 from tradesieve.application.source_snapshot_contracts import (
     SOURCE_SNAPSHOT_CONTRACT_MODELS,
     SourceSnapshotDetail,
@@ -101,12 +106,23 @@ def test_openapi_and_shared_registry_have_generated_schema_parity() -> None:
         "tradesieve.application.contracts"
     )
     assert openapi["x-tradesieve-canonical-source"]["additional_models"] == [
-        "tradesieve.application.source_snapshot_contracts"
+        "tradesieve.application.source_snapshot_contracts",
+        "tradesieve.application.official_screening",
+        "tradesieve.application.official_source_refresh",
     ]
     assert openapi["x-tradesieve-schema-entrypoints"] == {
         "SourceSnapshotListing": {"$ref": "#/components/schemas/SourceSnapshotListing"},
         "SourceSnapshotDetail": {"$ref": "#/components/schemas/SourceSnapshotDetail"},
         "SourceSnapshotHistory": {"$ref": "#/components/schemas/SourceSnapshotHistory"},
+        "OfficialScreeningRequest": {
+            "$ref": "#/components/schemas/OfficialScreeningRequest"
+        },
+        "OfficialScreeningResult": {
+            "$ref": "#/components/schemas/OfficialScreeningResult"
+        },
+        "OfficialSourceRefreshResult": {
+            "$ref": "#/components/schemas/OfficialSourceRefreshResult"
+        },
     }
     for schema in openapi_schemas.values():
         if schema.get("type") == "object":
@@ -155,8 +171,8 @@ def test_source_snapshot_contract_roots_have_parity_and_one_way_identity() -> No
     root_names = [model.__name__ for model in roots]
 
     assert roots == SOURCE_SNAPSHOT_CONTRACT_MODELS
-    assert registry["x-tradesieve-entrypoints"][-3:] == root_names
-    assert list(openapi["x-tradesieve-schema-entrypoints"]) == root_names
+    assert registry["x-tradesieve-entrypoints"][-6:-3] == root_names
+    assert list(openapi["x-tradesieve-schema-entrypoints"])[:3] == root_names
     assert all(name in openapi["components"]["schemas"] for name in root_names)
     assert all(name in registry["$defs"] for name in root_names)
     assert source_snapshot_query.SourceSnapshotListing is SourceSnapshotListing
@@ -240,7 +256,7 @@ def test_source_snapshot_schema_closure_is_operations_safe_and_redacted() -> Non
     assert actor_type_schema["enum"] == ["HUMAN", "SERVICE", "AGENT"]
 
 
-def test_snapshot_schema_registration_does_not_change_rest_or_webhook_surfaces() -> (
+def test_official_preview_adds_one_explicit_rest_surface_without_webhook_drift() -> (
     None
 ):
     openapi = load_json(ROOT / "api/openapi/tradesieve.v1.json")
@@ -252,11 +268,11 @@ def test_snapshot_schema_registration_does_not_change_rest_or_webhook_surfaces()
         ).encode()
         return hashlib.sha256(payload).hexdigest()
 
-    assert len(openapi["paths"]) == 9
+    assert len(openapi["paths"]) == 10
     assert (
         canonical_hash(openapi["paths"])
         == (
-            "bbba04b18871cb006628a43a49723dad34c790f44d45f350b451c8b5d0c89af9"  # pragma: allowlist secret
+            "aa766127d86dd1871e6554b1ab931ec8e5c9336456202fb9a84889707c06f2cf"  # pragma: allowlist secret
         )
     )
     assert (
@@ -271,13 +287,52 @@ def test_snapshot_schema_registration_does_not_change_rest_or_webhook_surfaces()
     )
 
 
-def test_redocly_ignore_is_limited_to_pathless_source_snapshot_roots() -> None:
+def test_official_preview_contract_and_example_are_generated_and_redacted() -> None:
+    openapi = load_json(ROOT / "api/openapi/tradesieve.v1.json")
+    registry = load_json(ROOT / "api/schemas/tradesieve.contracts.v1.json")
+    example = load_json(ROOT / "examples/requests/official-screening.json")
+    assert isinstance(openapi, dict)
+    assert isinstance(registry, dict)
+
+    parsed = OfficialScreeningRequest.model_validate(example)
+    assert parsed.party_names[0].name == "JOINT STOCK COMPANY SOVCOMFLOT"
+    operation = openapi["paths"]["/v1/official-screenings"]["post"]
+    assert operation["security"] == [{"OfficialScreeningBearer": []}]
+    assert operation["x-tradesieve-implementation-status"] == "technical-preview"
+    assert operation["requestBody"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/OfficialScreeningRequest"
+    }
+    assert operation["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/OfficialScreeningResult"
+    }
+    assert openapi["components"]["securitySchemes"]["OfficialScreeningBearer"] == {
+        "type": "http",
+        "description": "Deployment-scoped workload bearer token.",
+        "scheme": "bearer",
+    }
+    assert registry["x-tradesieve-entrypoints"][-3:] == [
+        OfficialScreeningRequest.__name__,
+        OfficialScreeningResult.__name__,
+        OfficialSourceRefreshResult.__name__,
+    ]
+    result_properties = registry["$defs"]["OfficialScreeningResult"]["properties"]
+    assert "ofac" in result_properties
+    assert result_properties["automatic_clearance"]["const"] is False
+    ofac_identifier_evidence = registry["$defs"]["OfficialOfacIdentifierEvidence"]
+    assert "identifier_uid" in ofac_identifier_evidence["properties"]
+    assert "identifier_value" not in ofac_identifier_evidence["properties"]
+    ofac_name_evidence = registry["$defs"]["OfficialOfacNameEvidence"]
+    assert "source_name" not in ofac_name_evidence["properties"]
+
+
+def test_redocly_ignore_is_limited_to_pathless_schema_roots() -> None:
     assert (ROOT / ".redocly.lint-ignore.yaml").read_text(encoding="utf-8") == (
         "api/openapi/tradesieve.v1.json:\n"
         "  no-unused-components:\n"
         "    - '#/components/schemas/SourceSnapshotDetail'\n"
         "    - '#/components/schemas/SourceSnapshotHistory'\n"
         "    - '#/components/schemas/SourceSnapshotListing'\n"
+        "    - '#/components/schemas/OfficialSourceRefreshResult'\n"
     )
 
 

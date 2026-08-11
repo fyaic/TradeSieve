@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "party_identifiers": [],
+  "party_names": [
+    {
+      "name": "JOINT STOCK COMPANY SOVCOMFLOT"
+    }
+  ],
+  "goods": {
+    "hs_code": "854231",
+    "annex_i_code": "3A001",
+    "classification_verified": true,
+    "technical_specification_available": true,
+    "product_family": null,
+    "technical_facts": []
+  }
+}

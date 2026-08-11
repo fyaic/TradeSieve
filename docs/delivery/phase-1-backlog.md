@@ -18,8 +18,8 @@
 | --- | --- | --- | --- | --- |
 | [TS-201](https://github.com/fyaic/TradeSieve/issues/19) Runtime source registry | S1 | Source operator knows scope/owner/licence/freshness | Governance fields required; read API/CLI redacts credentials | TS-101/103 |
 | [TS-202](https://github.com/fyaic/TradeSieve/issues/20) Immutable snapshot lifecycle | S1/S2 | Operator can retrieve/quarantine/hash/validate/diff/activate/rollback | Durable synthetic lifecycle/rollback, private bytes, safe canonical DTOs, and corruption refusal; no REST/MCP/raw export | TS-201/104 |
-| [TS-203](https://github.com/fyaic/TradeSieve/issues/3) EU source connector proof | S2 | Team proves EU data lifecycle | Approved official endpoint, raw/hash/parser/diff/locator, access/licence record | TS-202 |
-| [TS-204](https://github.com/fyaic/TradeSieve/issues/4) OFAC SLS connector proof | S2 | Team proves delta-capable source lifecycle | Snapshot/delta, stable IDs, program fields, history boundary documented | TS-202 |
+| [TS-203](https://github.com/fyaic/TradeSieve/issues/3) EU source connector proof | S1/S2 | Team proves real EU data lifecycle | Live FSF/Annex I retrieval, immutable source-specific PostgreSQL projections, atomic activation, idempotent refresh, fresh active read, exact evidence and isolated PostgreSQL gate implemented; scheduled refresh/diff alerting and legal-version discovery remain | TS-202 |
+| [TS-204](https://github.com/fyaic/TradeSieve/issues/4) / [TS-204A](https://github.com/fyaic/TradeSieve/issues/43) OFAC SLS lifecycle | S2 | Team proves current and locally retained source lifecycle | Fixed official SDN/non-SDN retrieval, deterministic replay/diff, immutable migration 0007 projections, atomic four-source activation and CLI/REST/CRM evidence implemented; scheduled refresh, alerts, affected-case rescreening and legal program/ownership review remain | TS-202 |
 | [TS-205](https://github.com/fyaic/TradeSieve/issues/27) Versioned rule bundle | S1/S2 | Result identifies cited rule/policy version | Source/scope/effective/owner/tests/activation/rollback stored | Issue #2, TS-202 |
 | TS-206 Impact analysis and rescreen jobs | S2 | Relevant open cases update after source/rule change | Test delta queues linked cases, produces events, invalidates affected decision only | TS-202/205/402 |
 
@@ -29,10 +29,12 @@
 | --- | --- | --- | --- | --- |
 | [TS-301](https://github.com/fyaic/TradeSieve/issues/7) Canonical request/result schemas | S1 | Integrator has one stable typed contract | OpenAPI plus examples cover action/parties/goods/route/end-use/payment/evidence/version/result | Issue #7 |
 | [TS-302](https://github.com/fyaic/TradeSieve/issues/21) Intake, canonical hash, and idempotency | S1 | Caller can retry safely | Same key/body returns same IDs; key/body conflict typed; original input preserved | TS-301/104 |
-| [TS-303](https://github.com/fyaic/TradeSieve/issues/22) Deterministic completeness and exact-identifier controls | S1 | User receives exact missing facts and strong-ID findings | Golden/incomplete/negative fixtures pass; missing facts never default green | TS-301/205 |
+| [TS-303](https://github.com/fyaic/TradeSieve/issues/22) Deterministic completeness and exact-identifier controls | S1 | User receives exact missing facts and strong-ID findings | Live EU FSF strong-ID and Annex I explicit-code technical preview works; canonical persisted screening/finding orchestration remains | TS-301/205 |
 | [TS-304](https://github.com/fyaic/TradeSieve/issues/5) Multilingual synthetic fixture set | S1/S2 | Matcher selection has an approved test basis | Chinese/Cyrillic/Latin, aliases, identifiers, weak/ambiguous negatives, ownership | Issue #5 |
 | [TS-305](https://github.com/fyaic/TradeSieve/issues/6) Matcher adapter and benchmark | S2 | Reviewer receives explainable candidates | Exact/pg_trgm/yente/Watchman/Splink candidates compared; active threshold/version approved | Issue #6, TS-304 |
-| TS-306 Goods/route/end-use/payment consistency controls | S2 | User sees non-party risk and required evidence | Golden case produces named facts/conflicts; HS/category never definitive | Issues #1/#2, TS-301/205 |
+| [TS-306A](https://github.com/fyaic/TradeSieve/issues/40) Versioned EU technical assertions | S2 | User sees deterministic source-bound parameter comparisons | Initial `3A001.a.5.a`/`.a.14`/`.e.1` numeric rules expose matched, not-matched, incomplete, source-drift and evidence states; never definitive classification | #3, TS-303 |
+| TS-306B BIS CHPL sensitive-goods candidates | S1 prototype | CRM user sees a bounded enhanced-due-diligence prompt from an explicit HS candidate | Exact official 50-code HS-6 fixture, tier/source/hash evidence, yellow evidence request, no classification/prohibition/clearance claim | TS-301/303 |
+| TS-306 Goods/route/end-use/payment consistency controls | S2 | User sees non-party risk and required evidence | Golden case produces named facts/conflicts; HS/category never definitive | Issues #1/#2, TS-301/205/306A |
 | TS-307 Reproducible screening orchestration | S1/S2 | Same input/version set replays | Result/version/input hashes stable; model suggestions isolated; coverage warnings visible | TS-302/303/305/306 |
 
 ## [E4 — Case, evidence, and human decision](https://github.com/fyaic/TradeSieve/issues/14)
@@ -49,11 +51,11 @@
 
 | Story | Sprint | User outcome | Acceptance summary | Depends on |
 | --- | --- | --- | --- | --- |
-| [TS-501](https://github.com/fyaic/TradeSieve/issues/24) Versioned REST API and typed errors | S1/S2 | CRM/OMS can screen/read/submit/request safely | Auth, limits, idempotency, OpenAPI, error semantics and interactive docs pass | TS-301/307/401 |
+| [TS-501](https://github.com/fyaic/TradeSieve/issues/24) Versioned REST API and typed errors | S1/S2 | CRM/OMS can screen/read/submit/request safely | Official-source-only `POST /v1/official-screenings` technical preview has hashed Bearer auth, byte/media limits, safe errors and versioned OpenAPI/JSON Schema; full tenant/OIDC, idempotent cases, reads and rate limits remain | TS-301/307/401 |
 | TS-502 CLI client | S3 | Analyst can validate/screen/read using files/stdin | Human/JSON output, stdout/stderr, safe exit codes, REST parity | TS-501 |
 | TS-503 MCP adapter | S3 | Agent can screen/read/explain/request review safely | Official SDK/target protocol, structured parity, narrow scopes, no clearance/bulk/arbitrary tools | Issue #9, TS-501 |
 | TS-504 Signed webhook delivery | S3 | Caller receives reliable state changes | Outbox, signature/timestamp/rotation, retry/dead-letter, at-least-once and dedupe tests | TS-401/104 |
-| [TS-505](https://github.com/fyaic/TradeSieve/issues/37) Sample CRM/OMS gate | S1 demo / S3 full | Integrator first sees a fixed synthetic CRM interception demo, then the complete integration | Demo maps fixed records to canonical contracts and enforces conservative results; full story later adds formal REST, webhook verification, re-read and named-action release | Issue #1, TS-501/504 |
+| [TS-505](https://github.com/fyaic/TradeSieve/issues/37) Sample CRM/OMS gate | S1 demo / S3 full | Integrator first sees a fixed synthetic CRM interception demo, then the complete integration | Visible demo maps fixed synthetic transactions to the real active EU/OFAC/Annex I service and enforces failure-closed actions; full story still needs formal case REST, webhook verification, re-read and named-action release | Issue #1, TS-501/504 |
 
 ## [E6 — Security, operations, and MVP acceptance](https://github.com/fyaic/TradeSieve/issues/16)
 

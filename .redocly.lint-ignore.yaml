@@ -3,3 +3,4 @@ api/openapi/tradesieve.v1.json:
     - '#/components/schemas/SourceSnapshotDetail'
     - '#/components/schemas/SourceSnapshotHistory'
     - '#/components/schemas/SourceSnapshotListing'
+    - '#/components/schemas/OfficialSourceRefreshResult'

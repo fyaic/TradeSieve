@@ -1,5 +1,5 @@
 schema_version: 1
-accessed_at: "2026-08-06"
+accessed_at: "2026-08-11"
 policy:
   primary_sources_control: true
   production_use_requires_licence_review: true
@@ -32,6 +32,24 @@ sources:
     use: Regime orientation and official data entry points
     access: Public web page
 
+  - id: eu-fsf-dataeu
+    title: Consolidated list of persons, groups and entities subject to EU financial sanctions
+    category: official-data
+    authority: European Commission via data.europa.eu
+    jurisdiction: EU
+    url: https://data.europa.eu/data/datasets/consolidated-list-of-persons-groups-and-entities-subject-to-eu-financial-sanctions
+    use: Runtime discovery of the official Consolidated Financial Sanctions File 1.1 XML distribution
+    access: Public official dataset; COM_REUSE (Commission Decision 2011/833/EU); verified 2026-08-10
+
+  - id: eu-dual-use-2025-2003-cellar
+    title: Commission Delegated Regulation (EU) 2025/2003 — Annex I Formex manifestation
+    category: official-law-data
+    authority: Publications Office of the European Union (CELLAR)
+    jurisdiction: EU
+    url: https://publications.europa.eu/resource/cellar/ec080244-c0fa-11f0-a612-01aa75ed71a1.0006.02/DOC_1
+    use: Versioned machine-readable source for the 2025 EU dual-use Annex I control entries
+    access: Public official legal publication; CELEX 32025R2003; verified 2026-08-10
+
   - id: eu-dual-use-regulation-2021-821
     title: Regulation (EU) 2021/821
     category: official-law
@@ -40,6 +58,15 @@ sources:
     url: https://eur-lex.europa.eu/eli/reg/2021/821
     use: Dual-use legal framework and versioned Annex I controls
     access: Public legal publication
+
+  - id: eu-dual-use-controls-overview
+    title: Exporting dual-use items
+    category: official-guidance
+    authority: European Commission
+    jurisdiction: EU
+    url: https://policy.trade.ec.europa.eu/help-exporters-and-importers/exporting-dual-use-items_en
+    use: Official scope, control-list, end-use-control and correlation-table limitations
+    access: Public official guidance; verified 2026-08-11
 
   - id: eu-taric
     title: EU customs tariff (TARIC)
@@ -83,8 +110,44 @@ sources:
     authority: U.S. Department of the Treasury, OFAC
     jurisdiction: US
     url: https://ofac.treasury.gov/sanctions-list-service
-    use: Sanctions list downloads, customized datasets, and deltas
-    access: Public service; production connector terms must be reviewed
+    use: Fixed official entry point for SDN and consolidated non-SDN comprehensive XML publications
+    access: Public service; legacy XML and one signed AWS GovCloud publication redirect verified 2026-08-10; production terms must be reviewed
+
+  - id: ofac-faq-90
+    title: OFAC FAQ 90 — comprehensive and delta files
+    category: official-guidance
+    authority: U.S. Department of the Treasury, OFAC
+    jurisdiction: US
+    url: https://ofac.treasury.gov/faqs/90
+    use: Full-refresh versus delta operating policy for locally maintained databases
+    access: Public official FAQ; verified 2026-08-10
+
+  - id: ofac-faq-1031
+    title: OFAC FAQ 1031 — record UID
+    category: official-guidance
+    authority: U.S. Department of the Treasury, OFAC
+    jurisdiction: US
+    url: https://ofac.treasury.gov/faqs/1031
+    use: Stable numeric record identity for snapshot diffs and replay
+    access: Public official FAQ; verified 2026-08-10
+
+  - id: ofac-advanced-format-faq
+    title: Frequently Asked Questions on Advanced Sanctions List Standard
+    category: official-technical-documentation
+    authority: U.S. Department of the Treasury, OFAC
+    jurisdiction: US
+    url: https://ofac.treasury.gov/sdn-list-data-formats-data-schemas/frequently-asked-questions-on-advanced-sanctions-list-standard
+    use: Relationship between supported legacy SDN/consolidated XML and advanced sanctions-list formats
+    access: Public official technical FAQ; verified 2026-08-10
+
+  - id: ofac-sls-namespace-change-2024
+    title: OFAC Sanctions List Service XML namespace change notice
+    category: official-technical-announcement
+    authority: U.S. Department of the Treasury, OFAC
+    jurisdiction: US
+    url: https://ofac.treasury.gov/recent-actions/20240507_44
+    use: Fixed legacy XML namespace and schema-drift validation
+    access: Public official notice; verified 2026-08-10
 
   - id: ofac-faq-401
     title: OFAC FAQ 401 — 50 Percent Rule
@@ -103,6 +166,15 @@ sources:
     url: https://www.trade.gov/consolidated-screening-list
     use: Consolidated export-screening data and API discovery
     access: Public data and API; underlying source publications remain authoritative
+
+  - id: us-bis-common-high-priority-items
+    title: Common High Priority Items List
+    category: official-guidance
+    authority: U.S. Department of Commerce, Bureau of Industry and Security
+    jurisdiction: US
+    url: https://www.bis.gov/licensing/country-guidance/common-high-priority-items-list-chpl
+    use: Exact HS-6 candidate flag for enhanced diversion-risk due diligence; never definitive classification, prohibition or clearance
+    access: Public official guidance; 50-item tier inventory verified 2026-08-11
 
   - id: uk-sanctions-list
     title: UK Sanctions List

@@ -10,6 +10,7 @@ TradeSieve documentation is decision-oriented: requirements preserve what is nee
 ## Product
 
 - [Service definition](product/service-definition.md)
+- [Prototype release boundary](product/prototype-release-boundary.md)
 - [Personas and user journeys](product/personas-and-journeys.md)
 - [Detailed product requirements](product/requirements.md)
 - [Phase 1 service MVP](product/mvp-scope.md)
@@ -18,7 +19,9 @@ TradeSieve documentation is decision-oriented: requirements preserve what is nee
 
 - [Development setup and checks](getting-started/development.md)
 - [Docker reference deployment](getting-started/docker-reference.md)
-- [Synthetic international-logistics CRM demo](getting-started/demo-crm.md)
+- [Synthetic international-logistics CRM over live official sources](getting-started/demo-crm.md)
+- [Four-source official refresh, CLI, and REST technical preview](getting-started/official-screening-cli.md)
+- [Prototype release installation and handoff](getting-started/prototype-release.md)
 - [Target MVP user experience](getting-started/mvp-user-experience.md)
 - [Draft OpenAPI contract](../api/openapi/tradesieve.v1.json)
 - [Shared JSON Schema registry](../api/schemas/tradesieve.contracts.v1.json)
@@ -49,6 +52,9 @@ TradeSieve documentation is decision-oriented: requirements preserve what is nee
 - [ADR-0004: Phase 1 modular Python service](decisions/0004-phase-1-modular-python-service.md)
 - [ADR-0005: Pydantic canonical contract source](decisions/0005-pydantic-canonical-contract-source.md)
 - [ADR-0006: Verified identity and deny-default authorization](decisions/0006-verified-identity-and-deny-default-authorization.md)
+- [ADR-0007: Official source-specific immutable projections](decisions/0007-official-source-specific-projections.md)
+- [ADR-0008: Atomic four-source active screening bundle](decisions/0008-atomic-four-source-active-bundle.md)
+- [ADR-0009: Source-bound technical assertions](decisions/0009-source-bound-technical-assertions.md)
 
 ## Delivery
 
@@ -59,8 +65,11 @@ TradeSieve documentation is decision-oriented: requirements preserve what is nee
 
 ## Research
 
+- [Assessment of the user-provided Russia sanctions workbook](research/user-workbook-assessment.md)
+
 - [Landscape synthesis](research/landscape.md)
 - [Regulatory and official data sources](research/regulatory-and-data-sources.md)
+- [OFAC SLS connector proof and history boundary](research/ofac-sls-connector-proof.md)
 - [Open-source projects and standards](research/open-source-and-standards.md)
 - [Academic research](research/academic-research.md)
 - [Industry patterns](research/industry-patterns.md)

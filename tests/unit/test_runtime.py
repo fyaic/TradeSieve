@@ -380,6 +380,7 @@ def test_submit_demo_screening_is_disabled_before_connections(
         deployment_id="production-1",
         required_source_set="approved-sources-v1",
         required_rule_set="approved-rules-v1",
+        official_api_token_sha256="sha256:" + "a" * 64,
     )
     with pytest.raises(RuntimeError, match="explicit demo mode"):
         runtime.submit_demo_screening(

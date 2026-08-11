@@ -13,7 +13,7 @@
 | EU customs/trade measures | [TARIC](https://taxation-customs.ec.europa.eu/customs/common-customs-tariff-cct/tariff-classification-goods/eu-customs-tariff-taric_en) | Database; daily transmission to member-state systems | CN/TARIC candidate measures and destination checks | Customs code does not replace technical dual-use classification |
 | Russia trade restrictions | [Regulation (EU) No 833/2014](https://eur-lex.europa.eu/eli/reg/2014/833) | Consolidated acts plus amendments | Versioned prohibitions, services, and goods annexes | Check the latest consolidated text and later Official Journal amendments |
 | Russia anti-circumvention | [Commission enhanced due-diligence guidance](https://finance.ec.europa.eu/document/download/3c86c9a8-f09e-4092-ab8c-a9e678df1494_en?filename=guidance-eu-operators-russia-sanctions-circumvention_en.pdf) | PDF | Red-flag taxonomy and evidence requirements | Guidance supports but does not replace binding acts |
-| US sanctions | [OFAC Sanctions List Service](https://ofac.treasury.gov/sanctions-list-service) | Downloads, customized datasets, deltas/archives | SDN and non-SDN data, historical deltas | Program-specific effects differ; list names alone do not encode every prohibition |
+| US sanctions | [OFAC Sanctions List Service](https://ofac.treasury.gov/sanctions-list-service) | Comprehensive legacy XML, advanced XML and change/delta publications | SDN and non-SDN source-specific snapshots; [live connector proof](ofac-sls-connector-proof.md) | Program-specific effects differ; local history begins only when snapshots are retained |
 | US ownership | [OFAC FAQ 401](https://ofac.treasury.gov/faqs/401) | Human-readable guidance | Ownership-rule configuration and graph tests | The 50 Percent Rule requires direct/indirect aggregate ownership evidence |
 | US export screening | [Consolidated Screening List](https://www.trade.gov/consolidated-screening-list) | CSV/TSV/JSON/API | BIS/State/Treasury screening aid | The API contains active records; verify official underlying publications and plan separately for history |
 | UK designations | [UK Sanctions List](https://www.gov.uk/government/publications/the-uk-sanctions-list) | Static CSV/XML/TXT/JSON-like formats listed by UK | UK party, ship, regime, and measure records | Since 2026-01-28 the old OFSI consolidated list is no longer updated |
@@ -50,6 +50,12 @@ Backfill has two different questions:
 - **As-of-time reconstruction:** determine what facts, lists, and rules were effective when the action occurred.
 
 The second requires archived official publications, vendor history, or internally preserved snapshots. Current-only APIs cannot reconstruct delisted entities or prior rule text. TradeSieve should clearly label `CURRENT_REPLAY` and `AS_OF_REPLAY`; they must never be conflated.
+
+For OFAC SLS, TradeSieve uses full comprehensive refresh plus a locally computed
+stable-UID diff. This follows [OFAC FAQ 90](https://ofac.treasury.gov/faqs/90), which
+recommends comprehensive files and full refresh for database administrators, while
+preserving deterministic replay. A published delta is not assumed to provide a
+complete pre-retention history.
 
 ## Country/regime modelling
 

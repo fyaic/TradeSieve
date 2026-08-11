@@ -185,7 +185,115 @@ function renderEmptyScreening() {
   elements.screeningPanel.replaceChildren(template.content.cloneNode(true));
 }
 
+function renderOfficialScreening(payload) {
+  const result = payload.result;
+  const [signalLabel, signalClass] = labels.signal[result.signal];
+  const actionLabel = labels.action[result.business_action] || result.business_action;
+  const priority = result.signal === "RED" ? "P0" : result.signal === "YELLOW" ? "P1" : "NONE";
+  const sanctions = result.sanctions.name_evidence.length
+    ? result.sanctions.name_evidence
+        .map(
+          (item) => `
+            <article class="risk-item">
+              <div class="risk-item-header">
+                <strong>EU FSF 官方别名候选</strong>
+                <span class="risk-priority priority-p0">${escapeHtml(item.eu_reference_number)}</span>
+              </div>
+              <p>主体类型：${escapeHtml(item.subject_type)}；强别名：${item.strong_alias ? "是" : "否"}</p>
+              <p>证据定位：${escapeHtml(item.source_native_locator)}</p>
+            </article>`,
+        )
+        .join("")
+    : '<div class="no-open-risk">本次精确规范化名称没有官方名单候选；这不等于已完成模糊、音译或所有权审查。</div>';
+  const technicalAssessment = result.dual_use.technical_assessment;
+  const technicalComparisons = technicalAssessment
+    ? technicalAssessment.comparisons
+        .map(
+          (item) =>
+            `${escapeHtml(item.fact_id)}：${escapeHtml(item.actual_value)} ${escapeHtml(item.unit)} ` +
+            `${escapeHtml(item.operator)} ${escapeHtml(item.threshold_value)}；${item.matched ? "满足" : "不满足"}`,
+        )
+        .join("<br>")
+    : "未提交经审核的结构化技术事实";
+  const technicalDetail = technicalAssessment
+    ? `<p>技术规则：${escapeHtml(technicalAssessment.rule_id || "未选择")} / ${escapeHtml(technicalAssessment.status)}</p>
+       <p>参数比较：${technicalComparisons || "等待补充参数"}</p>
+       <p>规则包：${escapeHtml(technicalAssessment.rule_bundle_id)} @ ${escapeHtml(technicalAssessment.rule_version)}</p>`
+    : `<p>技术参数判定：${technicalComparisons}</p>`;
+  const dualUse = `
+    <article class="risk-item">
+      <div class="risk-item-header">
+        <strong>EU Annex I 官方控制项</strong>
+        <span class="risk-priority priority-p1">${escapeHtml(result.dual_use.status)}</span>
+      </div>
+      <p>控制号：${escapeHtml(result.dual_use.requested_code || "未提供")}</p>
+      <p>缺失事实：${escapeHtml(result.dual_use.missing_facts.join("、") || "无")}</p>
+      <p>证据定位：${escapeHtml(result.dual_use.source_native_locator || "未命中控制项")}</p>
+      ${technicalDetail}
+    </article>`;
+  const sensitiveGoods = result.sensitive_goods
+    ? `<article class="risk-item">
+        <div class="risk-item-header">
+          <strong>BIS 高优先级物项 HS-6 候选</strong>
+          <span class="risk-priority priority-p1">${escapeHtml(result.sensitive_goods.status)}</span>
+        </div>
+        <p>HS-6：${escapeHtml(result.sensitive_goods.normalized_hs6 || "未提供")}；层级：${escapeHtml(result.sensitive_goods.tier || "未命中")}</p>
+        <p>待补事实：${escapeHtml(result.sensitive_goods.missing_facts.join("、") || "无")}</p>
+        <p>仅为增强尽调候选，不构成分类、禁止结论或放行依据。</p>
+      </article>`
+    : '<div class="no-open-risk">当前结果未包含 CHPL 候选信息。</div>';
+  const events = payload.integration_events
+    .map(
+      (event) => `
+        <div class="integration-event">
+          <div><strong>${escapeHtml(event.label)}</strong><span>${escapeHtml(event.detail)}</span></div>
+          <time datetime="${escapeHtml(event.occurred_at)}">${escapeHtml(formatTime(event.occurred_at))}</time>
+        </div>`,
+    )
+    .join("");
+
+  elements.screeningPanel.innerHTML = `
+    <section class="decision-block ${escapeHtml(signalClass)}" aria-label="真实官方来源审查结论">
+      <div class="decision-meta">
+        <span class="signal-label">${escapeHtml(signalLabel)}</span>
+        <span class="priority-label">${escapeHtml(priority)}</span>
+        <span class="action-label-result">${escapeHtml(actionLabel)}</span>
+      </div>
+      <h4 class="decision-title">真实活跃官方来源审查</h4>
+      <p class="decision-copy">名单与两用物项结果绑定同一个不可变来源版本；系统不会自动放行。</p>
+      <p class="result-warning">${escapeHtml(payload.warning)}</p>
+    </section>
+    <section class="result-section">
+      <h4 class="subsection-title">官方制裁名单证据</h4>
+      <div class="risk-list">${sanctions}</div>
+    </section>
+    <section class="result-section">
+      <h4 class="subsection-title">官方两用物项证据</h4>
+      <div class="risk-list">${dualUse}</div>
+    </section>
+    <section class="result-section">
+      <h4 class="subsection-title">敏感货物候选提示</h4>
+      <div class="risk-list">${sensitiveGoods}</div>
+    </section>
+    <section class="result-section">
+      <h4 class="subsection-title">CRM 与 TradeSieve 交互</h4>
+      <div class="integration-list">${events}</div>
+    </section>
+    <section class="result-section">
+      <h4 class="subsection-title">来源版本与证据哈希</h4>
+      <div class="result-identifiers">
+        <div><span>source_bundle_id</span><br>${escapeHtml(result.source_bundle_id)}</div>
+        <div><span>FSF snapshot</span><br>${escapeHtml(result.sanctions.source_snapshot_id)}</div>
+        <div><span>Annex I snapshot</span><br>${escapeHtml(result.dual_use.source_snapshot_id)}</div>
+      </div>
+    </section>`;
+}
+
 function renderScreening(payload) {
+  if (payload.live_official_sources) {
+    renderOfficialScreening(payload);
+    return;
+  }
   const result = payload.result;
   const [signalLabel, signalClass] = labels.signal[result.signal];
   const stateLabel = labels.state[result.state] || result.state;
@@ -345,13 +453,13 @@ async function screenSelectedRecord() {
     </div>`;
   try {
     const payload = await requestJson(
-      `/demo/api/crm/records/${encodeURIComponent(recordId)}/screen`,
+      `/demo/api/crm/records/${encodeURIComponent(recordId)}/screen-official`,
       { method: "POST" },
     );
     state.screenings.set(recordId, payload);
     if (state.selectedRecordId === recordId) {
       renderScreening(payload);
-      elements.screenButton.textContent = "重新执行演示审查";
+      elements.screenButton.textContent = "重新执行官方审查";
     }
     renderQueue();
   } catch (error) {

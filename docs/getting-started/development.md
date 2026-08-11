@@ -1,6 +1,6 @@
 # Development setup
 
-**Status:** TS-201 source-registry, TS-202 immutable snapshot, TS-205 rule-bundle, and TS-302 canonical screening-intake persistence foundations. This workflow validates the development package and canonical schemas; it does not expose a public screening interface or imply production readiness.
+**Status:** The development workflow covers the governed foundations and the official EU source persistence/screening vertical slice. It exposes an authenticated technical-preview endpoint, not a production screening or clearance service.
 
 ## Prerequisites
 
@@ -19,6 +19,12 @@ From a clean checkout:
 ```
 
 The script verifies the lockfile, installs all locked dependency groups, checks formatting/lint/types, runs unit and architecture-boundary tests with coverage, builds the wheel/source distribution, validates documentation/OpenAPI, scans tracked files for secrets, and audits Python dependencies. It covers non-container gates. Run `./scripts/test_source_snapshot_postgres.sh` for the isolated source-snapshot PostgreSQL 18.4 gate, `./scripts/test_screening_submission_postgres.sh` for the isolated canonical screening-submission migration/persistence/concurrency/constraint/corruption gate, and `./scripts/test_compose.sh` for the complete two-project reference-deployment lifecycle. Both isolated PostgreSQL scripts use bounded execution, unique Compose projects, synthetic fixtures, and trap-based zero-residue cleanup.
+
+The official projection gate is independently executable and cleans all Compose resources:
+
+```bash
+./scripts/test_official_source_postgres.sh
+```
 
 For a faster edit/test loop:
 
@@ -45,6 +51,7 @@ Every pull request runs:
 - tracked-file secret detection and dependency vulnerability audit.
 - a separate PostgreSQL 18.4 source-snapshot persistence/concurrency/constraint job;
 - a separate PostgreSQL 18.4 canonical screening-submission persistence/concurrency/constraint job;
+- a separate PostgreSQL 18.4 official-source projection/activation/idempotency/immutability job;
 - the separate Docker Compose reference deployment lifecycle.
 
 The PostgreSQL 18.4 canonical screening-submission gate is mandatory Reviewer evidence

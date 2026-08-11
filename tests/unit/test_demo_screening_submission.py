@@ -95,6 +95,7 @@ def test_demo_entitlement_allows_only_the_exact_synthetic_actor_and_hashed_targe
                 deployment_id="production-1",
                 required_source_set="approved-sources-v1",
                 required_rule_set="approved-rules-v1",
+                official_api_token_sha256="sha256:" + "a" * 64,
             ),
             DemoScreeningFixture.BASELINE,
             now=NOW,
@@ -108,6 +109,7 @@ def test_demo_entitlement_allows_only_the_exact_synthetic_actor_and_hashed_targe
                 deployment_id="production-1",
                 required_source_set="approved-sources-v1",
                 required_rule_set="approved-rules-v1",
+                official_api_token_sha256="sha256:" + "a" * 64,
             )
         ),
     ],

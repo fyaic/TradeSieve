@@ -4,12 +4,37 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any, cast
 
 import psycopg
 from alembic import command
 from alembic.config import Config
+from pydantic import ValidationError
 
+from tradesieve.adapters.eu_dual_use import (
+    EuDualUseOfficialSourceConnector,
+    EuDualUseSourceError,
+    HttpsEuDualUseTransport,
+)
+from tradesieve.adapters.eu_fsf import (
+    EuFsfOfficialSourceConnector,
+    EuFsfSourceError,
+    EuFsfXmlParser,
+    HttpsEuFsfTransport,
+)
+from tradesieve.adapters.ofac_sls import (
+    HttpsOfacSlsTransport,
+    OfacSlsOfficialSourceConnector,
+    OfacSlsSourceError,
+    OfacSlsXmlParser,
+)
+from tradesieve.adapters.postgres_official_sources import (
+    OfficialSourcePersistenceError,
+    PostgresOfficialSourceRepository,
+)
 from tradesieve.adapters.postgres_source_registry import PostgresSourceRegistry
 from tradesieve.application.auth import (
     AuthorizationAuditFailure,
@@ -17,6 +42,12 @@ from tradesieve.application.auth import (
     AuthorizationUnavailable,
     Operation,
 )
+from tradesieve.application.official_screening import (
+    OfficialScreeningRequest,
+    OfficialScreeningService,
+    PersistedOfficialScreeningService,
+)
+from tradesieve.application.official_source_refresh import OfficialSourceRefreshService
 from tradesieve.application.rule_bundle import RuleBundleUnavailable
 from tradesieve.application.screening_submission import (
     ScreeningSubmissionServiceError,
@@ -241,6 +272,120 @@ def submit_demo_screening_command(
     return 0
 
 
+class _DuplicateJsonKey(Exception):
+    pass
+
+
+def _strict_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise _DuplicateJsonKey
+        result[key] = value
+    return result
+
+
+def _read_official_screening_request(location: str) -> OfficialScreeningRequest:
+    maximum = 1024 * 1024
+    if location == "-":
+        content = sys.stdin.buffer.read(maximum + 1)
+    else:
+        path = Path(location)
+        if not path.is_file():
+            raise ValueError("request input is unavailable")
+        with path.open("rb") as stream:
+            content = stream.read(maximum + 1)
+    if not content or len(content) > maximum:
+        raise ValueError("request input is outside its byte bound")
+    try:
+        decoded: Any = json.loads(
+            content.decode("utf-8", errors="strict"),
+            object_pairs_hook=_strict_json_object,
+        )
+        return OfficialScreeningRequest.model_validate(decoded)
+    except (_DuplicateJsonKey, UnicodeError, json.JSONDecodeError, ValidationError):
+        raise ValueError("request input is invalid") from None
+
+
+def screen_official_command(*, request_location: str) -> int:
+    """Run sanctions and Annex I checks against freshly retrieved official bytes."""
+
+    try:
+        request = _read_official_screening_request(request_location)
+    except (OSError, ValueError):
+        print(json.dumps({"status": "INVALID_REQUEST"}, sort_keys=True))
+        return 3
+    service = OfficialScreeningService(
+        EuFsfOfficialSourceConnector(HttpsEuFsfTransport()),
+        EuDualUseOfficialSourceConnector(HttpsEuDualUseTransport()),
+        OfacSlsOfficialSourceConnector(HttpsOfacSlsTransport()),
+        fsf_parser=EuFsfXmlParser(),
+        ofac_parser=cast(Any, OfacSlsXmlParser()),
+    )
+    try:
+        result = service.screen(request)
+    except (
+        EuFsfSourceError,
+        EuDualUseSourceError,
+        OfacSlsSourceError,
+        RuntimeError,
+    ):
+        print(json.dumps({"status": "OFFICIAL_SOURCE_UNAVAILABLE"}, sort_keys=True))
+        return 2
+    print(result.model_dump_json())
+    return 0
+
+
+def refresh_official_sources_command(settings: Settings) -> int:
+    """Fetch, verify, persist, and atomically activate all official sources."""
+
+    try:
+        with connect(settings) as connection:
+            result = OfficialSourceRefreshService(
+                EuFsfOfficialSourceConnector(HttpsEuFsfTransport()),
+                EuDualUseOfficialSourceConnector(HttpsEuDualUseTransport()),
+                OfacSlsOfficialSourceConnector(HttpsOfacSlsTransport()),
+                PostgresOfficialSourceRepository(connection),
+                fsf_parser=EuFsfXmlParser(),
+                ofac_parser=cast(Any, OfacSlsXmlParser()),
+            ).refresh()
+    except (
+        EuFsfSourceError,
+        EuDualUseSourceError,
+        OfacSlsSourceError,
+        OfficialSourcePersistenceError,
+        psycopg.Error,
+        RuntimeError,
+        ValueError,
+    ):
+        print(json.dumps({"status": "OFFICIAL_SOURCE_REFRESH_FAILED"}, sort_keys=True))
+        return 2
+    print(result.model_dump_json())
+    return 0
+
+
+def screen_active_command(settings: Settings, *, request_location: str) -> int:
+    """Screen against the fresh atomically active official-source bundle."""
+
+    try:
+        request = _read_official_screening_request(request_location)
+    except (OSError, ValueError):
+        print(json.dumps({"status": "INVALID_REQUEST"}, sort_keys=True))
+        return 3
+    try:
+        with connect(settings) as connection:
+            result = PersistedOfficialScreeningService(
+                PostgresOfficialSourceRepository(connection)
+            ).screen(request)
+    except (OfficialSourcePersistenceError, psycopg.Error, RuntimeError, ValueError):
+        print(
+            json.dumps({"status": "ACTIVE_OFFICIAL_SOURCE_UNAVAILABLE"}, sort_keys=True)
+        )
+        return 2
+    print(result.model_dump_json())
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -251,6 +396,7 @@ def main() -> None:
         "list-sources",
         "list-source-snapshots",
         "list-rules",
+        "refresh-official-sources",
     ):
         subparsers.add_parser(command_name)
     submission = subparsers.add_parser(
@@ -262,6 +408,24 @@ def main() -> None:
         "--fixture",
         required=True,
         choices=tuple(DemoScreeningFixture),
+    )
+    official = subparsers.add_parser(
+        "screen-official",
+        help="screen a JSON request against freshly retrieved official EU sources",
+    )
+    official.add_argument(
+        "--request",
+        required=True,
+        help="JSON file path, or '-' to read bounded JSON from stdin",
+    )
+    active = subparsers.add_parser(
+        "screen-active",
+        help="screen JSON against the fresh active official-source bundle",
+    )
+    active.add_argument(
+        "--request",
+        required=True,
+        help="JSON file path, or '-' to read bounded JSON from stdin",
     )
     args = parser.parse_args()
     settings = get_settings()
@@ -277,7 +441,7 @@ def main() -> None:
         raise SystemExit(list_source_snapshots(settings))
     elif args.command == "list-rules":
         raise SystemExit(list_rules(settings))
-    else:
+    elif args.command == "submit-demo-screening":
         raise SystemExit(
             submit_demo_screening_command(
                 settings,
@@ -285,6 +449,12 @@ def main() -> None:
                 fixture=DemoScreeningFixture(args.fixture),
             )
         )
+    elif args.command == "screen-official":
+        raise SystemExit(screen_official_command(request_location=args.request))
+    elif args.command == "screen-active":
+        raise SystemExit(screen_active_command(settings, request_location=args.request))
+    else:
+        raise SystemExit(refresh_official_sources_command(settings))
 
 
 if __name__ == "__main__":  # pragma: no cover

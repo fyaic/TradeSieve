@@ -29,6 +29,7 @@ def production_settings() -> Settings:
         deployment_id="deployment-production",
         required_source_set="approved-source-set",
         required_rule_set="approved-rule-set",
+        official_api_token_sha256="sha256:" + "a" * 64,
     )
 
 
@@ -96,6 +97,52 @@ def test_red_fixture_uses_a_strong_synthetic_identifier_and_p0_hold() -> None:
     assert scenario.result.findings[0].kind == "SYNTHETIC_EXACT_IDENTIFIER_MATCH"
 
 
+def test_demo_records_map_to_live_official_screening_facts_conservatively() -> None:
+    settings = Settings()
+    record_ids = [
+        item.record_id for item in demo_crm.list_demo_crm_records(settings).records
+    ]
+    requests = {
+        record_id: demo_crm.official_request_for_demo_crm_record(
+            settings,
+            record_id,
+        )
+        for record_id in record_ids
+    }
+
+    listed = requests["crm-quote-260810-0047"]
+    assert any(
+        item.name == "Benevolence International Foundation"
+        for item in listed.party_names
+    )
+    assert listed.goods.annex_i_code == "3A001"
+    assert listed.goods.hs_code == "853710"
+    assert listed.goods.classification_verified is False
+    assert listed.goods.technical_specification_available is False
+    cell = requests["crm-quote-260810-0039"].goods
+    assert cell.annex_i_code == "3A001"
+    assert cell.hs_code is None
+    assert cell.classification_verified is True
+    assert cell.technical_specification_available is True
+    assert cell.product_family == "ELECTROCHEMICAL_CELL"
+    assert {item.fact_id.value for item in cell.technical_facts} == {
+        "is_battery",
+        "cell_type",
+        "energy_density_wh_per_kg",
+        "measurement_temperature_celsius",
+    }
+    assert all(request.party_names for request in requests.values())
+    assert (
+        sum(request.goods.classification_verified for request in requests.values()) == 1
+    )
+    assert any(
+        request.goods.technical_specification_available for request in requests.values()
+    )
+    assert any(request.goods.annex_i_code is None for request in requests.values())
+    assert requests["crm-quote-260809-0186"].goods.hs_code == "850440"
+    assert requests["crm-quote-260810-0052"].goods.hs_code == "400921"
+
+
 def test_demo_functions_reject_production_mode_and_unknown_records() -> None:
     settings = production_settings()
     with pytest.raises(RuntimeError, match="explicit demo mode"):
@@ -108,6 +155,11 @@ def test_demo_functions_reject_production_mode_and_unknown_records() -> None:
             "crm-quote-260810-0047",
             now=datetime.now(UTC),
         )
+    with pytest.raises(RuntimeError, match="explicit demo mode"):
+        demo_crm.official_request_for_demo_crm_record(
+            settings,
+            "crm-quote-260810-0047",
+        )
 
     demo_settings = Settings()
     with pytest.raises(KeyError, match="missing-record"):
@@ -117,6 +169,11 @@ def test_demo_functions_reject_production_mode_and_unknown_records() -> None:
             demo_settings,
             "missing-record",
             now=datetime.now(UTC),
+        )
+    with pytest.raises(KeyError, match="missing-record"):
+        demo_crm.official_request_for_demo_crm_record(
+            demo_settings,
+            "missing-record",
         )
 
 
@@ -295,7 +352,7 @@ def test_all_visible_assets_are_self_contained_and_avoid_automatic_clearance() -
     javascript = root.joinpath("app.js").read_text(encoding="utf-8")
 
     assert "TradeSieve" in page
-    assert "纯合成演示" in page
+    assert "合成交易 / 真实官方来源" in page
     assert "prefers-color-scheme: dark" in css
     assert "prefers-reduced-motion" in css
     assert "HUMAN_CLEARED" not in javascript

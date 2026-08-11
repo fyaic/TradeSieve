@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import sys
 from contextlib import nullcontext
@@ -15,6 +16,7 @@ from alembic.config import Config
 
 from tradesieve import manage
 from tradesieve.application.auth import Operation
+from tradesieve.application.official_screening import OfficialScreeningRequest
 from tradesieve.application.source_snapshot_contracts import SourceSnapshotListing
 from tradesieve.config import Settings
 from tradesieve.demo_source_snapshot import DemoSourceActor
@@ -110,7 +112,7 @@ def test_inspect_runtime_returns_status_and_details(
     assert manage.inspect_runtime(Settings()) == (0 if ready else 1)
     payload = json.loads(capsys.readouterr().out)
     assert payload["ready"] is ready
-    assert payload["expected_migration"] == "20260806_0005"
+    assert payload["expected_migration"] == "20260810_0007"
     assert payload["expected_source_coverage"] == "synthetic-demo-sources-v1"
     assert payload["expected_rule_coverage"] == "synthetic-demo-rules-v1"
 
@@ -295,6 +297,7 @@ def test_list_rules_is_hard_disabled_before_identity_in_production(
         deployment_id="production-1",
         required_source_set="approved-sources-v1",
         required_rule_set="approved-rules-v1",
+        official_api_token_sha256="sha256:" + "a" * 64,
     )
     monkeypatch.setattr(
         manage,
@@ -331,6 +334,7 @@ def test_list_source_snapshots_is_disabled_before_connection_in_production(
         deployment_id="production-1",
         required_source_set="approved-sources-v1",
         required_rule_set="approved-rules-v1",
+        official_api_token_sha256="sha256:" + "a" * 64,
     )
     monkeypatch.setattr(
         manage,
@@ -675,6 +679,7 @@ def test_submit_demo_screening_is_disabled_before_runtime_in_production(
         deployment_id="production-1",
         required_source_set="approved-sources-v1",
         required_rule_set="approved-rules-v1",
+        official_api_token_sha256="sha256:" + "a" * 64,
     )
     assert (
         manage.submit_demo_screening_command(
@@ -754,3 +759,326 @@ def test_main_routes_demo_submission_options_and_exit(
         manage.main()
     assert exc_info.value.code == 4
     assert called == [("synthetic-key", demo_fixture("changed"))]
+
+
+def official_request_bytes() -> bytes:
+    return json.dumps(
+        {
+            "schema_version": "1.0.0",
+            "party_identifiers": [
+                {"type": "regnumber", "value": "private-value", "country": "US"}
+            ],
+            "goods": {
+                "hs_code": "854231",
+                "annex_i_code": "3A001",
+                "classification_verified": True,
+                "technical_specification_available": True,
+                "product_family": "ADC_INTEGRATED_CIRCUIT",
+                "technical_facts": [
+                    {
+                        "fact_id": "resolution_bits",
+                        "unit": "BITS",
+                        "numeric_value": "12",
+                        "evidence_ref": "datasheet-1",
+                        "verified": True,
+                    },
+                    {
+                        "fact_id": "sample_rate_msps",
+                        "unit": "MSPS",
+                        "numeric_value": "401",
+                        "evidence_ref": "datasheet-1",
+                        "verified": True,
+                    },
+                    {
+                        "fact_id": "stores_or_processes_digitised_data",
+                        "unit": "BOOLEAN",
+                        "boolean_value": False,
+                        "evidence_ref": "datasheet-1",
+                        "verified": True,
+                    },
+                ],
+            },
+        }
+    ).encode()
+
+
+def test_official_request_reader_accepts_file_and_bounded_stdin(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    request_file = tmp_path / "request.json"
+    request_file.write_bytes(official_request_bytes())
+    from_file = manage._read_official_screening_request(str(request_file))
+    assert isinstance(from_file, OfficialScreeningRequest)
+    assert from_file.goods.annex_i_code == "3A001"
+    assert from_file.goods.product_family == "ADC_INTEGRATED_CIRCUIT"
+
+    monkeypatch.setattr(
+        sys, "stdin", SimpleNamespace(buffer=io.BytesIO(official_request_bytes()))
+    )
+    from_stdin = manage._read_official_screening_request("-")
+    assert from_stdin == from_file
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        b"",
+        b"\xff",
+        b"not-json",
+        b'{"schema_version":"1.0.0","schema_version":"1.0.0"}',
+        b"{}",
+        b"x" * (1024 * 1024 + 1),
+    ],
+)
+def test_official_request_reader_rejects_invalid_bounded_stdin(
+    monkeypatch: pytest.MonkeyPatch, content: bytes
+) -> None:
+    monkeypatch.setattr(sys, "stdin", SimpleNamespace(buffer=io.BytesIO(content)))
+    with pytest.raises(ValueError, match="request input"):
+        manage._read_official_screening_request("-")
+
+
+def test_official_request_reader_rejects_missing_file(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="unavailable"):
+        manage._read_official_screening_request(str(tmp_path / "missing.json"))
+
+
+def test_screen_official_command_prints_canonical_result(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    request = OfficialScreeningRequest.model_validate_json(official_request_bytes())
+    calls: list[object] = []
+
+    class FakeResult:
+        def model_dump_json(self) -> str:
+            return '{"automatic_clearance":false,"business_action":"HOLD"}'
+
+    class FakeService:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            assert len(args) == 3
+            assert kwargs["fsf_parser"] is not None
+            assert kwargs["ofac_parser"] is not None
+
+        def screen(self, value: object) -> FakeResult:
+            calls.append(value)
+            return FakeResult()
+
+    monkeypatch.setattr(
+        manage, "_read_official_screening_request", lambda path: request
+    )
+    monkeypatch.setattr(manage, "OfficialScreeningService", FakeService)
+    assert manage.screen_official_command(request_location="request.json") == 0
+    assert calls == [request]
+    assert json.loads(capsys.readouterr().out) == {
+        "automatic_clearance": False,
+        "business_action": "HOLD",
+    }
+
+
+def test_screen_official_command_redacts_input_and_source_failures(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        manage,
+        "_read_official_screening_request",
+        lambda path: (_ for _ in ()).throw(ValueError("private-input")),
+    )
+    assert manage.screen_official_command(request_location="private-path") == 3
+    assert json.loads(capsys.readouterr().out) == {"status": "INVALID_REQUEST"}
+
+    request = OfficialScreeningRequest.model_validate_json(official_request_bytes())
+    monkeypatch.setattr(
+        manage, "_read_official_screening_request", lambda path: request
+    )
+
+    class BrokenService:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        def screen(self, value: object) -> object:
+            raise RuntimeError("private-source")
+
+    monkeypatch.setattr(manage, "OfficialScreeningService", BrokenService)
+    assert manage.screen_official_command(request_location="private-path") == 2
+    output = capsys.readouterr().out
+    assert json.loads(output) == {"status": "OFFICIAL_SOURCE_UNAVAILABLE"}
+    assert "private" not in output
+
+
+def test_main_routes_official_screening_request_and_exit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["tradesieve-manage", "screen-official", "--request", "-"],
+    )
+    monkeypatch.setattr(manage, "get_settings", Settings)
+
+    def route(*, request_location: str) -> int:
+        calls.append(request_location)
+        return 2
+
+    monkeypatch.setattr(manage, "screen_official_command", route)
+    with pytest.raises(SystemExit) as caught:
+        manage.main()
+    assert caught.value.code == 2
+    assert calls == ["-"]
+
+
+def test_refresh_official_sources_command_prints_safe_receipt(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    calls: list[object] = []
+
+    class Result:
+        def model_dump_json(self) -> str:
+            return '{"bundle_id":"official-bundle-safe","outcome":"APPLIED"}'
+
+    class Service:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            assert len(args) == 4
+            assert kwargs["fsf_parser"] is not None
+            assert kwargs["ofac_parser"] is not None
+
+        def refresh(self) -> Result:
+            calls.append("refresh")
+            return Result()
+
+    monkeypatch.setattr(manage, "connect", lambda settings: nullcontext(object()))
+    monkeypatch.setattr(
+        manage, "PostgresOfficialSourceRepository", lambda connection: "repository"
+    )
+    monkeypatch.setattr(manage, "OfficialSourceRefreshService", Service)
+
+    assert manage.refresh_official_sources_command(Settings()) == 0
+    assert calls == ["refresh"]
+    assert json.loads(capsys.readouterr().out) == {
+        "bundle_id": "official-bundle-safe",
+        "outcome": "APPLIED",
+    }
+
+
+def test_refresh_official_sources_command_redacts_failures(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    class Service:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        def refresh(self) -> object:
+            raise RuntimeError("private-source-detail")
+
+    monkeypatch.setattr(manage, "connect", lambda settings: nullcontext(object()))
+    monkeypatch.setattr(
+        manage, "PostgresOfficialSourceRepository", lambda connection: "repository"
+    )
+    monkeypatch.setattr(manage, "OfficialSourceRefreshService", Service)
+    assert manage.refresh_official_sources_command(Settings()) == 2
+    output = capsys.readouterr().out
+    assert json.loads(output) == {"status": "OFFICIAL_SOURCE_REFRESH_FAILED"}
+    assert "private" not in output
+
+
+def test_screen_active_command_uses_persisted_service_and_redacts_failures(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    request = OfficialScreeningRequest.model_validate_json(official_request_bytes())
+    calls: list[object] = []
+
+    class Result:
+        def model_dump_json(self) -> str:
+            return '{"business_action":"HOLD","source_bundle_id":"safe"}'
+
+    class Service:
+        def __init__(self, repository: object) -> None:
+            assert repository == "repository"
+
+        def screen(self, value: object) -> Result:
+            calls.append(value)
+            return Result()
+
+    monkeypatch.setattr(
+        manage, "_read_official_screening_request", lambda path: request
+    )
+    monkeypatch.setattr(manage, "connect", lambda settings: nullcontext(object()))
+    monkeypatch.setattr(
+        manage, "PostgresOfficialSourceRepository", lambda connection: "repository"
+    )
+    monkeypatch.setattr(manage, "PersistedOfficialScreeningService", Service)
+    assert (
+        manage.screen_active_command(Settings(), request_location="request.json") == 0
+    )
+    assert calls == [request]
+    assert json.loads(capsys.readouterr().out) == {
+        "business_action": "HOLD",
+        "source_bundle_id": "safe",
+    }
+
+    monkeypatch.setattr(
+        manage,
+        "_read_official_screening_request",
+        lambda path: (_ for _ in ()).throw(ValueError("private-input")),
+    )
+    assert manage.screen_active_command(Settings(), request_location="private") == 3
+    assert json.loads(capsys.readouterr().out) == {"status": "INVALID_REQUEST"}
+
+    monkeypatch.setattr(
+        manage, "_read_official_screening_request", lambda path: request
+    )
+
+    class BrokenService(Service):
+        def screen(self, value: object) -> Result:
+            raise RuntimeError("private-database")
+
+    monkeypatch.setattr(manage, "PersistedOfficialScreeningService", BrokenService)
+    assert manage.screen_active_command(Settings(), request_location="private") == 2
+    output = capsys.readouterr().out
+    assert json.loads(output) == {"status": "ACTIVE_OFFICIAL_SOURCE_UNAVAILABLE"}
+    assert "private" not in output
+
+
+@pytest.mark.parametrize(
+    ("command", "expected"),
+    [("refresh-official-sources", "refresh"), ("screen-active", "active")],
+)
+def test_main_routes_persisted_official_commands(
+    monkeypatch: pytest.MonkeyPatch,
+    command: str,
+    expected: str,
+) -> None:
+    calls: list[tuple[str, str | None]] = []
+    argv = ["tradesieve-manage", command]
+    if command == "screen-active":
+        argv.extend(["--request", "-"])
+    monkeypatch.setattr(sys, "argv", argv)
+    monkeypatch.setattr(manage, "get_settings", Settings)
+
+    def refresh(_settings: Settings) -> int:
+        calls.append(("refresh", None))
+        return 2
+
+    def active(_settings: Settings, *, request_location: str) -> int:
+        calls.append(("active", request_location))
+        return 2
+
+    monkeypatch.setattr(
+        manage,
+        "refresh_official_sources_command",
+        refresh,
+    )
+    monkeypatch.setattr(
+        manage,
+        "screen_active_command",
+        active,
+    )
+    with pytest.raises(SystemExit) as caught:
+        manage.main()
+    assert caught.value.code == 2
+    assert calls == [(expected, "-" if expected == "active" else None)]

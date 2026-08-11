@@ -2,7 +2,7 @@
 
 > 面向制裁、出口管制与敏感交易审查的独立合规决策支持服务。
 
-[![Status: Phase 1 in progress](https://img.shields.io/badge/status-Phase%201%20in%20progress-6f42c1)](#项目进度)
+[![Status: 0.1 alpha prototype](https://img.shields.io/badge/status-0.1%20alpha%20prototype-6f42c1)](#项目进度)
 [![Runtime: Docker Compose](https://img.shields.io/badge/runtime-Docker%20Compose-2496ed)](docs/getting-started/docker-reference.md)
 [![Decision: Human clearance](https://img.shields.io/badge/decision-human%20clearance%20only-b7791f)](docs/decisions/0002-human-clearance-only.md)
 [![Target interfaces: REST CLI MCP](https://img.shields.io/badge/target-REST%20%7C%20CLI%20%7C%20MCP-0969da)](docs/architecture/agent-interface-principles.md)
@@ -49,11 +49,20 @@ flowchart LR
 
 接口层不会拥有另一套业务规则。领域模型和应用契约是唯一事实来源，REST/OpenAPI、JSON Schema、CLI、MCP 和事件适配器共享它们。
 
+### 两个知识池，不混淆权威
+
+| 知识边界 | 当前用途 | 当前实现状态 |
+| --- | --- | --- |
+| 官方/实时来源池 | 保存监管机构原始发布、规范化投影、版本和新鲜度；每次实时审查只读取一个完整活跃 bundle | EU FSF、EU Annex I、OFAC SDN、OFAC Consolidated 已实现原子激活和失败关闭；BIS CHPL 以明确版本的 50 个 HS-6 指导候选接入 |
+| 内部案件/经验池 | 保存历史交互、人工标记、Excel/聊天调研、finding、证据、决定、失效与重筛关系 | 通用快照、受理和审计基础已存在；任意内部资料导入、案件复核和经验检索尚未闭环 |
+
+领导聊天和《对俄制裁名单-调研补充版.xlsx》可作为第二个池的有来源、可复核输入，但不会因为被收集到表格中就冒充监管机构清单。两个池可以在未来同一应用服务中联合查询，必须保留不同的来源、权限、保留期和政策效果；历史经验尤其不能自动产生法律放行。
+
 ## 项目进度
 
-**当前阶段：Phase 1 MVP 开发中。现在已有可运行的合成受理与基础设施演示，但还没有可供外部系统提交真实 screening 请求的公开接口。**
+**当前阶段：`0.1.0a1` 高保真工程原型。EU FSF、EU Annex I、OFAC SDN 和 OFAC Consolidated 已能经过验证后作为一个四源 bundle 原子写入 PostgreSQL，并由 CLI、认证 REST 和合成 CRM 调用同一个活跃版本审查服务；BIS CHPL 的 50 个 HS-6 候选和 `3A001` 首批来源绑定技术参数规则已接入。完整案件、人工作业、MCP、所有权/控制传播和俄罗斯专项货物/路线法律效果仍未完成。**
 
-截至 2026-08-10，进度如下：
+截至 2026-08-11，进度如下：
 
 | 能力 | 状态 | 当前结果 |
 | --- | --- | --- |
@@ -64,20 +73,26 @@ flowchart LR
 | 规则包治理 | ✅ 已完成 | 有版本、有引用、可审批/激活/回滚的合成规则包 |
 | 原始来源快照 | ✅ 已完成 | 私有不可变对象、解析/验证证据、双人治理、PostgreSQL 持久化 |
 | 规范化受理与幂等 | ✅ 合成演示可用 | 严格 canonical intake、授权范围幂等、原子审计/outbox、PostgreSQL 18.4 持久化和 demo-only 运行入口；见 [TS-302](https://github.com/fyaic/TradeSieve/issues/21) / [PR #36](https://github.com/fyaic/TradeSieve/pull/36) |
-| 合成物流 CRM 门禁 | ✅ demo-only 可用 | 5 条中国货代风格合成询报价，演示红灯升级、黄灯补件/拦截和绿灯候选的人工确认边界；见 [使用指南](docs/getting-started/demo-crm.md) / [TS-505](https://github.com/fyaic/TradeSieve/issues/37) |
-| 确定性审查与证据 | ⏳ 下一步 | 受治理规则、来源快照和物化事实的确定性评估 |
+| 合成物流 CRM 门禁 | ✅ 原型可演示 | 5 条中国货代风格合成询报价；页面调用 PostgreSQL 活跃官方来源。名单场景验证公开 FSF 别名，`850440` 场景显示 BIS Tier 3A 候选，高能量密度二次电芯执行真实 `3A001.e.1` 数字阈值；见 [使用指南](docs/getting-started/demo-crm.md) |
+| EU 官方制裁名单 | 🧪 活跃版本可用 | 经 data.europa.eu 发现当前 FSF XML；有界 gzip/identity 下载、安全解析、原始哈希、6,234 主体/31,053 别名/3,007 标识投影、不可变激活、强标识精确匹配和官方别名候选；尚无模糊/音译/所有权匹配 |
+| EU 两用物项 Annex I | 🧪 活跃版本 + 首批技术断言 | 从 Publications Office CELLAR 读取 `32025R2003` 官方 Formex 附件并持久化 384 个控制条目；首批手工复核规则覆盖 `3A001.a.5.a`、`.a.14`、`.e.1` 的 ADC/电芯数字阈值，绑定精确条目哈希；不从 HS 或货描自动归类 |
+| BIS 高优先级物项 CHPL | ✅ 原型候选提示 | 2026-08-11 复核官方 50 项 HS-6 指导清单并绑定内容哈希；精确候选返回 tier 和待补证据，只触发增强尽调，不声明受控、禁止或放行 |
+| OFAC SLS 制裁名单 | 🧪 活跃版本可用 | 固定官方 SDN/Consolidated XML 入口、严格 GovCloud 跳转、安全解析、稳定 UID/哈希差分和来源专用不可变投影；精确强标识/名称候选已进入 CLI、REST、CRM；尚无 50 Percent Rule、所有权/控制传播或 program 法律效果引擎 |
+| 官方来源刷新与审查 CLI | ✅ 可运行 | `refresh-official-sources` 原子激活同一 FSF/Annex I/OFAC SDN/OFAC Consolidated bundle；`screen-active` 只使用 48 小时内的完整活跃版本；`screen-official` 保留为逐次联网诊断入口 |
+| 持久化来源投影与激活 | ✅ 四源垂直切片完成 | migration `20260810_0007` 在保留 0006 EU 历史证据的同时加入 OFAC 来源专用投影；新激活必须四源完整，重复刷新幂等，缺失/损坏/陈旧时失败关闭 |
+| 完整确定性审查与证据 | ⏳ 进行中 | 官方别名精确规范化候选和首批 `3A001` 技术事实比较已接入；完整 Annex I 规则、模糊/音译实体解析、所有权/控制、俄罗斯 `833/2014`、路线/最终用途/catch-all 仍待接入 |
 | 案件/发现项/处置状态 | ⏳ 计划中 | 结构化 finding、evidence、hold 和人工决定 |
-| Screening REST API | ⏳ 计划中 | CRM/OMS 同步拦截与查询；当前 OpenAPI 仍是设计契约，不是已上线接口 |
+| Screening REST API | 🧪 官方来源技术预览 | `POST /v1/official-screenings` 使用部署级 Bearer token、1 MiB JSON 上限和活跃来源服务；尚无正式 OIDC/租户授权、幂等案件受理、查询和 webhook |
 | Screening CLI 与 MCP | ⏳ 计划中 | 面向运营/CI 和 Agent 的同契约适配器；当前尚无 MCP Server |
 | Webhook 与可观测性 | ⏳ 计划中 | 签名事件、脱敏日志/指标/链路 |
 
-当前开发分支最近一次完整门禁为 **1,734 个测试通过，10,021 条语句和 2,806 个分支 100% 覆盖**；独立 PostgreSQL 18.4 门禁也已完成迁移、真实事务、双连接竞态、约束、破坏/修复、降级再升级和零残留验证。这些证据证明当前代码边界和回归集，不代表制裁数据覆盖率、法律正确率或生产可用性。
+当前分支已通过 2,073 个仓库测试和 100% 语句/分支覆盖率，以及独立 PostgreSQL 18.4、完整 Compose 和联网官方来源门禁。migration `0007` 从空库完成四源激活/幂等/完整回读/不可变约束，也证明 0006 中已有 EU 活跃证据升级后逐条保留、但因缺少 OFAC 会失败关闭。2026-08-11 联网端到端验收解析并持久化 EU FSF 6,234 个主体、Annex I 384 个控制条目、OFAC SDN 19,199 条和 Consolidated 481 条；重复刷新返回 `IDEMPOTENT`。同一活跃 bundle 经 CLI 与认证 REST 返回完全一致结果，公开 SOVCOMFLOT 样本产生带 `RUSSIA-EO14024` program 证据的 `RED/HOLD`，合成 CRM 也绑定相同四源 snapshot，并能识别 CHPL 候选及对有限 `3A001` 产品族执行来源哈希绑定的技术阈值比较。这些证据证明当前代码边界和来源可达性，不代表全球名单覆盖、法律正确率或生产可用性。
 
 详细范围见 [MVP 定义](docs/product/mvp-scope.md)、[Phase 1 计划](docs/delivery/phase-1-plan.md) 和 [敏捷 backlog](docs/delivery/phase-1-backlog.md)。
 
 ## 现在可以怎样使用
 
-目前对外可用的是一个**合成数据、demo-only 的受理生命周期、运维检查面和物流 CRM 演示页**。它可以验证部署、数据库迁移、数据源/规则/快照治理、幂等受理、持久化和失败关闭行为，并用预置合成 finding/result 展示 CRM 拦截效果；不能提交真实客户或交易，CRM 演示也不是实时审查引擎。
+当前主路径是“四份正式来源刷新并原子激活 → CLI/REST/CRM 读取同一活跃 bundle → 识别 CHPL HS-6 敏感候选 → 对显式合格 Annex I 候选执行来源绑定技术断言 → 返回保守业务动作和可追溯证据”。合成 CRM 只提供测试交易，名单和 Annex I 证据来自真实活跃官方版本；CHPL 是截至标明核验日期的内置指导快照，不会冒充动态法律清单。该垂直切片仍是原型：不持久化任意 REST 请求/结果或案件，也没有正式 OIDC、模糊/音译实体解析、OFAC 50 Percent Rule、完整 Annex I/俄罗斯专项货物控制或 MCP。
 
 ### 1. 启动参考环境
 
@@ -100,7 +115,80 @@ curl --fail http://127.0.0.1:8080/health/ready
 
 `/health/live` 只表示 HTTP 进程可响应；`/health/ready` 还会核验数据库迁移、来源清单、私有快照证据和已激活规则包。HTTP `200` 仅表示服务具备运行条件，绝不表示任何交易已获放行。
 
-### 2. 打开合成物流 CRM 演示
+### 2. 刷新并激活真实官方来源
+
+参考栈启动后，执行一次运维刷新：
+
+```bash
+docker compose run --rm --no-deps app \
+  python -m tradesieve.manage refresh-official-sources
+```
+
+命令会发现并下载当前 EU FSF、固定审核版本 `32025R2003` Annex I、OFAC SDN 和 OFAC Consolidated，验证原始字节和投影完整性，再把四者作为一个 bundle 原子激活。第一次成功返回 `APPLIED`；同一四源版本再次刷新返回 `IDEMPOTENT`。任一下载、格式、哈希、计数、数据库约束或提交失败都会退出 `2`，旧活跃版本不被半更新覆盖。
+
+### 3. 使用活跃版本执行审查
+
+准备一个本地 JSON 文件；也可以使用 `--request -` 从有界标准输入读取，避免把主体标识写进 shell 历史：
+
+```json
+{
+  "schema_version": "1.0.0",
+  "party_identifiers": [
+    {"type": "regnumber", "value": "待审查登记号", "country": "RU"}
+  ],
+  "party_names": [
+    {"name": "待审查客户、承运人或最终用户名称"}
+  ],
+  "goods": {
+    "hs_code": "854231",
+    "annex_i_code": "3A001",
+    "classification_verified": true,
+    "technical_specification_available": true,
+    "product_family": "ELECTROCHEMICAL_CELL",
+    "technical_facts": [
+      {"fact_id": "is_battery", "unit": "BOOLEAN", "boolean_value": false, "evidence_ref": "datasheet-1", "verified": true},
+      {"fact_id": "cell_type", "unit": "CELL_TYPE", "text_value": "SECONDARY", "evidence_ref": "datasheet-1", "verified": true},
+      {"fact_id": "energy_density_wh_per_kg", "unit": "WH_PER_KG", "numeric_value": "380", "evidence_ref": "datasheet-1", "verified": true},
+      {"fact_id": "measurement_temperature_celsius", "unit": "CELSIUS", "numeric_value": "20", "evidence_ref": "datasheet-1", "verified": true}
+    ]
+  }
+}
+```
+
+保存为 `screening.json` 后执行：
+
+```bash
+docker compose run --rm --no-deps app \
+  python -m tradesieve.manage screen-active --request screening.json
+```
+
+该命令只读取 PostgreSQL 中完整、未损坏且不超过 48 小时的活跃 bundle，并在一个结果中返回：
+
+1. bundle ID、激活时间及内容哈希；
+2. EU FSF 版本、原始文件哈希、强标识/名称候选状态和原生定位；
+3. OFAC SDN/Consolidated 的独立版本、program、强标识/名称候选和原生定位；
+4. Annex I CELEX、控制号命中、条目哈希、原生定位和缺失事实；
+5. CHPL 的 HS-6 精确候选状态、tier、指导来源哈希和待补事实；
+6. 已支持分支的技术规则 ID/版本、来源条目哈希、逐项单位化比较和证据引用；
+7. `HOLD` / `REQUEST_EVIDENCE` / `MONITOR`，且 `automatic_clearance` 永远为 `false`。
+
+名称候选不是精确身份结论：EU 或 OFAC 任一候选都会返回 `RED/HOLD` 等待授权人员复核；当前尚不支持模糊相似、音译、词序变体、所有权/控制传播或 OFAC 50 Percent Rule。`hs_code` 只用于 CHPL 精确候选提示；输入的 `annex_i_code` 必须来自合格的归类过程，TradeSieve 不会从 HS/CN/TARIC 或货描自动推导正式控制号。结构化技术事实只对已支持的规则分支作 `MATCHED/NOT_MATCHED/INCOMPLETE` 比较；它既不是完整归类也不是放行。即使所有已实现检查均无候选，结果也只是 `GREEN_CANDIDATE/MONITOR`。活跃来源不存在、陈旧、损坏，或活跃条文哈希与已批准规则不一致时失败关闭。完整说明见 [官方来源使用指南](docs/getting-started/official-screening-cli.md)。
+
+### 4. 从 CRM/OMS 调用认证 REST 技术预览
+
+demo 环境的明文 token 仅用于本机验收；服务配置只保存其 SHA-256。生产模式拒绝该默认摘要，必须换成独立生成的部署凭据。
+
+```bash
+curl --fail-with-body \
+  -H 'Authorization: Bearer local_demo_only_official_screening_token' \
+  -H 'Content-Type: application/json' \
+  --data-binary @screening.json \
+  http://127.0.0.1:8080/v1/official-screenings
+```
+
+未认证请求在业务正文解析前返回 `401`；非 JSON、无 `Content-Length`、超过 1 MiB 或契约无效的请求被拒绝；没有新鲜活跃来源时返回安全的 `503`，调用方必须保持业务拦截。这个 endpoint 是官方来源垂直切片，不等同于仍在设计中的完整 `POST /v1/screenings` 案件/幂等接口。
+
+### 5. 打开合成物流 CRM 演示
 
 参考栈就绪后，在浏览器打开：
 
@@ -108,16 +196,18 @@ curl --fail http://127.0.0.1:8080/health/ready
 http://127.0.0.1:8080/demo/crm
 ```
 
-选择一条固定合成询报价并点击“发起合规审查”。页面会展示：
+选择一条固定合成询报价并点击“发起合规审查”。按钮调用真实活跃官方来源服务；若尚未运行刷新或来源陈旧，页面保持拦截并显示服务不可用。页面会展示：
 
-- 上海到莫斯科工业控制设备的合成主体强标识符命中和红灯升级；
-- 锂电池运输文件、最终用户、转售路径或敏感参数不足时的黄灯补件/拦截；
-- 没有开放 P0/P1 时的绿灯候选，以及仍需授权人工确认的非放行边界；
-- CRM 到 TradeSieve 的字段映射、输入指纹、`screening_id`、`case_id` 和结果指纹。
+- 使用公开 EU FSF 企业别名的合成交易产生官方名称候选；
+- `3A001` 控制号命中当前 Annex I，并明确指出合格归类复核和技术规格缺口；
+- HS `850440` 命中 BIS CHPL Tier 3A 后只产生增强尽调候选和补证要求；
+- 高能量密度二次电芯以经审核的合成技术参数触发 `3A001.e.1` 严格阈值比较；
+- 其他合成交易在缺少 Annex I 归类时请求补充事实；
+- 同一 bundle 的 FSF/Annex I/OFAC SDN/OFAC Consolidated snapshot ID、内容哈希和原生证据定位。
 
-页面和接口只在 demo 模式注册，全部名称、登记号、金额、路线和单证均为固定合成 fixture。它使用真实规范输入校验与规范结果模型，但 finding 和处置结果是预置演示数据，不是实时名单或法律规则执行。完整说明见 [合成 CRM 使用指南](docs/getting-started/demo-crm.md)。
+页面和接口只在 demo 模式注册。交易、金额、路线、单证和技术参数是固定合成 fixture；首条记录的名单名称来自公开官方制裁文件，只用于可重复验收，不对应真实客户关系。审查证据不是预置结果；当前覆盖 FSF 精确规范化名称/强标识、显式 Annex I 控制号和首批 `3A001` 来源绑定技术断言。完整说明见 [合成 CRM 使用指南](docs/getting-started/demo-crm.md)。
 
-### 3. 使用当前运维 CLI
+### 6. 使用当前运维 CLI
 
 ```bash
 # 总体就绪度与有限检查项
@@ -139,7 +229,7 @@ docker compose run --rm --no-deps app \
 
 这些命令只返回经过裁剪的运维安全字段，不导出原始来源字节、客户数据、凭据或私有规则文本。
 
-### 4. 演示一次可重放的合成受理
+### 7. 演示一次可重放的合成受理
 
 以下入口只使用仓库内置合成交易，不读取文件、标准输入或真实业务数据。先提交一个固定合成请求：
 
@@ -161,7 +251,7 @@ docker compose run --rm --no-deps app \
 
 这是用于架构评估、CI 和接入方理解受理语义的 operations demo，不是接收任意输入的正式 screening CLI。它只证明“请求被安全、可审计地受理”，不代表已经执行制裁/两用物项判断，更不代表可以放行。
 
-### 5. 停止并清理 demo
+### 8. 停止并清理 demo
 
 ```bash
 docker compose down --volumes --remove-orphans
@@ -175,22 +265,23 @@ docker compose down --volumes --remove-orphans
 
 | 使用者 | 现在可做什么 | 现在不能做什么 |
 | --- | --- | --- |
-| 架构/安全评估者 | 启动 Compose；检查健康、治理、幂等受理、重放/冲突、CRM 门禁和失败关闭行为 | 不能提交真实客户、货物或交易 |
-| 开发者 | 运行完整测试与合成收据生命周期；审查领域模型、OpenAPI/JSON Schema、CRM demo adapter 和合成示例 | 不应把 demo 命令、demo API 或草案 OpenAPI 当作正式在线 API |
-| CRM/OMS 团队 | 在浏览器观察字段映射、红黄绿候选状态、补件和外部引用；用合成命令验证幂等语义；依据 [集成设计](docs/architecture/integration-design.md) 准备拦截点 | 尚不能向正式 screening endpoint 提交任意业务请求或接收 webhook |
+| 架构/安全评估者 | 启动 Compose；刷新/检查不可变官方 bundle；验证认证 REST 和 CRM 失败关闭 | 不能把技术预览当作生产服务或法律清关工具 |
+| 开发者 | 运行完整测试、官方连接器和 PostgreSQL 18.4 投影门禁；审查哈希、定位和 Annex I 证据 | 不应把精确名称候选或控制号存在误解为完整实体解析/技术归类 |
+| CRM/OMS 团队 | 调用 `POST /v1/official-screenings` 验证同步拦截；保存 bundle/evidence 引用并执行业务动作 | 当前没有完整 `POST /v1/screenings` 幂等案件、状态查询或 webhook |
 | AI/Agent 团队 | 审查 [Agent 接口原则](docs/architecture/agent-interface-principles.md) 和共享 Schema | 尚不能连接 MCP Server |
 | 合规人员 | 审查产品范围、证据模型、规则治理和人工放行边界 | 尚没有完整案件复核工作台 |
 
-当前正式 HTTP 操作清单只实现：
+当前 HTTP 操作清单只实现：
 
 ```text
 GET /health/live
 GET /health/ready
+POST /v1/official-screenings
 ```
 
-demo 模式另注册隐藏于 OpenAPI 的 `/demo/crm` 及固定 fixture API。它们不接收任意交易输入，也不会在 production 模式存在。
+demo 模式另注册隐藏于 OpenAPI 的 `/demo/crm` 及固定 fixture API；其中 `/screen-official` 调用同一个持久化官方来源审查服务。`POST /v1/official-screenings` 已进入版本化 [OpenAPI](api/openapi/tradesieve.v1.json) 和共享 JSON Schema，使用部署级 Bearer token，但尚未实现租户/OIDC/对象级授权和请求/案件持久化。
 
-仓库中的 [OpenAPI](api/openapi/tradesieve.v1.json)、[JSON Schema](api/schemas/tradesieve.contracts.v1.json) 和 `examples/` 是用于设计、评审和生成测试的版本化契约，尚不等于已实现的路由。
+仓库中的 [OpenAPI](api/openapi/tradesieve.v1.json)、[JSON Schema](api/schemas/tradesieve.contracts.v1.json) 和 `examples/` 同时包含已实现的官方来源技术预览以及仍处于设计状态的完整案件 API；每个接口的实现状态应按文档和扩展字段判断。
 
 ### Phase 1 完成后的目标用法
 
@@ -221,8 +312,14 @@ CLI 和 MCP 将调用相同的应用服务和契约：CLI 面向运营、CI 与�
 ```bash
 ./scripts/test_source_snapshot_postgres.sh  # PostgreSQL 18.4 持久化/并发/约束
 ./scripts/test_screening_submission_postgres.sh  # 受理幂等/事务/竞态/破坏修复
+./scripts/test_official_source_postgres.sh  # 官方投影/激活/幂等/不可变约束
+./scripts/test_official_screening_live.sh   # 四源联网刷新 + CLI/REST/CRM 同 bundle
 ./scripts/test_compose.sh                   # 完整参考部署与零残留验收
+uv run python scripts/ofac_sls_live_probe.py  # OFAC SDN/non-SDN 联网解析与重放证据
 ```
+
+独立 OFAC 探针只验证连接器与重放边界，不写数据库；四源联网门禁会在隔离的临时 PostgreSQL/Compose 项目中执行两次正式刷新、CLI/REST/CRM 审查和零残留清理。详见
+[OFAC SLS 连接器证明](docs/research/ofac-sls-connector-proof.md)。
 
 详见 [开发环境](docs/getting-started/development.md) 和 [Docker 参考部署](docs/getting-started/docker-reference.md)。测试与示例只能使用合成数据，禁止提交客户、货运、支付、身份、凭据或生产证据。
 

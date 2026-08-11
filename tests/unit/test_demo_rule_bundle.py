@@ -158,6 +158,7 @@ def test_demo_entitlements_are_exact_and_disabled_outside_demo() -> None:
         deployment_id="production-1",
         required_source_set="approved-sources-v1",
         required_rule_set="approved-rules-v1",
+        official_api_token_sha256="sha256:" + "a" * 64,
     )
     with pytest.raises(RuntimeError, match="explicit demo mode"):
         synthetic_demo_rule_bundle(production)

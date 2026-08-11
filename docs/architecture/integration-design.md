@@ -16,17 +16,42 @@ The caller asks TradeSieve about a named proposed business action. TradeSieve re
 | Operator/batch | Analyst submits files or diagnostic batches | CLI over REST |
 | Agent-assisted | Authorized agent screens/reads/explains/requests review | MCP over the same application service |
 
-## Implemented demo CRM seam
+## Implemented official-source vertical slice and demo CRM seam
 
-[TS-505](https://github.com/fyaic/TradeSieve/issues/37) now includes a demo-only browser workspace at `/demo/crm`. It accepts only five repository-owned synthetic fixture IDs, converts each fixed CRM record into the canonical `ScreeningRequest`, runs the strict intake decoder and returns a precomputed canonical `ScreeningResult`. The purpose is to make the original CRM interception requirement visible before the production screening path exists.
+[TS-505](https://github.com/fyaic/TradeSieve/issues/37) includes a demo-only browser workspace at `/demo/crm`. The visible screen action accepts only five repository-owned synthetic fixture IDs, maps them into `OfficialScreeningRequest`, and calls the same persisted official-source application service as the authenticated `POST /v1/official-screenings` technical-preview route. One fixture uses a public EU FSF enterprise alias; another supplies an explicit qualified `3A001` candidate plus reviewed synthetic secondary-cell facts so [TS-306A](https://github.com/fyaic/TradeSieve/issues/40) executes a source-bound `3A001.e.1` threshold.
 
 The seam preserves the intended ownership split:
 
 - the demo CRM owns customers, quotes, routes, amounts and document-status display;
-- TradeSieve contracts own the screening request/result shape, state, action, findings, evidence requirements and opaque IDs;
+- TradeSieve contracts own the official screening request/result, source hashes, evidence locators and conservative business action;
+- structured technical facts carry canonical units, evidence references and verification state; the caller cannot submit executable expressions or infer a code from HS/free text;
 - the browser never evaluates sanctions, goods or route rules;
 - demo routes are registered only in explicit demo mode, accept no arbitrary business input and stay outside the formal OpenAPI inventory;
-- [TS-303](https://github.com/fyaic/TradeSieve/issues/22), [TS-401](https://github.com/fyaic/TradeSieve/issues/23) and [TS-501](https://github.com/fyaic/TradeSieve/issues/24) replace the precomputed fixture path with governed controls, durable cases and the formal REST adapter.
+- a retained `/screen` fixture route still regression-tests the canonical precomputed contract, but the browser calls `/screen-official` and displays real active EU FSF/Annex I and OFAC evidence;
+- `POST /v1/official-screenings` has a deployment-scoped hashed Bearer credential, request-envelope limits and fail-closed source freshness, but is not the final tenant/OIDC/idempotent case API;
+- [TS-303](https://github.com/fyaic/TradeSieve/issues/22), [TS-401](https://github.com/fyaic/TradeSieve/issues/23) and [TS-501](https://github.com/fyaic/TradeSieve/issues/24) add broader controls, durable cases and the formal integration surface.
+
+```mermaid
+flowchart LR
+    CRM["Synthetic CRM or external client"]
+    HTTP["demo /screen-official or authenticated /v1/official-screenings"]
+    APP["PersistedOfficialScreeningService"]
+    DB[("Atomic active official bundle")]
+    FSF["EU FSF projection"]
+    DUAL["EU Annex I projection"]
+    SDN["OFAC SDN projection"]
+    CONS["OFAC Consolidated projection"]
+    TECH["Source-bound technical assertions"]
+
+    CRM --> HTTP --> APP --> DB
+    DB --> FSF
+    DB --> DUAL
+    DB --> SDN
+    DB --> CONS
+    DUAL --> TECH
+```
+
+Source refresh is an operator-only command. It retrieves and verifies all four official publications before one database transaction writes immutable projections, appends an activation event and changes the active pointer. Business requests never mix independently refreshed source versions. If the active bundle is incomplete, missing, older than 48 hours, in the future, or fails full read-time reconstruction/hashing, CLI/REST/demo screening is unavailable and the caller holds.
 
 See [the demo guide](../getting-started/demo-crm.md) for scenarios, startup and limitations.
 

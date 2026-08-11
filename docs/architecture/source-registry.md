@@ -12,6 +12,26 @@ The registry answers two different questions without conflating them:
 1. Is a source governed well enough to activate?
 2. Is the active source fact usable now?
 
+It is also only one of two deliberately separate knowledge boundaries:
+
+| Boundary | Contains | Runtime effect |
+| --- | --- | --- |
+| Official/current source pool | Verified regulator publications, immutable raw snapshots, normalized source assertions, freshness and active versions | Supplies current external facts to every screening run; stale, missing or corrupt required sources fail closed |
+| Internal case/experience pool | Prior screening inputs, findings, evidence, reviewer decisions, expiry/invalidation and organization-specific watchlist facts | Supplies auditable internal context and precedent candidates; never rewrites an official fact or automatically clears a new action |
+
+The first pool answers “what do the governed external sources say now/as-of a retained
+version?” The second answers “what did this organization previously observe and decide,
+under which evidence and version?” They may be queried together by the application
+service, but must retain separate provenance, retention, authorization and policy
+effects. A spreadsheet or chat-derived fact enters the internal pool as attributed,
+reviewable evidence; it does not enter the official pool merely because it resembles a
+regulator list.
+
+The implemented official technical-preview aggregate currently activates four members
+atomically: EU FSF, EU Annex I, OFAC SDN and OFAC Consolidated. This high-volume
+source-specific bundle complements the generic registry/snapshot lifecycle; it does
+not turn internal watchlist or case facts into regulator publications.
+
 PostgreSQL stores three separate records:
 
 | Record | Authority |

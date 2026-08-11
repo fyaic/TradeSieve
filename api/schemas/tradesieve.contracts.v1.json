@@ -1803,6 +1803,1177 @@
       "title": "LifecycleActorType",
       "type": "string"
     },
+    "OfficialDualUseResult": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "const": "EU_DUAL_USE_ANNEX_I",
+          "default": "EU_DUAL_USE_ANNEX_I",
+          "title": "Source",
+          "type": "string"
+        },
+        "source_celex": {
+          "const": "32025R2003",
+          "default": "32025R2003",
+          "title": "Source Celex",
+          "type": "string"
+        },
+        "source_effective_from": {
+          "title": "Source Effective From",
+          "type": "string"
+        },
+        "source_snapshot_id": {
+          "title": "Source Snapshot Id",
+          "type": "string"
+        },
+        "source_snapshot_content_hash": {
+          "title": "Source Snapshot Content Hash",
+          "type": "string"
+        },
+        "source_archive_hash": {
+          "title": "Source Archive Hash",
+          "type": "string"
+        },
+        "source_retrieved_at": {
+          "title": "Source Retrieved At",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "requested_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Requested Code"
+        },
+        "entry_content_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Entry Content Hash"
+        },
+        "source_native_locator": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Source Native Locator"
+        },
+        "missing_facts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Missing Facts",
+          "type": "array"
+        },
+        "technical_assessment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OfficialTechnicalAssessmentResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "source_effective_from",
+        "source_snapshot_id",
+        "source_snapshot_content_hash",
+        "source_archive_hash",
+        "source_retrieved_at",
+        "status",
+        "requested_code",
+        "entry_content_hash",
+        "source_native_locator",
+        "missing_facts"
+      ],
+      "title": "OfficialDualUseResult",
+      "type": "object"
+    },
+    "OfficialGoodsCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "hs_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hs Code"
+        },
+        "annex_i_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Annex I Code"
+        },
+        "classification_verified": {
+          "default": false,
+          "title": "Classification Verified",
+          "type": "boolean"
+        },
+        "technical_specification_available": {
+          "default": false,
+          "title": "Technical Specification Available",
+          "type": "boolean"
+        },
+        "product_family": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TechnicalProductFamily"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "technical_facts": {
+          "items": {
+            "$ref": "#/$defs/OfficialTechnicalFact"
+          },
+          "maxItems": 16,
+          "title": "Technical Facts",
+          "type": "array"
+        }
+      },
+      "title": "OfficialGoodsCandidate",
+      "type": "object"
+    },
+    "OfficialOfacIdentifierEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "list_kind": {
+          "title": "List Kind",
+          "type": "string"
+        },
+        "entry_uid": {
+          "title": "Entry Uid",
+          "type": "string"
+        },
+        "subject_type": {
+          "title": "Subject Type",
+          "type": "string"
+        },
+        "programs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Programs",
+          "type": "array"
+        },
+        "identifier_uid": {
+          "title": "Identifier Uid",
+          "type": "string"
+        },
+        "identifier_type": {
+          "title": "Identifier Type",
+          "type": "string"
+        },
+        "source_native_locator": {
+          "title": "Source Native Locator",
+          "type": "string"
+        }
+      },
+      "required": [
+        "list_kind",
+        "entry_uid",
+        "subject_type",
+        "programs",
+        "identifier_uid",
+        "identifier_type",
+        "source_native_locator"
+      ],
+      "title": "OfficialOfacIdentifierEvidence",
+      "type": "object"
+    },
+    "OfficialOfacListResult": {
+      "additionalProperties": false,
+      "properties": {
+        "list_kind": {
+          "title": "List Kind",
+          "type": "string"
+        },
+        "source_publish_date": {
+          "title": "Source Publish Date",
+          "type": "string"
+        },
+        "source_snapshot_id": {
+          "title": "Source Snapshot Id",
+          "type": "string"
+        },
+        "source_snapshot_content_hash": {
+          "title": "Source Snapshot Content Hash",
+          "type": "string"
+        },
+        "source_raw_content_hash": {
+          "title": "Source Raw Content Hash",
+          "type": "string"
+        },
+        "source_retrieved_at": {
+          "title": "Source Retrieved At",
+          "type": "string"
+        },
+        "identifier_query_count": {
+          "title": "Identifier Query Count",
+          "type": "integer"
+        },
+        "identifier_statuses": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Identifier Statuses",
+          "type": "array"
+        },
+        "identifier_evidence": {
+          "items": {
+            "$ref": "#/$defs/OfficialOfacIdentifierEvidence"
+          },
+          "title": "Identifier Evidence",
+          "type": "array"
+        },
+        "name_query_count": {
+          "title": "Name Query Count",
+          "type": "integer"
+        },
+        "name_statuses": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Name Statuses",
+          "type": "array"
+        },
+        "name_evidence": {
+          "items": {
+            "$ref": "#/$defs/OfficialOfacNameEvidence"
+          },
+          "title": "Name Evidence",
+          "type": "array"
+        }
+      },
+      "required": [
+        "list_kind",
+        "source_publish_date",
+        "source_snapshot_id",
+        "source_snapshot_content_hash",
+        "source_raw_content_hash",
+        "source_retrieved_at",
+        "identifier_query_count",
+        "identifier_statuses",
+        "identifier_evidence",
+        "name_query_count",
+        "name_statuses",
+        "name_evidence"
+      ],
+      "title": "OfficialOfacListResult",
+      "type": "object"
+    },
+    "OfficialOfacNameEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "list_kind": {
+          "title": "List Kind",
+          "type": "string"
+        },
+        "entry_uid": {
+          "title": "Entry Uid",
+          "type": "string"
+        },
+        "subject_type": {
+          "title": "Subject Type",
+          "type": "string"
+        },
+        "programs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Programs",
+          "type": "array"
+        },
+        "source_native_locator": {
+          "title": "Source Native Locator",
+          "type": "string"
+        },
+        "alias_category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Alias Category"
+        }
+      },
+      "required": [
+        "list_kind",
+        "entry_uid",
+        "subject_type",
+        "programs",
+        "source_native_locator",
+        "alias_category"
+      ],
+      "title": "OfficialOfacNameEvidence",
+      "type": "object"
+    },
+    "OfficialOfacResult": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "const": "OFAC_SANCTIONS_LIST_SERVICE",
+          "default": "OFAC_SANCTIONS_LIST_SERVICE",
+          "title": "Source",
+          "type": "string"
+        },
+        "lists": {
+          "items": {
+            "$ref": "#/$defs/OfficialOfacListResult"
+          },
+          "title": "Lists",
+          "type": "array"
+        }
+      },
+      "required": [
+        "lists"
+      ],
+      "title": "OfficialOfacResult",
+      "type": "object"
+    },
+    "OfficialPartyIdentifier": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        },
+        "country": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Country"
+        }
+      },
+      "required": [
+        "type",
+        "value"
+      ],
+      "title": "OfficialPartyIdentifier",
+      "type": "object"
+    },
+    "OfficialPartyName": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "OfficialPartyName",
+      "type": "object"
+    },
+    "OfficialSanctionsEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "eu_reference_number": {
+          "title": "Eu Reference Number",
+          "type": "string"
+        },
+        "entity_logical_id": {
+          "title": "Entity Logical Id",
+          "type": "string"
+        },
+        "subject_type": {
+          "title": "Subject Type",
+          "type": "string"
+        },
+        "identifier_type": {
+          "title": "Identifier Type",
+          "type": "string"
+        },
+        "identifier_assertion_hash": {
+          "title": "Identifier Assertion Hash",
+          "type": "string"
+        },
+        "source_native_locator": {
+          "title": "Source Native Locator",
+          "type": "string"
+        },
+        "country_consistent": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Country Consistent"
+        },
+        "usable_for_exact_match": {
+          "title": "Usable For Exact Match",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "eu_reference_number",
+        "entity_logical_id",
+        "subject_type",
+        "identifier_type",
+        "identifier_assertion_hash",
+        "source_native_locator",
+        "country_consistent",
+        "usable_for_exact_match"
+      ],
+      "title": "OfficialSanctionsEvidence",
+      "type": "object"
+    },
+    "OfficialSanctionsNameEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "eu_reference_number": {
+          "title": "Eu Reference Number",
+          "type": "string"
+        },
+        "entity_logical_id": {
+          "title": "Entity Logical Id",
+          "type": "string"
+        },
+        "subject_type": {
+          "title": "Subject Type",
+          "type": "string"
+        },
+        "alias_assertion_hash": {
+          "title": "Alias Assertion Hash",
+          "type": "string"
+        },
+        "source_native_locator": {
+          "title": "Source Native Locator",
+          "type": "string"
+        },
+        "strong_alias": {
+          "title": "Strong Alias",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "eu_reference_number",
+        "entity_logical_id",
+        "subject_type",
+        "alias_assertion_hash",
+        "source_native_locator",
+        "strong_alias"
+      ],
+      "title": "OfficialSanctionsNameEvidence",
+      "type": "object"
+    },
+    "OfficialSanctionsResult": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "const": "EU_CONSOLIDATED_FINANCIAL_SANCTIONS_FILE",
+          "default": "EU_CONSOLIDATED_FINANCIAL_SANCTIONS_FILE",
+          "title": "Source",
+          "type": "string"
+        },
+        "source_generation_date": {
+          "title": "Source Generation Date",
+          "type": "string"
+        },
+        "source_global_file_id": {
+          "title": "Source Global File Id",
+          "type": "string"
+        },
+        "source_snapshot_id": {
+          "title": "Source Snapshot Id",
+          "type": "string"
+        },
+        "source_snapshot_content_hash": {
+          "title": "Source Snapshot Content Hash",
+          "type": "string"
+        },
+        "source_raw_content_hash": {
+          "title": "Source Raw Content Hash",
+          "type": "string"
+        },
+        "source_retrieved_at": {
+          "title": "Source Retrieved At",
+          "type": "string"
+        },
+        "identifier_query_count": {
+          "title": "Identifier Query Count",
+          "type": "integer"
+        },
+        "identifier_statuses": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Identifier Statuses",
+          "type": "array"
+        },
+        "identifier_evidence": {
+          "items": {
+            "$ref": "#/$defs/OfficialSanctionsEvidence"
+          },
+          "title": "Identifier Evidence",
+          "type": "array"
+        },
+        "name_query_count": {
+          "title": "Name Query Count",
+          "type": "integer"
+        },
+        "name_statuses": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Name Statuses",
+          "type": "array"
+        },
+        "name_evidence": {
+          "items": {
+            "$ref": "#/$defs/OfficialSanctionsNameEvidence"
+          },
+          "title": "Name Evidence",
+          "type": "array"
+        }
+      },
+      "required": [
+        "source_generation_date",
+        "source_global_file_id",
+        "source_snapshot_id",
+        "source_snapshot_content_hash",
+        "source_raw_content_hash",
+        "source_retrieved_at",
+        "identifier_query_count",
+        "identifier_statuses",
+        "identifier_evidence",
+        "name_query_count",
+        "name_statuses",
+        "name_evidence"
+      ],
+      "title": "OfficialSanctionsResult",
+      "type": "object"
+    },
+    "OfficialScreeningRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0",
+          "default": "1.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "party_identifiers": {
+          "items": {
+            "$ref": "#/$defs/OfficialPartyIdentifier"
+          },
+          "maxItems": 64,
+          "title": "Party Identifiers",
+          "type": "array"
+        },
+        "party_names": {
+          "items": {
+            "$ref": "#/$defs/OfficialPartyName"
+          },
+          "maxItems": 64,
+          "title": "Party Names",
+          "type": "array"
+        },
+        "goods": {
+          "$ref": "#/$defs/OfficialGoodsCandidate"
+        }
+      },
+      "required": [
+        "goods"
+      ],
+      "title": "OfficialScreeningRequest",
+      "type": "object"
+    },
+    "OfficialScreeningResult": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0",
+          "default": "1.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "signal": {
+          "$ref": "#/$defs/Signal"
+        },
+        "business_action": {
+          "$ref": "#/$defs/BusinessAction"
+        },
+        "automatic_clearance": {
+          "const": false,
+          "default": false,
+          "title": "Automatic Clearance",
+          "type": "boolean"
+        },
+        "source_bundle_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Bundle Id"
+        },
+        "source_bundle_content_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Bundle Content Hash"
+        },
+        "source_bundle_activated_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Bundle Activated At"
+        },
+        "sanctions": {
+          "$ref": "#/$defs/OfficialSanctionsResult"
+        },
+        "ofac": {
+          "$ref": "#/$defs/OfficialOfacResult"
+        },
+        "dual_use": {
+          "$ref": "#/$defs/OfficialDualUseResult"
+        },
+        "sensitive_goods": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OfficialSensitiveGoodsResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "caveats": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Caveats",
+          "type": "array"
+        }
+      },
+      "required": [
+        "signal",
+        "business_action",
+        "sanctions",
+        "ofac",
+        "dual_use",
+        "caveats"
+      ],
+      "title": "OfficialScreeningResult",
+      "type": "object"
+    },
+    "OfficialSensitiveGoodsResult": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "const": "US_BIS_COMMON_HIGH_PRIORITY_ITEMS_GUIDANCE",
+          "default": "US_BIS_COMMON_HIGH_PRIORITY_ITEMS_GUIDANCE",
+          "title": "Source",
+          "type": "string"
+        },
+        "source_publication_date": {
+          "title": "Source Publication Date",
+          "type": "string"
+        },
+        "source_checked_on": {
+          "title": "Source Checked On",
+          "type": "string"
+        },
+        "source_url": {
+          "title": "Source Url",
+          "type": "string"
+        },
+        "source_content_hash": {
+          "title": "Source Content Hash",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "NOT_PROVIDED",
+            "NO_CANDIDATE",
+            "CANDIDATE"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "requested_hs_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Requested Hs Code"
+        },
+        "normalized_hs6": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Normalized Hs6"
+        },
+        "tier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Tier"
+        },
+        "candidate_only": {
+          "const": true,
+          "default": true,
+          "title": "Candidate Only",
+          "type": "boolean"
+        },
+        "missing_facts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Missing Facts",
+          "type": "array"
+        },
+        "automatic_clearance": {
+          "const": false,
+          "default": false,
+          "title": "Automatic Clearance",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "source_publication_date",
+        "source_checked_on",
+        "source_url",
+        "source_content_hash",
+        "status",
+        "requested_hs_code",
+        "normalized_hs6",
+        "tier",
+        "missing_facts"
+      ],
+      "title": "OfficialSensitiveGoodsResult",
+      "type": "object"
+    },
+    "OfficialSourceRefreshResult": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0",
+          "default": "1.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "outcome": {
+          "$ref": "#/$defs/OfficialSourceWriteOutcome"
+        },
+        "bundle_id": {
+          "title": "Bundle Id",
+          "type": "string"
+        },
+        "bundle_content_hash": {
+          "title": "Bundle Content Hash",
+          "type": "string"
+        },
+        "fsf_snapshot_id": {
+          "title": "Fsf Snapshot Id",
+          "type": "string"
+        },
+        "fsf_snapshot_content_hash": {
+          "title": "Fsf Snapshot Content Hash",
+          "type": "string"
+        },
+        "fsf_entity_count": {
+          "title": "Fsf Entity Count",
+          "type": "integer"
+        },
+        "fsf_alias_count": {
+          "title": "Fsf Alias Count",
+          "type": "integer"
+        },
+        "fsf_identifier_count": {
+          "title": "Fsf Identifier Count",
+          "type": "integer"
+        },
+        "dual_use_snapshot_id": {
+          "title": "Dual Use Snapshot Id",
+          "type": "string"
+        },
+        "dual_use_snapshot_content_hash": {
+          "title": "Dual Use Snapshot Content Hash",
+          "type": "string"
+        },
+        "dual_use_entry_count": {
+          "title": "Dual Use Entry Count",
+          "type": "integer"
+        },
+        "ofac_sdn_snapshot_id": {
+          "title": "Ofac Sdn Snapshot Id",
+          "type": "string"
+        },
+        "ofac_sdn_snapshot_content_hash": {
+          "title": "Ofac Sdn Snapshot Content Hash",
+          "type": "string"
+        },
+        "ofac_sdn_entry_count": {
+          "title": "Ofac Sdn Entry Count",
+          "type": "integer"
+        },
+        "ofac_sdn_alias_count": {
+          "title": "Ofac Sdn Alias Count",
+          "type": "integer"
+        },
+        "ofac_sdn_identifier_count": {
+          "title": "Ofac Sdn Identifier Count",
+          "type": "integer"
+        },
+        "ofac_consolidated_snapshot_id": {
+          "title": "Ofac Consolidated Snapshot Id",
+          "type": "string"
+        },
+        "ofac_consolidated_snapshot_content_hash": {
+          "title": "Ofac Consolidated Snapshot Content Hash",
+          "type": "string"
+        },
+        "ofac_consolidated_entry_count": {
+          "title": "Ofac Consolidated Entry Count",
+          "type": "integer"
+        },
+        "ofac_consolidated_alias_count": {
+          "title": "Ofac Consolidated Alias Count",
+          "type": "integer"
+        },
+        "ofac_consolidated_identifier_count": {
+          "title": "Ofac Consolidated Identifier Count",
+          "type": "integer"
+        },
+        "activated_at": {
+          "title": "Activated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "outcome",
+        "bundle_id",
+        "bundle_content_hash",
+        "fsf_snapshot_id",
+        "fsf_snapshot_content_hash",
+        "fsf_entity_count",
+        "fsf_alias_count",
+        "fsf_identifier_count",
+        "dual_use_snapshot_id",
+        "dual_use_snapshot_content_hash",
+        "dual_use_entry_count",
+        "ofac_sdn_snapshot_id",
+        "ofac_sdn_snapshot_content_hash",
+        "ofac_sdn_entry_count",
+        "ofac_sdn_alias_count",
+        "ofac_sdn_identifier_count",
+        "ofac_consolidated_snapshot_id",
+        "ofac_consolidated_snapshot_content_hash",
+        "ofac_consolidated_entry_count",
+        "ofac_consolidated_alias_count",
+        "ofac_consolidated_identifier_count",
+        "activated_at"
+      ],
+      "title": "OfficialSourceRefreshResult",
+      "type": "object"
+    },
+    "OfficialSourceWriteOutcome": {
+      "enum": [
+        "APPLIED",
+        "IDEMPOTENT"
+      ],
+      "title": "OfficialSourceWriteOutcome",
+      "type": "string"
+    },
+    "OfficialTechnicalAssessmentResult": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "rule_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Rule Id"
+        },
+        "rule_version": {
+          "title": "Rule Version",
+          "type": "string"
+        },
+        "rule_bundle_id": {
+          "title": "Rule Bundle Id",
+          "type": "string"
+        },
+        "rule_bundle_content_hash": {
+          "title": "Rule Bundle Content Hash",
+          "type": "string"
+        },
+        "source_celex": {
+          "title": "Source Celex",
+          "type": "string"
+        },
+        "source_entry_code": {
+          "title": "Source Entry Code",
+          "type": "string"
+        },
+        "source_entry_content_hash": {
+          "title": "Source Entry Content Hash",
+          "type": "string"
+        },
+        "source_native_locator": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Source Native Locator"
+        },
+        "required_facts": {
+          "items": {
+            "$ref": "#/$defs/TechnicalFactId"
+          },
+          "title": "Required Facts",
+          "type": "array"
+        },
+        "missing_facts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Missing Facts",
+          "type": "array"
+        },
+        "evidence_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "comparisons": {
+          "items": {
+            "$ref": "#/$defs/OfficialTechnicalComparisonResult"
+          },
+          "title": "Comparisons",
+          "type": "array"
+        },
+        "automatic_clearance": {
+          "const": false,
+          "default": false,
+          "title": "Automatic Clearance",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "status",
+        "rule_id",
+        "rule_version",
+        "rule_bundle_id",
+        "rule_bundle_content_hash",
+        "source_celex",
+        "source_entry_code",
+        "source_entry_content_hash",
+        "source_native_locator",
+        "required_facts",
+        "missing_facts",
+        "evidence_refs",
+        "comparisons"
+      ],
+      "title": "OfficialTechnicalAssessmentResult",
+      "type": "object"
+    },
+    "OfficialTechnicalComparisonResult": {
+      "additionalProperties": false,
+      "properties": {
+        "clause_id": {
+          "title": "Clause Id",
+          "type": "string"
+        },
+        "fact_id": {
+          "$ref": "#/$defs/TechnicalFactId"
+        },
+        "operator": {
+          "title": "Operator",
+          "type": "string"
+        },
+        "actual_value": {
+          "title": "Actual Value",
+          "type": "string"
+        },
+        "threshold_value": {
+          "title": "Threshold Value",
+          "type": "string"
+        },
+        "unit": {
+          "$ref": "#/$defs/TechnicalFactUnit"
+        },
+        "matched": {
+          "title": "Matched",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "clause_id",
+        "fact_id",
+        "operator",
+        "actual_value",
+        "threshold_value",
+        "unit",
+        "matched"
+      ],
+      "title": "OfficialTechnicalComparisonResult",
+      "type": "object"
+    },
+    "OfficialTechnicalFact": {
+      "additionalProperties": false,
+      "properties": {
+        "fact_id": {
+          "$ref": "#/$defs/TechnicalFactId"
+        },
+        "unit": {
+          "$ref": "#/$defs/TechnicalFactUnit"
+        },
+        "numeric_value": {
+          "anyOf": [
+            {
+              "pattern": "^(?:[1-9][0-9]{0,17}(?:\\.[0-9]{1,6})?|0\\.(?!0{1,6}$)[0-9]{1,6})$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Numeric Value"
+        },
+        "boolean_value": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Boolean Value"
+        },
+        "text_value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TechnicalCellType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "evidence_ref": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+          "title": "Evidence Ref",
+          "type": "string"
+        },
+        "verified": {
+          "default": false,
+          "title": "Verified",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "fact_id",
+        "unit",
+        "evidence_ref"
+      ],
+      "title": "OfficialTechnicalFact",
+      "type": "object"
+    },
     "OwnershipControlRelationship": {
       "additionalProperties": false,
       "properties": {
@@ -3390,6 +4561,49 @@
       "title": "SourceStatusValue",
       "type": "string"
     },
+    "TechnicalCellType": {
+      "enum": [
+        "PRIMARY",
+        "SECONDARY"
+      ],
+      "title": "TechnicalCellType",
+      "type": "string"
+    },
+    "TechnicalFactId": {
+      "enum": [
+        "resolution_bits",
+        "sample_rate_msps",
+        "stores_or_processes_digitised_data",
+        "cell_type",
+        "energy_density_wh_per_kg",
+        "continuous_power_density_w_per_kg",
+        "measurement_temperature_celsius",
+        "is_battery"
+      ],
+      "title": "TechnicalFactId",
+      "type": "string"
+    },
+    "TechnicalFactUnit": {
+      "enum": [
+        "BITS",
+        "MSPS",
+        "BOOLEAN",
+        "CELL_TYPE",
+        "WH_PER_KG",
+        "W_PER_KG",
+        "CELSIUS"
+      ],
+      "title": "TechnicalFactUnit",
+      "type": "string"
+    },
+    "TechnicalProductFamily": {
+      "enum": [
+        "ADC_INTEGRATED_CIRCUIT",
+        "ELECTROCHEMICAL_CELL"
+      ],
+      "title": "TechnicalProductFamily",
+      "type": "string"
+    },
     "Uncertainty": {
       "additionalProperties": false,
       "properties": {
@@ -3534,6 +4748,9 @@
     "EventEnvelope",
     "SourceSnapshotListing",
     "SourceSnapshotDetail",
-    "SourceSnapshotHistory"
+    "SourceSnapshotHistory",
+    "OfficialScreeningRequest",
+    "OfficialScreeningResult",
+    "OfficialSourceRefreshResult"
   ]
 }

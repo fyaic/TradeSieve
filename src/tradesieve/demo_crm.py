@@ -24,6 +24,7 @@ from tradesieve.application.auth import (
 from tradesieve.application.contracts import (
     BusinessAction,
     CaseState,
+    ClassificationScheme,
     ContractModel,
     DataClassification,
     DocumentType,
@@ -35,11 +36,24 @@ from tradesieve.application.contracts import (
     ScreeningResult,
     Signal,
 )
+from tradesieve.application.official_screening import (
+    OfficialGoodsCandidate,
+    OfficialPartyName,
+    OfficialScreeningRequest,
+    OfficialScreeningResult,
+    OfficialTechnicalFact,
+)
 from tradesieve.application.screening_intake import (
     JSON_MEDIA_TYPE,
     CanonicalScreeningIntake,
 )
 from tradesieve.config import Settings
+from tradesieve.domain.eu_dual_use_technical import (
+    TechnicalCellType,
+    TechnicalFactId,
+    TechnicalFactUnit,
+    TechnicalProductFamily,
+)
 
 _CREATED_AT = datetime(2026, 8, 10, 1, 30, tzinfo=UTC)
 _HASH_ZERO = "sha256:" + "0" * 64
@@ -135,6 +149,18 @@ class DemoCrmScreeningResponse(ContractModel):
     record_id: str
     canonical_input_hash: str
     result: ScreeningResult
+    integration_events: list[DemoCrmIntegrationEvent]
+
+
+class DemoCrmOfficialScreeningResponse(ContractModel):
+    demo_only: Literal[True] = True
+    live_official_sources: Literal[True] = True
+    data_classification: Literal["SYNTHETIC_TRANSACTION"] = "SYNTHETIC_TRANSACTION"
+    warning: Literal[
+        "合成交易已调用真实活跃官方来源；结果用于技术验收，不是法律放行。"
+    ] = "合成交易已调用真实活跃官方来源；结果用于技术验收，不是法律放行。"
+    record_id: str
+    result: OfficialScreeningResult
     integration_events: list[DemoCrmIntegrationEvent]
 
 
@@ -238,7 +264,7 @@ def _base_request(
                     "type": "SYNTHETIC_REGISTRATION_ID",
                     "value": "CN-SYNTHETIC-91310000-001",
                     "issuer": "CN",
-                }
+                },
             ],
             "address": "上海市虹口区合成路 18 号",
         },
@@ -288,7 +314,7 @@ def _base_request(
                     "basis": "Synthetic bank and customer compliance policy scope.",
                     "fact_class": "SOURCE_ASSERTION",
                     "source_refs": ["demo-crm-policy:1.0.0"],
-                }
+                },
             ],
             "parties": parties,
             "ownership_and_control": [],
@@ -512,8 +538,8 @@ def _make_scenarios() -> dict[str, _Scenario]:
     record = _record(
         record_id="crm-quote-260810-0047",
         quote_number="HZ-260810-0047",
-        customer_name="伏尔加工业系统（合成）有限公司",
-        customer_country="俄罗斯",
+        customer_name="Benevolence International Foundation（公开名单测试样本）",
+        customer_country="美国 / 俄罗斯路线（合成交易）",
         sales_owner="顾明远",
         service_mode="中欧班列 + 卡车",
         incoterm="DAP Moscow",
@@ -539,8 +565,8 @@ def _make_scenarios() -> dict[str, _Scenario]:
     request = _base_request(
         record_id=record.record_id,
         correlation_id="crm-demo-red-0047",
-        buyer_name="ООО Волга Промышленные Системы (синтетика)",
-        buyer_country="RU",
+        buyer_name="Benevolence International Foundation",
+        buyer_country="US",
         buyer_identifier="RU-SYNTHETIC-7704-884219",
         end_user_name=None,
         end_user_country=None,
@@ -557,7 +583,16 @@ def _make_scenarios() -> dict[str, _Scenario]:
                     "code": "853710",
                     "candidate_only": True,
                     "rationale": "Supplier candidate code, pending review.",
-                }
+                },
+                {
+                    "candidate_ref": "annex-i-1",
+                    "scheme": "EU_DUAL_USE_ANNEX_I",
+                    "code": "3A001",
+                    "candidate_only": True,
+                    "rationale": (
+                        "Public Annex I code used only to exercise the live gate."
+                    ),
+                },
             ],
             "quantity": "36",
             "quantity_unit": "pieces",
@@ -645,13 +680,14 @@ def _make_scenarios() -> dict[str, _Scenario]:
         origin="深圳",
         destination="法兰克福",
         route_summary="深圳宝安 - 香港 - 法兰克福",
-        goods_summary="锂离子电池模组，UN3480 候选",
-        shipment_summary="12 箱，386 kg，1.8 m³",
+        goods_summary="高能量密度锂离子二次电芯（非电池包）",
+        shipment_summary="12 箱，386 kg，1.8 m³；电芯单体运输",
         amount="42,780.00",
         currency="EUR",
         action_due_at="明天 12:00 前",
         documents=[
             ("商业发票", "AVAILABLE"),
+            ("制造商技术规格书", "AVAILABLE"),
             ("MSDS", "MISSING"),
             ("UN38.3 测试概要", "MISSING"),
             ("航空运输鉴定书", "PENDING"),
@@ -669,11 +705,30 @@ def _make_scenarios() -> dict[str, _Scenario]:
         bank_country="DE",
         goods={
             "line_ref": "line-1",
-            "description": "Lithium-ion battery modules, UN3480 candidate",
+            "description": (
+                "High-energy-density lithium-ion secondary cells; not assembled "
+                "batteries"
+            ),
             "manufacturer": "东莞恒芯能源（演示）有限公司",
             "model_or_part_number": "HX-4820-SYNTHETIC",
+            "technical_specification": (
+                "Synthetic reviewed manufacturer sheet: secondary cell; 380 Wh/kg "
+                "at 20 C; not a battery assembly."
+            ),
+            "classification_candidates": [
+                {
+                    "candidate_ref": "annex-i-1",
+                    "scheme": "EU_DUAL_USE_ANNEX_I",
+                    "code": "3A001",
+                    "candidate_only": True,
+                    "rationale": (
+                        "Synthetic qualified candidate for deterministic 3A001.e.1 "
+                        "technical-assertion acceptance."
+                    ),
+                }
+            ],
             "quantity": "120",
-            "quantity_unit": "modules",
+            "quantity_unit": "cells",
             "total_value": "42780.00",
             "currency": "EUR",
             "origin_country": "CN",
@@ -693,7 +748,7 @@ def _make_scenarios() -> dict[str, _Scenario]:
         documents=documents,
         amount="42780.00",
         currency="EUR",
-        purpose="Synthetic payment for lithium-ion battery modules.",
+        purpose="Synthetic payment for high-energy-density lithium-ion cells.",
     )
     scenarios.append(
         (
@@ -1150,6 +1205,93 @@ def screen_demo_crm_record(
     )
 
 
+def official_request_for_demo_crm_record(
+    settings: Settings,
+    record_id: str,
+) -> OfficialScreeningRequest:
+    """Map one fixed synthetic CRM record into the live official-source contract."""
+
+    _require_demo(settings)
+    scenario = _SCENARIOS.get(record_id)
+    if scenario is None:
+        raise KeyError(record_id)
+    annex_candidates = [
+        candidate.code
+        for line in scenario.request.goods
+        for candidate in line.classification_candidates
+        if candidate.scheme is ClassificationScheme.EU_DUAL_USE_ANNEX_I
+    ]
+    annex_code = annex_candidates[0] if len(annex_candidates) == 1 else None
+    hs_candidates = [
+        candidate.code
+        for line in scenario.request.goods
+        for candidate in line.classification_candidates
+        if candidate.scheme is ClassificationScheme.HS
+    ]
+    hs_code = hs_candidates[0] if len(hs_candidates) == 1 else None
+    technical_specification_available = bool(
+        scenario.request.goods
+        and all(line.technical_specification for line in scenario.request.goods)
+    )
+    if record_id == "crm-quote-260810-0039":
+        goods = OfficialGoodsCandidate(
+            hs_code=hs_code,
+            annex_i_code=annex_code,
+            classification_verified=True,
+            technical_specification_available=True,
+            product_family=TechnicalProductFamily.ELECTROCHEMICAL_CELL,
+            technical_facts=[
+                OfficialTechnicalFact(
+                    fact_id=TechnicalFactId.IS_BATTERY,
+                    unit=TechnicalFactUnit.BOOLEAN,
+                    boolean_value=False,
+                    evidence_ref="manufacturer-datasheet-hx-4820",
+                    verified=True,
+                ),
+                OfficialTechnicalFact(
+                    fact_id=TechnicalFactId.CELL_TYPE,
+                    unit=TechnicalFactUnit.CELL_TYPE,
+                    text_value=TechnicalCellType.SECONDARY,
+                    evidence_ref="manufacturer-datasheet-hx-4820",
+                    verified=True,
+                ),
+                OfficialTechnicalFact.model_validate(
+                    {
+                        "fact_id": "energy_density_wh_per_kg",
+                        "unit": "WH_PER_KG",
+                        "numeric_value": "380",
+                        "evidence_ref": "manufacturer-datasheet-hx-4820",
+                        "verified": True,
+                    }
+                ),
+                OfficialTechnicalFact.model_validate(
+                    {
+                        "fact_id": "measurement_temperature_celsius",
+                        "unit": "CELSIUS",
+                        "numeric_value": "20",
+                        "evidence_ref": "manufacturer-datasheet-hx-4820",
+                        "verified": True,
+                    }
+                ),
+            ],
+        )
+    else:
+        goods = OfficialGoodsCandidate(
+            hs_code=hs_code,
+            annex_i_code=annex_code,
+            classification_verified=False,
+            technical_specification_available=technical_specification_available,
+        )
+    return OfficialScreeningRequest(
+        party_names=[
+            OfficialPartyName(name=party.legal_name)
+            for party in scenario.request.parties
+            if party.legal_name is not None
+        ],
+        goods=goods,
+    )
+
+
 def _require_demo(settings: Settings) -> None:
     if settings.mode != "demo":
         raise RuntimeError("synthetic CRM demonstrator requires explicit demo mode")
@@ -1157,9 +1299,12 @@ def _require_demo(settings: Settings) -> None:
 
 __all__ = [
     "DemoCrmDetailResponse",
+    "DemoCrmIntegrationEvent",
     "DemoCrmListResponse",
+    "DemoCrmOfficialScreeningResponse",
     "DemoCrmScreeningResponse",
     "get_demo_crm_record",
     "list_demo_crm_records",
+    "official_request_for_demo_crm_record",
     "screen_demo_crm_record",
 ]
