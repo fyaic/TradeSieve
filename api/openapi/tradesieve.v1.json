@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "TradeSieve API",
-    "version": "0.1.0-alpha.2",
+    "version": "0.1.0-alpha.3",
     "summary": "Canonical contract for evidence-oriented trade-compliance screening and human review",
     "description": "Alpha prototype contract. A successful API response is not legal clearance. Only an authorized human decision can create HUMAN_CLEARED for a named action, scope, and expiry.",
     "license": {

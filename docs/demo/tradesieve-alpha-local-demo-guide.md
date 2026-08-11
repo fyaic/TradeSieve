@@ -1,7 +1,7 @@
 # TradeSieve Alpha 本地演示与接入指南
 
 **验证日期：** 2026-08-11
-**适用版本：** `0.1.0-alpha.2` 及当前 `main`
+**适用版本：** `0.1.0-alpha.3` 及当前 `main`
 **对象：** 业务负责人、合规/法务、CRM/OMS 集成开发者、CLI/Agent 使用者
 **性质：** 可运行的技术原型与接入说明，不是法律意见、自动法律判断或生产放行系统。
 
@@ -55,7 +55,7 @@ TradeSieve 当前已经能演示一条真实运行链路：
 ```bash
 git clone git@github.com:fyaic/TradeSieve.git
 cd TradeSieve
-git checkout v0.1.0-alpha.2
+git checkout v0.1.0-alpha.3
 cp .env.example .env
 docker compose up -d --build --wait
 docker compose run --rm --no-deps app \

@@ -2,6 +2,15 @@
 
 All notable changes to TradeSieve are documented here. Versions follow Semantic Versioning for public interfaces and PEP 440 for the Python package.
 
+## [0.1.0a3] - 2026-08-11
+
+Release-pipeline repair; application behavior is unchanged from `0.1.0a2`.
+
+### Fixed
+
+- Verify portable wheel/source-archive checksum entries from the directory containing
+  the built artifacts, with a repository regression assertion for the working path.
+
 ## [0.1.0a2] - 2026-08-11
 
 Agent-interface and delivery hardening preview.
@@ -50,5 +59,6 @@ First distributable engineering prototype.
 - No fuzzy/transliteration matching, ownership/control propagation, OFAC 50 Percent Rule, complete Russia goods/route/legal-effect engine, general workbook ingestion, production case workflow, OIDC tenancy, webhook or MCP server is included.
 - CHPL, HS and technical candidates do not constitute customs/export classification, prohibition, licence determination or clearance.
 
+[0.1.0a3]: https://github.com/fyaic/TradeSieve/releases/tag/v0.1.0-alpha.3
 [0.1.0a2]: https://github.com/fyaic/TradeSieve/releases/tag/v0.1.0-alpha.2
 [0.1.0a1]: https://github.com/fyaic/TradeSieve/releases/tag/v0.1.0-alpha.1

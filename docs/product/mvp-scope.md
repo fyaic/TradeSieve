@@ -2,7 +2,7 @@
 
 **Planning window:** 2026-08-10 through 2026-09-18 (three two-week sprints)
 **Planning assumption:** dates are a baseline until team capacity and source access are confirmed.
-**Current repository state:** `0.1.0a2` engineering prototype. A real-source screening vertical slice, active-source CLI, authenticated technical-preview REST endpoint, one local read-only stdio MCP tool and synthetic CRM are implemented. Full transaction/case persistence, reviewer workflow, webhook, remote MCP/OAuth and the broader target tool set remain acceptance targets.
+**Current repository state:** `0.1.0a3` engineering prototype. A real-source screening vertical slice, active-source CLI, authenticated technical-preview REST endpoint, one local read-only stdio MCP tool and synthetic CRM are implemented. Full transaction/case persistence, reviewer workflow, webhook, remote MCP/OAuth and the broader target tool set remain acceptance targets.
 
 ## Phase 1 outcome
 

@@ -22,7 +22,7 @@ x-tradesieve-service: &tradesieve-service
   build:
     context: .
     dockerfile: Dockerfile
-  image: tradesieve:0.1.0-alpha.2
+  image: tradesieve:0.1.0-alpha.3
   environment: *tradesieve-environment
   init: true
   read_only: true
