@@ -1,6 +1,6 @@
 # Technical handoff
 
-**Release target:** `0.1.0a5`  
+**Release target:** `0.1.0a5`
 **Audience:** engineering, platform, security, data governance and future compliance-rule owners
 
 This document keeps engineering evidence out of the business-facing README while preserving an auditable handoff.
