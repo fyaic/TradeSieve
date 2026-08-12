@@ -131,8 +131,8 @@ def source_registration_row(*, active: bool = True) -> tuple[Any, ...]:
         None,
         "Synthetic demo fixture; no production use",
         None,
-        3600,
-        7200,
+        604800,
+        2592000,
         active,
     )
 
@@ -488,7 +488,7 @@ def test_readiness_rejects_missing_rule_coverage(
             [
                 source_entry(
                     observed_at=datetime.now(UTC),
-                    retrieved_at=datetime.now(UTC) - timedelta(hours=3),
+                    retrieved_at=datetime.now(UTC) - timedelta(days=31),
                 )
             ],
             "STALE",
@@ -643,6 +643,39 @@ def test_bootstrap_reuses_exact_registered_source_without_registry_writes(
     runtime.bootstrap_demo(Settings())
     assert bootstrapped == ["source", "rule"]
     assert connection.executed == []
+
+
+def test_bootstrap_replaces_only_the_removed_legacy_registration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connection = FakeConnection()
+    use_connection(monkeypatch, connection)
+    bootstrapped: list[str] = []
+    monkeypatch.setattr(
+        runtime,
+        "prepare_demo_source_bootstrap",
+        lambda active_connection, registration: DemoSourcePreflightState.LEGACY_REMOVED,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_bootstrap_demo_source_snapshots",
+        lambda settings, active_connection: bootstrapped.append("source"),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_bootstrap_demo_rule_bundle",
+        lambda settings, active_connection, now: bootstrapped.append("rule"),
+    )
+
+    runtime.bootstrap_demo(Settings())
+
+    assert bootstrapped == ["source", "rule"]
+    assert not any(
+        "INSERT INTO source_set_manifest" in query for query, _ in connection.executed
+    )
+    assert any(
+        "INSERT INTO source_registry" in query for query, _ in connection.executed
+    )
 
 
 def test_demo_bootstrap_preflight_failure_has_no_downstream_bootstrap_write(

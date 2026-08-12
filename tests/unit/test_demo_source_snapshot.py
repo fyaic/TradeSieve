@@ -253,6 +253,13 @@ def graph_environment(root: Path) -> GraphEnvironment:
     return GraphEnvironment(settings, graph, repository, audits)
 
 
+def test_demo_source_registration_remains_current_for_business_evaluation() -> None:
+    registration = demo_source_registration(Settings())
+
+    assert registration.refresh_expectation == timedelta(days=7)
+    assert registration.stale_after == timedelta(days=30)
+
+
 def test_fixtures_are_stable_finite_obviously_synthetic_and_ordered() -> None:
     settings = Settings()
     first = synthetic_demo_source_fixtures(settings)
@@ -1170,6 +1177,59 @@ def test_preflight_first_locks_scope_and_compare_deletes_only_exact_marker() -> 
         observed,
         observed,
     )
+
+
+def test_preflight_upgrades_only_the_exact_legacy_freshness_registration() -> None:
+    registration = demo_source_registration(Settings())
+    legacy_row = list(registration_row(registration))
+    legacy_row[13:15] = [3600, 7200]
+    observed = datetime(2026, 8, 6, tzinfo=UTC)
+    marker = ("AVAILABLE", observed, "synthetic-snapshot-v1", observed, observed)
+    connection = PreflightConnection(
+        registration,
+        manifest=([registration.source_id],),
+        registration_row=tuple(legacy_row),
+        observation=marker,
+    )
+
+    assert (
+        prepare_demo_source_bootstrap(cast(Any, connection), registration=registration)
+        is DemoSourcePreflightState.LEGACY_REMOVED
+    )
+    assert sum(query.startswith("DELETE") for query, _ in connection.calls) == 1
+
+
+def test_preflight_rejects_legacy_freshness_without_the_exact_marker() -> None:
+    registration = demo_source_registration(Settings())
+    legacy_row = list(registration_row(registration))
+    legacy_row[13:15] = [3600, 7200]
+    connection = PreflightConnection(
+        registration,
+        manifest=([registration.source_id],),
+        registration_row=tuple(legacy_row),
+        observation=None,
+    )
+
+    with pytest.raises(DemoSourceBootstrapUnavailable):
+        prepare_demo_source_bootstrap(cast(Any, connection), registration=registration)
+    assert not any(query.startswith("DELETE") for query, _ in connection.calls)
+
+
+def test_preflight_rejects_legacy_freshness_with_a_nonlegacy_observation() -> None:
+    registration = demo_source_registration(Settings())
+    legacy_row = list(registration_row(registration))
+    legacy_row[13:15] = [3600, 7200]
+    observed = datetime(2026, 8, 6, tzinfo=UTC)
+    connection = PreflightConnection(
+        registration,
+        manifest=([registration.source_id],),
+        registration_row=tuple(legacy_row),
+        observation=("AVAILABLE", observed, "sha256:" + "a" * 64, observed, observed),
+    )
+
+    with pytest.raises(DemoSourceBootstrapUnavailable):
+        prepare_demo_source_bootstrap(cast(Any, connection), registration=registration)
+    assert not any(query.startswith("DELETE") for query, _ in connection.calls)
 
 
 @pytest.mark.parametrize("registration_value", [object(), "inactive"])

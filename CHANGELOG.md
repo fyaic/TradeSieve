@@ -2,6 +2,28 @@
 
 All notable changes to TradeSieve are documented here. Versions follow Semantic Versioning for public interfaces and PEP 440 for the Python package.
 
+## [0.1.0a5] - 2026-08-12
+
+Business handoff and demonstrator reliability preview; official-source screening semantics are unchanged from `0.1.0a4`.
+
+### Added
+
+- Business-oriented repository front page with stable PDF, CRM, REST, CLI and MCP entry points and screenshot-backed outcomes.
+- One-command local business demo bootstrap that verifies source refresh, active screening, service readiness and the synthetic CRM before declaring success.
+- Business delivery pack with a scoped 95/100 demonstration/integration-readiness score and a separate technical handoff for engineering evidence and production blockers.
+- Same-run REST/CLI/MCP parity evidence and a visual summary suitable for non-technical reviewers.
+
+### Changed
+
+- Repository-owned synthetic demo source fixtures now warn after seven days and expire after thirty days, so a long-running local demo does not become unavailable after two hours. The official four-source active bundle remains limited to 48 hours.
+- Business progress wording is shorter and non-technical; detailed test, migration and live-source evidence moved to the technical handoff.
+- PDF and release metadata now target `0.1.0a5`.
+
+### Safety boundary
+
+- The 95/100 score applies only to business demonstration and synthetic integration handoff, not production or legal fitness.
+- Production use remains blocked on qualified policy review, case/reviewer workflows, ownership/control propagation, complete Russia/export-control effects, production identity/operations and a real CRM mapping exercise.
+
 ## [0.1.0a4] - 2026-08-11
 
 Documentation correctness repair; screening behavior is unchanged from `0.1.0a3`.
@@ -70,6 +92,7 @@ First distributable engineering prototype.
 - No fuzzy/transliteration matching, ownership/control propagation, OFAC 50 Percent Rule, complete Russia goods/route/legal-effect engine, general workbook ingestion, production case workflow, OIDC tenancy, webhook or MCP server is included.
 - CHPL, HS and technical candidates do not constitute customs/export classification, prohibition, licence determination or clearance.
 
+[0.1.0a5]: https://github.com/fyaic/TradeSieve/releases/tag/v0.1.0-alpha.5
 [0.1.0a4]: https://github.com/fyaic/TradeSieve/releases/tag/v0.1.0-alpha.4
 [0.1.0a3]: https://github.com/fyaic/TradeSieve/releases/tag/v0.1.0-alpha.3
 [0.1.0a2]: https://github.com/fyaic/TradeSieve/releases/tag/v0.1.0-alpha.2

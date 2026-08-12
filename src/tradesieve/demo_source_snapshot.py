@@ -147,8 +147,11 @@ def demo_source_registration(settings: Settings) -> SourceRegistration:
         data_scope="Synthetic entities with no production data",
         access_method=SourceAccessMethod.INTERNAL,
         licence_summary="Synthetic demo fixture; no production use",
-        refresh_expectation=timedelta(hours=1),
-        stale_after=timedelta(hours=2),
+        # These fixtures are immutable repository-owned demo evidence. Keep the
+        # reference stack usable across a multi-day business evaluation without
+        # weakening the independent 48-hour freshness gate on official sources.
+        refresh_expectation=timedelta(days=7),
+        stale_after=timedelta(days=30),
         active=True,
     )
 

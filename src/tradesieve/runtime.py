@@ -270,13 +270,17 @@ def bootstrap_demo(settings: Settings) -> None:
             connection,
             registration=registration,
         )
-        if preflight is DemoSourcePreflightState.EMPTY:
+        if preflight in {
+            DemoSourcePreflightState.EMPTY,
+            DemoSourcePreflightState.LEGACY_REMOVED,
+        }:
             registry = SourceRegistryService(PostgresSourceRegistry(connection))
-            registry.define_required_sources(
-                settings.deployment_id,
-                settings.required_source_set,
-                (DEMO_SOURCE_ID,),
-            )
+            if preflight is DemoSourcePreflightState.EMPTY:
+                registry.define_required_sources(
+                    settings.deployment_id,
+                    settings.required_source_set,
+                    (DEMO_SOURCE_ID,),
+                )
             registry.register(registration)
         _bootstrap_demo_source_snapshots(settings, connection)
         now = datetime.now(UTC)

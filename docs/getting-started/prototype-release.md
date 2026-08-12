@@ -1,6 +1,6 @@
 # Prototype release installation and handoff
 
-**Version:** `0.1.0a4`
+**Version:** `0.1.0a5`
 **Audience:** evaluator, integration developer and internal demonstrator.  
 **Boundary:** synthetic demonstration and architecture evaluation; not production legal clearance.
 
@@ -11,11 +11,8 @@ Prerequisites are Git access to the private `fyaic/TradeSieve` repository and Do
 ```bash
 git clone git@github.com:fyaic/TradeSieve.git
 cd TradeSieve
-git checkout v0.1.0-alpha.4
-cp .env.example .env
-docker compose up -d --build --wait
-docker compose run --rm --no-deps app \
-  python -m tradesieve.manage refresh-official-sources
+git checkout v0.1.0-alpha.5
+./scripts/start_business_demo.sh
 ```
 
 Open `http://127.0.0.1:8080/demo/crm`, choose a fixed quotation and select **发起合规审查**. The refresh requires network access to the named official publications. If refresh has not succeeded, the CRM remains held.
@@ -23,7 +20,8 @@ Open `http://127.0.0.1:8080/demo/crm`, choose a fixed quotation and select **发
 Clean up the isolated demo when finished:
 
 ```bash
-docker compose down --volumes --remove-orphans
+docker compose --env-file .env.example -p tradesieve-demo \
+  down --volumes --remove-orphans
 ```
 
 This deletes the demo database and private-source object volume.
@@ -54,7 +52,7 @@ Release assets contain a wheel and source archive. For an isolated engineering i
 
 ```bash
 python3.13 -m venv .venv
-.venv/bin/python -m pip install tradesieve-0.1.0a4-py3-none-any.whl
+.venv/bin/python -m pip install tradesieve-0.1.0a5-py3-none-any.whl
 .venv/bin/tradesieve-manage --help
 ```
 

@@ -1,7 +1,7 @@
 # External services and outbound dependencies
 
-**Evidence date:** 2026-08-11
-**Scope:** `0.1.0a4` engineering prototype.
+**Evidence date:** 2026-08-12
+**Scope:** `0.1.0a5` engineering prototype.
 
 TradeSieve does not require a commercial sanctions API. Ordinary screening reads a
 previously verified active bundle from the deployment's PostgreSQL database. Network
