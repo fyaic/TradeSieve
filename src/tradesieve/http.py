@@ -115,7 +115,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     runtime_settings = settings or get_settings()
     application = FastAPI(
         title="TradeSieve runtime foundation",
-        version="0.1.0a5",
+        version="0.1.0a6",
         debug=runtime_settings.debug,
     )
 

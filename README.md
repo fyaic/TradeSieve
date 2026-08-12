@@ -15,7 +15,7 @@ TradeSieve 是一个与 CRM、订单和订舱系统解耦的合规审查服务�
 
 | 你是谁 | 建议先看 | 可以马上做什么 |
 | --- | --- | --- |
-| 业务负责人、演示人员 | [图文演示 PDF](https://github.com/fyaic/TradeSieve/releases/download/v0.1.0-alpha.5/tradesieve-alpha-local-demo-guide-zh.pdf) · [业务交付包](docs/delivery/business-delivery-pack.md) | 看懂效果、讲解五个固定场景、确认后续试点流程 |
+| 业务负责人、演示人员 | [高清图文演示 PDF](https://github.com/fyaic/TradeSieve/releases/download/v0.1.0-alpha.6/tradesieve-alpha-local-demo-guide-zh.pdf) · [业务交付包](docs/delivery/business-delivery-pack.md) | 看懂效果、讲解五个固定场景、确认后续试点流程 |
 | CRM / OMS 团队 | [API 接入说明](docs/getting-started/official-screening-cli.md) · [OpenAPI](api/openapi/tradesieve.v1.json) | 用认证 REST 提交一笔合成订单并处理拦截结果 |
 | 没有 CRM 的业务或技术人员 | [完整演示与接入指南](docs/demo/tradesieve-alpha-local-demo-guide.md) | 通过网页、REST 或 CLI 使用同一个审查服务 |
 | Codex / Agent 使用者 | [MCP 与 Agent 接入](docs/getting-started/mcp-agent.md) · [真实 Agent 验收记录](docs/evidence/codex-agent-mcp-demo-2026-08-11.md) | 通过本地只读 MCP 工具审查，不获得放行能力 |
@@ -32,31 +32,33 @@ TradeSieve 是一个与 CRM、订单和订舱系统解耦的合规审查服务�
 
 ### 1. 中国国际物流 CRM 风格的合成询报价
 
-![TradeSieve 合成 CRM 概览](docs/demo/assets/tradesieve-alpha-local-demo-guide/01-crm-overview.png)
+[![TradeSieve 合成 CRM 概览](docs/demo/assets/tradesieve-alpha-local-demo-guide/01-crm-overview.png)](docs/demo/assets/tradesieve-alpha-local-demo-guide/01-crm-overview.png)
 
 ### 2. 名单候选：直接给出 `RED / HOLD`
 
 示例使用公开官方名单名称，不使用真实客户数据。页面同时显示来源版本和证据定位，便于人工复核。
 
-![公开名单候选产生 RED HOLD](docs/demo/assets/tradesieve-alpha-local-demo-guide/02-red-hold-official-match.png)
+[![公开名单候选产生 RED HOLD](docs/demo/assets/tradesieve-alpha-local-demo-guide/02-red-hold-official-match.png)](docs/demo/assets/tradesieve-alpha-local-demo-guide/02-red-hold-official-match.png)
 
 ### 3. 有限范围的两用物项技术阈值比较
 
 在业务已经提供合格 Annex I 候选和经核验技术参数时，当前首批 `3A001` 规则可以逐项比较，并说明为什么拦截。
 
-![3A001 技术阈值命中](docs/demo/assets/tradesieve-alpha-local-demo-guide/03-dual-use-threshold-match.png)
+[![3A001 技术阈值命中](docs/demo/assets/tradesieve-alpha-local-demo-guide/03-dual-use-threshold-match.png)](docs/demo/assets/tradesieve-alpha-local-demo-guide/03-dual-use-threshold-match.png)
 
 ### 4. CHPL 敏感候选：缺资料时请求补证
 
 HS-6 候选只触发增强尽调，不会冒充出口管制归类或禁运结论。
 
-![CHPL Tier 3A 请求补充证据](docs/demo/assets/tradesieve-alpha-local-demo-guide/04-chpl-tier3a-request-evidence.png)
+[![CHPL Tier 3A 请求补充证据](docs/demo/assets/tradesieve-alpha-local-demo-guide/04-chpl-tier3a-request-evidence.png)](docs/demo/assets/tradesieve-alpha-local-demo-guide/04-chpl-tier3a-request-evidence.png)
 
 ### 5. REST、CLI 和 MCP 调用同一个活跃版本
 
 下面是 2026-08-12 的本地同轮实测摘要。三种接口得到相同的 bundle、风险等级和业务动作；无效 MCP 参数被拒绝。
 
-![API CLI MCP 同源实测](docs/demo/assets/tradesieve-alpha-local-demo-guide/05-api-cli-mcp-parity.png)
+[![API CLI MCP 同源实测](docs/demo/assets/tradesieve-alpha-local-demo-guide/05-api-cli-mcp-parity.png)](docs/demo/assets/tradesieve-alpha-local-demo-guide/05-api-cli-mcp-parity.png)
+
+GitHub 页面会按窗口缩放图片；点击任一图片可查看无损原图。
 
 可复核的结构化记录见 [接口一致性证据](docs/evidence/interface-parity-2026-08-12.json)。
 
@@ -78,7 +80,7 @@ CRM 推荐在客户准入、报价放行、订单确认、订舱、装运和收�
 ```bash
 git clone git@github.com:fyaic/TradeSieve.git
 cd TradeSieve
-git checkout v0.1.0-alpha.5
+git checkout v0.1.0-alpha.6
 ./scripts/start_business_demo.sh
 ```
 
@@ -122,7 +124,7 @@ uv run --locked python scripts/mcp_stdio_probe.py \
 
 ## 项目进度
 
-**当前阶段：`0.1.0a5`，业务演示与原型接入准备度 `95/100`。** 这个内部交付检查分数只评价“业务团队能否拿到、看懂、演示并用合成数据接入”，不评价生产运营或法律正确率，也不是独立认证。评分依据和剩余 5 分见 [业务交付包](docs/delivery/business-delivery-pack.md)。
+**当前阶段：`0.1.0a6`，业务演示与原型接入准备度 `95/100`。** 这个内部交付检查分数只评价“业务团队能否拿到、看懂、演示并用合成数据接入”，不评价生产运营或法律正确率，也不是独立认证。评分依据和剩余 5 分见 [业务交付包](docs/delivery/business-delivery-pack.md)。
 
 | 业务能力 | 当前状态 | 业务能得到什么 |
 | --- | --- | --- |

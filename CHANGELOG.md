@@ -2,6 +2,20 @@
 
 All notable changes to TradeSieve are documented here. Versions follow Semantic Versioning for public interfaces and PEP 440 for the Python package.
 
+## [0.1.0a6] - 2026-08-12
+
+Delivery-asset quality repair; screening behavior is unchanged from `0.1.0a5`.
+
+### Fixed
+
+- Recaptured the four synthetic CRM states from the running application at 2.5K-class resolution and converted every delivery screenshot to a genuine lossless PNG.
+- Rebuilt the REST/CLI/MCP parity visual at 2560×1600 and made README screenshots clickable to their original files.
+- Regenerated the Chinese walkthrough PDF with the sharp assets instead of the mislabeled, lossy JPEG captures shipped in earlier alphas.
+
+### Added
+
+- A repository gate that rejects missing, non-PNG or undersized walkthrough screenshots before release.
+
 ## [0.1.0a5] - 2026-08-12
 
 Business handoff and demonstrator reliability preview; official-source screening semantics are unchanged from `0.1.0a4`.
@@ -93,6 +107,7 @@ First distributable engineering prototype.
 - CHPL, HS and technical candidates do not constitute customs/export classification, prohibition, licence determination or clearance.
 
 [0.1.0a5]: https://github.com/fyaic/TradeSieve/releases/tag/v0.1.0-alpha.5
+[0.1.0a6]: https://github.com/fyaic/TradeSieve/releases/tag/v0.1.0-alpha.6
 [0.1.0a4]: https://github.com/fyaic/TradeSieve/releases/tag/v0.1.0-alpha.4
 [0.1.0a3]: https://github.com/fyaic/TradeSieve/releases/tag/v0.1.0-alpha.3
 [0.1.0a2]: https://github.com/fyaic/TradeSieve/releases/tag/v0.1.0-alpha.2

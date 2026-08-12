@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import re
+import struct
 import sys
 from pathlib import Path
 from urllib.parse import unquote
@@ -78,6 +79,17 @@ REQUIRED = (
     "research/sources.yaml",
 )
 MARKDOWN_LINK = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
+DEMO_SCREENSHOTS = tuple(
+    ROOT / "docs/demo/assets/tradesieve-alpha-local-demo-guide" / filename
+    for filename in (
+        "01-crm-overview.png",
+        "02-red-hold-official-match.png",
+        "03-dual-use-threshold-match.png",
+        "04-chpl-tier3a-request-evidence.png",
+        "05-api-cli-mcp-parity.png",
+    )
+)
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
 def reject_duplicate_json_keys(pairs):
@@ -91,6 +103,25 @@ def reject_duplicate_json_keys(pairs):
 
 def load_json_text(text: str):
     return json.loads(text, object_pairs_hook=reject_duplicate_json_keys)
+
+
+def check_demo_screenshots() -> list[str]:
+    errors: list[str] = []
+    for path in DEMO_SCREENSHOTS:
+        relative = path.relative_to(ROOT)
+        if not path.is_file():
+            errors.append(f"missing demo screenshot: {relative}")
+            continue
+        header = path.read_bytes()[:24]
+        if len(header) != 24 or header[:8] != PNG_SIGNATURE or header[12:16] != b"IHDR":
+            errors.append(f"{relative}: expected a genuine PNG image")
+            continue
+        width, height = struct.unpack(">II", header[16:24])
+        if width < 1600 or height < 900:
+            errors.append(
+                f"{relative}: expected at least 1600x900, got {width}x{height}"
+            )
+    return errors
 
 
 def check_local_links(path: Path, text: str) -> list[str]:
@@ -429,6 +460,7 @@ def main() -> int:
         )
 
     errors.extend(check_openapi())
+    errors.extend(check_demo_screenshots())
 
     old_repository_url = "github.com/" + "veil-chow-fyaic" + "/TradeSieve"
     for path in sorted(ROOT.rglob("*")):
