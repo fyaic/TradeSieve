@@ -1388,7 +1388,7 @@ if [[ "$final_source_audit_projection" != "14|14|true|2" ]]; then
 fi
 
 "${compose[@]}" exec -T postgres psql -U tradesieve -d tradesieve \
-  -c "UPDATE source_runtime_observation SET retrieved_at = CURRENT_TIMESTAMP - INTERVAL '3 hours', observed_at = CURRENT_TIMESTAMP WHERE deployment_id = 'demo' AND source_id = 'synthetic-source-v1'" >/dev/null
+  -c "UPDATE source_runtime_observation SET retrieved_at = CURRENT_TIMESTAMP - INTERVAL '31 days', observed_at = CURRENT_TIMESTAMP WHERE deployment_id = 'demo' AND source_id = 'synthetic-source-v1'" >/dev/null
 assert_live "stale required source"
 assert_readiness_unavailable "stale required source"
 assert_source_listing "STALE" "false" "2"

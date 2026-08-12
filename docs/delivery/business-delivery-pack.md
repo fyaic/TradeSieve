@@ -53,7 +53,7 @@ TradeSieve 不替代业务系统，也不要求把监管数据写进 CRM。CRM �
 
 ## 5. 交付物清单
 
-- GitHub Release：源码包、Python wheel/sdist、校验和、SBOM、构建证明与 PDF；
+- GitHub Release：源码包、Python wheel/sdist、校验和与 PDF；
 - README：首页快速入口、效果截图、使用方式、进度和边界；
 - 合成 CRM：五条中国国际物流风格的固定询报价；
 - 接口：认证 REST、CLI、本地只读 MCP；

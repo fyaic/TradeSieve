@@ -645,6 +645,39 @@ def test_bootstrap_reuses_exact_registered_source_without_registry_writes(
     assert connection.executed == []
 
 
+def test_bootstrap_replaces_only_the_removed_legacy_registration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connection = FakeConnection()
+    use_connection(monkeypatch, connection)
+    bootstrapped: list[str] = []
+    monkeypatch.setattr(
+        runtime,
+        "prepare_demo_source_bootstrap",
+        lambda active_connection, registration: DemoSourcePreflightState.LEGACY_REMOVED,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_bootstrap_demo_source_snapshots",
+        lambda settings, active_connection: bootstrapped.append("source"),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_bootstrap_demo_rule_bundle",
+        lambda settings, active_connection, now: bootstrapped.append("rule"),
+    )
+
+    runtime.bootstrap_demo(Settings())
+
+    assert bootstrapped == ["source", "rule"]
+    assert not any(
+        "INSERT INTO source_set_manifest" in query for query, _ in connection.executed
+    )
+    assert any(
+        "INSERT INTO source_registry" in query for query, _ in connection.executed
+    )
+
+
 def test_demo_bootstrap_preflight_failure_has_no_downstream_bootstrap_write(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

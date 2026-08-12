@@ -140,22 +140,26 @@ def _classify(
 ) -> DemoSourcePreflightState:
     counts = _checked_counts(counts_row)
     registry_absent = manifest_row is None and registration_row is None
-    registry_exact = _manifest_is_exact(manifest_row, expected) and (
-        registration_row == _registration_values(expected)
-    )
-    if not registry_absent and not registry_exact:
+    manifest_exact = _manifest_is_exact(manifest_row, expected)
+    expected_values = _registration_values(expected)
+    registry_exact = manifest_exact and registration_row == expected_values
+    legacy_values = (*expected_values[:13], 3600, 7200, *expected_values[15:])
+    legacy_registry_exact = manifest_exact and registration_row == legacy_values
+    if not registry_absent and not registry_exact and not legacy_registry_exact:
         raise _UnsafeDemoState
     if registry_absent and any(counts):
         raise _UnsafeDemoState
     if observation_row is None:
         if registry_absent:
             return DemoSourcePreflightState.EMPTY
+        if legacy_registry_exact:
+            raise _UnsafeDemoState
         return (
             DemoSourcePreflightState.REGISTERED
             if not any(counts)
             else DemoSourcePreflightState.SNAPSHOT_GRAPH
         )
-    if not registry_exact or len(observation_row) != 5:
+    if (not registry_exact and not legacy_registry_exact) or len(observation_row) != 5:
         raise _UnsafeDemoState
     availability, observed_at, snapshot_id, retrieved_at, effective_from = (
         observation_row
@@ -169,6 +173,8 @@ def _classify(
         if any(counts):
             raise _UnsafeDemoState
         return DemoSourcePreflightState.LEGACY_REMOVED
+    if legacy_registry_exact:
+        raise _UnsafeDemoState
     if (
         isinstance(snapshot_id, str)
         and _REAL_SNAPSHOT_ID.fullmatch(snapshot_id) is not None
