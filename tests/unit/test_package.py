@@ -7,7 +7,7 @@ from tradesieve import __version__
 
 
 def test_package_exposes_alpha_version() -> None:
-    assert __version__ == "0.1.0a4"
+    assert __version__ == "0.1.0a5"
 
 
 def test_package_registers_the_management_console_script() -> None:
@@ -37,6 +37,6 @@ def test_container_cli_handoff_streams_the_host_request_over_stdin() -> None:
 
     for path in paths:
         document = path.read_text(encoding="utf-8")
-        assert "compose exec -T app" in document
+        assert "exec -T app" in document
         assert "screen-active --request -" in document
         assert "screen-active --request screening.json" not in document

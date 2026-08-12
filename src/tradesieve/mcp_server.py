@@ -22,7 +22,7 @@ from tradesieve.runtime import connect
 
 SERVER_NAME = "tradesieve"
 SERVER_TITLE = "TradeSieve official-source screening"
-SERVER_VERSION = "0.1.0a4"
+SERVER_VERSION = "0.1.0a5"
 SERVER_INSTRUCTIONS = (
     "Read-only trade-compliance decision support. Results are not legal clearance. "
     "GREEN_CANDIDATE still requires policy controls; HOLD and REQUEST_EVIDENCE must "

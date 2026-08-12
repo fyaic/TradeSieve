@@ -131,8 +131,8 @@ def source_registration_row(*, active: bool = True) -> tuple[Any, ...]:
         None,
         "Synthetic demo fixture; no production use",
         None,
-        3600,
-        7200,
+        604800,
+        2592000,
         active,
     )
 
@@ -488,7 +488,7 @@ def test_readiness_rejects_missing_rule_coverage(
             [
                 source_entry(
                     observed_at=datetime.now(UTC),
-                    retrieved_at=datetime.now(UTC) - timedelta(hours=3),
+                    retrieved_at=datetime.now(UTC) - timedelta(days=31),
                 )
             ],
             "STALE",

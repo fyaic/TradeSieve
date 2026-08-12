@@ -1,0 +1,31 @@
+{
+  "automatic_clearance": false,
+  "business_action": "HOLD",
+  "input": "examples/requests/official-screening.json",
+  "interfaces": {
+    "CLI": {
+      "command": "tradesieve-manage screen-active",
+      "result": "RED / HOLD"
+    },
+    "MCP": {
+      "invalid_request_rejected": true,
+      "protocol": "stdio",
+      "protocol_version": "2025-11-25",
+      "result": "RED / HOLD",
+      "tool": "screen_transaction"
+    },
+    "REST API": {
+      "endpoint": "POST /v1/official-screenings",
+      "result": "RED / HOLD"
+    }
+  },
+  "release_candidate": "0.1.0a5",
+  "verification_environments": [
+    "tradesieve-walkthrough",
+    "tradesieve-delivery-check"
+  ],
+  "parity": true,
+  "schema_version": "1.0.0",
+  "source_bundle_id": "official-bundle-29ecef0561b30897b2f73870714b9181fd7fae96c36d1985aeb5ebbfd66834b4",
+  "verified_at": "2026-08-12T10:30:55+08:00"
+}

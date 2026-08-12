@@ -1,7 +1,7 @@
 # TradeSieve Alpha 本地演示与接入指南
 
 **验证日期：** 2026-08-11
-**适用版本：** `0.1.0-alpha.4` 及当前 `main`
+**适用版本：** `0.1.0-alpha.5` 及当前 `main`
 **对象：** 业务负责人、合规/法务、CRM/OMS 集成开发者、CLI/Agent 使用者
 **性质：** 可运行的技术原型与接入说明，不是法律意见、自动法律判断或生产放行系统。
 
@@ -55,11 +55,8 @@ TradeSieve 当前已经能演示一条真实运行链路：
 ```bash
 git clone git@github.com:fyaic/TradeSieve.git
 cd TradeSieve
-git checkout v0.1.0-alpha.4
-cp .env.example .env
-docker compose up -d --build --wait
-docker compose run --rm --no-deps app \
-  python -m tradesieve.manage refresh-official-sources
+git checkout v0.1.0-alpha.5
+./scripts/start_business_demo.sh
 ```
 
 打开：
@@ -71,14 +68,9 @@ http://127.0.0.1:8080/demo/crm
 如需像本文一样使用隔离名称与端口：
 
 ```bash
-COMPOSE_PROJECT_NAME=tradesieve-walkthrough \
+TRADESIEVE_DEMO_PROJECT=tradesieve-walkthrough \
 TRADESIEVE_HOST_PORT=18080 \
-docker compose up -d --build --wait
-
-COMPOSE_PROJECT_NAME=tradesieve-walkthrough \
-TRADESIEVE_HOST_PORT=18080 \
-docker compose run --rm --no-deps app \
-  python -m tradesieve.manage refresh-official-sources
+./scripts/start_business_demo.sh
 ```
 
 打开 `http://127.0.0.1:18080/demo/crm`。
@@ -120,6 +112,16 @@ docker compose run --rm --no-deps app \
 ### 5.3 CHPL 敏感货物候选转为补件动作
 
 ![HS-6 850440 命中 CHPL Tier 3A 并列出补件项](assets/tradesieve-alpha-local-demo-guide/04-chpl-tier3a-request-evidence.png)
+
+### 5.4 REST、CLI 与 MCP 接口一致性
+
+2026-08-12 使用同一个合成请求完成一轮本地复核：认证 REST、`screen-active`
+CLI 和 `screen_transaction` MCP 工具都返回同一个活跃 bundle、`RED/HOLD` 和
+`automatic_clearance=false`；MCP 无效输入被拒绝。
+
+![REST、CLI、MCP 同源实测摘要](assets/tradesieve-alpha-local-demo-guide/05-api-cli-mcp-parity.png)
+
+结构化记录见 [接口一致性证据](../evidence/interface-parity-2026-08-12.json)。
 
 Excel 中的 CHPL 分层字段在这里被用于候选提示，但只有经过官方页面核对、带日期和哈希的 50 项 fixture 可执行。表内占位主体、船舶、概述文字和未同步记录没有被当作官方事实导入。
 
@@ -323,15 +325,15 @@ BIS CHPL 在当前版本中是有访问日期和内容哈希的内置快照，�
 默认项目：
 
 ```bash
-docker compose down --volumes --remove-orphans
+docker compose --env-file .env.example -p tradesieve-demo \
+  down --volumes --remove-orphans
 ```
 
 本文隔离项目：
 
 ```bash
-COMPOSE_PROJECT_NAME=tradesieve-walkthrough \
-TRADESIEVE_HOST_PORT=18080 \
-docker compose down --volumes --remove-orphans
+docker compose --env-file .env.example -p tradesieve-walkthrough \
+  down --volumes --remove-orphans
 ```
 
 该操作会删除 demo PostgreSQL 和原始对象命名卷。不要把试点或生产证据放在此参考栈。

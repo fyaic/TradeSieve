@@ -253,6 +253,13 @@ def graph_environment(root: Path) -> GraphEnvironment:
     return GraphEnvironment(settings, graph, repository, audits)
 
 
+def test_demo_source_registration_remains_current_for_business_evaluation() -> None:
+    registration = demo_source_registration(Settings())
+
+    assert registration.refresh_expectation == timedelta(days=7)
+    assert registration.stale_after == timedelta(days=30)
+
+
 def test_fixtures_are_stable_finite_obviously_synthetic_and_ordered() -> None:
     settings = Settings()
     first = synthetic_demo_source_fixtures(settings)
