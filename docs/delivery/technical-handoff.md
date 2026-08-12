@@ -1,6 +1,6 @@
 # Technical handoff
 
-**Release target:** `0.1.0a5`
+**Release target:** `0.1.0a6`
 **Audience:** engineering, platform, security, data governance and future compliance-rule owners
 
 This document keeps engineering evidence out of the business-facing README while preserving an auditable handoff.
@@ -34,16 +34,15 @@ A repeated refresh returned `IDEMPOTENT`. A public SOVCOMFLOT sample returned `R
 
 On 2026-08-12 REST, CLI and MCP were re-run against the same active bundle. All returned `RED/HOLD`, `automatic_clearance=false` and bundle `official-bundle-29ecef0561b30897b2f73870714b9181fd7fae96c36d1985aeb5ebbfd66834b4`; invalid MCP input was rejected. See [structured evidence](../evidence/interface-parity-2026-08-12.json).
 
-The final local `0.1.0a5` repository gate passed 2,088 tests with 100% statement and branch coverage. A clean isolated `tradesieve-delivery-check` Compose project then built `0.1.0-alpha.5`, activated the four-source bundle, passed readiness and active-screening checks, rendered the synthetic CRM and returned `RED/HOLD` from the live page. REST and MCP were rerun against that deployment and returned the same bundle and conservative action; the MCP probe also rejected invalid input. The complete Compose compatibility gate also passed after upgrading the bounded legacy synthetic-source freshness registration. GitHub Actions and the Release provide the independent hosted run and final artifact hashes. Counts are evidence of the implemented boundary, not a claim of global data coverage, legal accuracy or production fitness.
+The final local `0.1.0a5` repository gate passed 2,088 tests with 100% statement and branch coverage. A clean isolated `tradesieve-delivery-check` Compose project then built `0.1.0-alpha.5`, activated the four-source bundle, passed readiness and active-screening checks, rendered the synthetic CRM and returned `RED/HOLD` from the live page. REST and MCP were rerun against that deployment and returned the same bundle and conservative action; the MCP probe also rejected invalid input. The complete Compose compatibility gate also passed after upgrading the bounded legacy synthetic-source freshness registration. The `0.1.0a6` delivery-only repair repeated the same 2,088-test, 100%-coverage repository gate and added lossless screenshot validation; it does not change screening semantics. GitHub Actions and the Release provide the independent hosted run and final artifact hashes. Counts are evidence of the implemented boundary, not a claim of global data coverage, legal accuracy or production fitness.
 
-## 3. `0.1.0a5` delivery changes
+## 3. `0.1.0a6` delivery changes
 
-- business-oriented README with stable delivery links and screenshot-backed outcomes;
-- one-command local business demo bootstrap with bounded official-source retry and active-screening verification;
-- 7-day warning / 30-day expiry for repository-owned synthetic demo snapshots so a long-running demo does not become unusable after two hours; official four-source screening remains limited to 48 hours;
-- business delivery scorecard and explicit human/professional sign-off gap;
-- current REST/CLI/MCP parity evidence and visual summary;
-- refreshed PDF/release packaging and alpha version metadata.
+- recaptured all four CRM states from the live local application at 2.5K-class resolution and standardized the delivery files as genuine PNGs;
+- rebuilt the interface-parity visual at 2560×1600 and made README/walkthrough images open their original files when clicked;
+- regenerated and visually inspected the 14-page Chinese PDF with the sharp assets;
+- added a repository quality gate that rejects missing, non-PNG or undersized delivery screenshots;
+- changed only delivery assets and version metadata; screening semantics remain identical to `0.1.0a5`.
 
 ## 4. Production blockers
 

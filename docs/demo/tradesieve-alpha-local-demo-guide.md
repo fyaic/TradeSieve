@@ -1,7 +1,7 @@
 # TradeSieve Alpha 本地演示与接入指南
 
-**验证日期：** 2026-08-11
-**适用版本：** `0.1.0-alpha.5` 及当前 `main`
+**验证日期：** 2026-08-12
+**适用版本：** `0.1.0-alpha.6` 及当前 `main`
 **对象：** 业务负责人、合规/法务、CRM/OMS 集成开发者、CLI/Agent 使用者
 **性质：** 可运行的技术原型与接入说明，不是法律意见、自动法律判断或生产放行系统。
 
@@ -55,7 +55,7 @@ TradeSieve 当前已经能演示一条真实运行链路：
 ```bash
 git clone git@github.com:fyaic/TradeSieve.git
 cd TradeSieve
-git checkout v0.1.0-alpha.5
+git checkout v0.1.0-alpha.6
 ./scripts/start_business_demo.sh
 ```
 
@@ -85,7 +85,9 @@ TRADESIEVE_HOST_PORT=18080 \
 6. 核对 `source_bundle_id`、snapshot ID 和证据定位；
 7. CRM 只保存必要引用和业务动作，不复制内部名单、规则、相似度特征或复核笔记。
 
-![CRM 总览：5 条合成中国国际物流询报价与独立 TradeSieve 门禁](assets/tradesieve-alpha-local-demo-guide/01-crm-overview.png)
+以下图片均为无损原图；在 GitHub 中点击图片可查看完整分辨率。
+
+[![CRM 总览：5 条合成中国国际物流询报价与独立 TradeSieve 门禁](assets/tradesieve-alpha-local-demo-guide/01-crm-overview.png)](assets/tradesieve-alpha-local-demo-guide/01-crm-overview.png)
 
 ## 5. 五个合成场景说明
 
@@ -99,19 +101,19 @@ TRADESIEVE_HOST_PORT=18080 \
 
 ### 5.1 制裁名单候选触发业务拦截
 
-![公开 EU FSF 别名候选、证据定位与 RED/HOLD](assets/tradesieve-alpha-local-demo-guide/02-red-hold-official-match.png)
+[![公开 EU FSF 别名候选、证据定位与 RED/HOLD](assets/tradesieve-alpha-local-demo-guide/02-red-hold-official-match.png)](assets/tradesieve-alpha-local-demo-guide/02-red-hold-official-match.png)
 
 页面展示的是**官方别名候选**和原生 XML 定位，不是“系统已认定交易违法”。当前名称能力只做 Unicode 规范化后的精确候选；模糊匹配、音译、词序变化、股权/控制传播和 OFAC 50 Percent Rule 尚未实现，所以候选要人工复核，无候选也不能自动放行。
 
 ### 5.2 两用物项有限技术规则
 
-![来源绑定的 3A001.e.1 二次电芯参数比较](assets/tradesieve-alpha-local-demo-guide/03-dual-use-threshold-match.png)
+[![来源绑定的 3A001.e.1 二次电芯参数比较](assets/tradesieve-alpha-local-demo-guide/03-dual-use-threshold-match.png)](assets/tradesieve-alpha-local-demo-guide/03-dual-use-threshold-match.png)
 
 该场景将经标记为“已审核”的合成结构化参数传给有限规则包，显示 20°C 与 380 Wh/kg 的比较和规则版本。它证明系统可以产生可追溯、可重放的确定性结果；它不证明 TradeSieve 能从货描或 HS 自动推导 `3A001`，也不覆盖 Annex I 的全部条目和注释。
 
 ### 5.3 CHPL 敏感货物候选转为补件动作
 
-![HS-6 850440 命中 CHPL Tier 3A 并列出补件项](assets/tradesieve-alpha-local-demo-guide/04-chpl-tier3a-request-evidence.png)
+[![HS-6 850440 命中 CHPL Tier 3A 并列出补件项](assets/tradesieve-alpha-local-demo-guide/04-chpl-tier3a-request-evidence.png)](assets/tradesieve-alpha-local-demo-guide/04-chpl-tier3a-request-evidence.png)
 
 ### 5.4 REST、CLI 与 MCP 接口一致性
 
@@ -119,7 +121,7 @@ TRADESIEVE_HOST_PORT=18080 \
 CLI 和 `screen_transaction` MCP 工具都返回同一个活跃 bundle、`RED/HOLD` 和
 `automatic_clearance=false`；MCP 无效输入被拒绝。
 
-![REST、CLI、MCP 同源实测摘要](assets/tradesieve-alpha-local-demo-guide/05-api-cli-mcp-parity.png)
+[![REST、CLI、MCP 同源实测摘要](assets/tradesieve-alpha-local-demo-guide/05-api-cli-mcp-parity.png)](assets/tradesieve-alpha-local-demo-guide/05-api-cli-mcp-parity.png)
 
 结构化记录见 [接口一致性证据](../evidence/interface-parity-2026-08-12.json)。
 

@@ -1,12 +1,12 @@
 # 业务交付包
 
-**适用版本：** `0.1.0a5`
+**适用版本：** `0.1.0a6`
 **适用范围：** 业务演示、流程评审、合成数据试接入和技术选型
 **不适用范围：** 真实交易自动放行、法律意见、生产替代现有合规团队
 
 ## 1. 建议阅读顺序
 
-1. 用 10–15 分钟浏览[图文演示 PDF](https://github.com/fyaic/TradeSieve/releases/download/v0.1.0-alpha.5/tradesieve-alpha-local-demo-guide-zh.pdf)；
+1. 用 10–15 分钟浏览[高清图文演示 PDF](https://github.com/fyaic/TradeSieve/releases/download/v0.1.0-alpha.6/tradesieve-alpha-local-demo-guide-zh.pdf)；
 2. 按 README 的“一键本地演示”启动合成 CRM；
 3. 依次演示“名单候选”“两用物项阈值”“CHPL 补证”和“普通询价”场景；
 4. CRM 团队阅读 [API 接入说明](../getting-started/official-screening-cli.md)；

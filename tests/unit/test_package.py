@@ -7,7 +7,7 @@ from tradesieve import __version__
 
 
 def test_package_exposes_alpha_version() -> None:
-    assert __version__ == "0.1.0a5"
+    assert __version__ == "0.1.0a6"
 
 
 def test_package_registers_the_management_console_script() -> None:
