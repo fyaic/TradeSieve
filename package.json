@@ -4,6 +4,6 @@
   "version": "0.1.0-alpha.6",
   "description": "Pinned documentation tooling for TradeSieve",
   "devDependencies": {
-    "@redocly/cli": "2.44.2"
+    "@redocly/cli": "2.49.0"
   }
 }
