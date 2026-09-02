@@ -1,5 +1,11 @@
-* @veil-chow-fyaic
-
+# Code ownership is intentionally scoped to security-sensitive implementation and
+# governed source/decision material. Dependency manifests are reviewed through CI
+# and the maintainer queue without automatically requesting a personal review.
+/src/ @veil-chow-fyaic
+/migrations/ @veil-chow-fyaic
+/api/ @veil-chow-fyaic
+/.github/workflows/ @veil-chow-fyaic
+/.github/CODEOWNERS @veil-chow-fyaic
 /docs/requirements/ @veil-chow-fyaic
 /docs/decisions/ @veil-chow-fyaic
 /research/ @veil-chow-fyaic

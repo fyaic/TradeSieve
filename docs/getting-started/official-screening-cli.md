@@ -130,7 +130,7 @@ With network access to the official publications and Docker available:
 ./scripts/test_official_screening_live.sh
 ```
 
-The gate uses an isolated project and temporary evidence directory. It runs migration 0007, performs an applied refresh plus an idempotent replay, screens the committed public candidate through CLI and authenticated REST, invokes the fixed CRM official-source route, and proves all three interfaces bind the same four-source bundle. Output is reduced to counts and booleans; containers, networks, volumes and temporary evidence are removed.
+The gate uses an isolated project and temporary evidence directory. It runs migration 0007, performs an applied refresh plus an idempotent replay, screens the committed public candidate through CLI and authenticated REST, invokes the fixed CRM official-source route and directly drives the packaged MCP server over stdio. It proves all four interfaces bind the same four-source bundle. Output is reduced to counts and booleans; containers, networks, volumes and temporary evidence are removed.
 
 ## Output and decisions
 

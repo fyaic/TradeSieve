@@ -1,4 +1,4 @@
-"""Validate bounded live four-source CLI, REST, and CRM evidence."""
+"""Validate bounded live four-source CLI, REST, CRM, and MCP evidence."""
 
 from __future__ import annotations
 
@@ -29,19 +29,32 @@ def _ofac_by_kind(result: OfficialScreeningResult) -> dict[str, OfficialOfacList
 
 
 def main() -> None:
-    if len(sys.argv) != 6:
-        raise SystemExit("five evidence file paths are required")
+    if len(sys.argv) != 7:
+        raise SystemExit("six evidence file paths are required")
     refresh = OfficialSourceRefreshResult.model_validate_json(_read(sys.argv[1]))
     replay = OfficialSourceRefreshResult.model_validate_json(_read(sys.argv[2]))
     cli = OfficialScreeningResult.model_validate_json(_read(sys.argv[3]))
     rest = OfficialScreeningResult.model_validate_json(_read(sys.argv[4]))
     crm_payload = json.loads(_read(sys.argv[5]))
+    mcp_payload = json.loads(_read(sys.argv[6]))
     if (
         not isinstance(crm_payload, dict)
         or crm_payload.get("live_official_sources") is not True
     ):
         raise RuntimeError("CRM response is not live official-source evidence")
     crm = OfficialScreeningResult.model_validate(crm_payload.get("result"))
+    if not isinstance(mcp_payload, dict) or set(mcp_payload.get("tools", [])) != {
+        "screen_transaction"
+    }:
+        raise RuntimeError("MCP response is outside the approved tool boundary")
+    if (
+        mcp_payload.get("protocol") != "stdio"
+        or mcp_payload.get("invalid_request_rejected") is not True
+        or mcp_payload.get("signal") != "RED"
+        or mcp_payload.get("business_action") != "HOLD"
+        or mcp_payload.get("automatic_clearance") is not False
+    ):
+        raise RuntimeError("MCP response did not enforce the live safety gate")
 
     if refresh.outcome is not OfficialSourceWriteOutcome.APPLIED:
         raise RuntimeError("first live refresh was not applied")
@@ -98,6 +111,8 @@ def main() -> None:
         kind: item.source_snapshot_id for kind, item in crm_ofac.items()
     } != {kind: item.source_snapshot_id for kind, item in cli_ofac.items()}:
         raise RuntimeError("CRM did not use the same active four-source bundle")
+    if mcp_payload.get("source_bundle_id") != refresh.bundle_id:
+        raise RuntimeError("MCP did not use the same active four-source bundle")
 
     print(
         json.dumps(
@@ -107,6 +122,7 @@ def main() -> None:
                 "dual_use_entries": refresh.dual_use_entry_count,
                 "fsf_entities": refresh.fsf_entity_count,
                 "idempotent_replay": True,
+                "mcp_same_bundle": True,
                 "ofac_consolidated_entries": (refresh.ofac_consolidated_entry_count),
                 "ofac_russia_candidate_held": True,
                 "ofac_sdn_entries": refresh.ofac_sdn_entry_count,

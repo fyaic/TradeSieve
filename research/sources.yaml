@@ -354,7 +354,7 @@ sources:
     jurisdiction: Global
     url: https://github.com/Redocly/redocly-cli
     use: Pinned Phase 1 OpenAPI linting in repository CI
-    access: MIT code; CI pins npm package version 2.44.2
+    access: MIT code; repository tooling pins npm package version 2.49.0
 
   - id: json-schema
     title: JSON Schema specification

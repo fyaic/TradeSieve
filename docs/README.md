@@ -71,6 +71,7 @@ TradeSieve documentation is decision-oriented: requirements preserve what is nee
 
 - [External services and outbound dependencies](operations/external-dependencies.md)
 - [REST/CLI/MCP interface parity evidence](evidence/interface-parity-2026-08-12.json)
+- [Dependency and MCP 2.1 smoke test](evidence/dependency-and-mcp-smoke-2026-09-02.md)
 - [MCP stdio smoke test](evidence/tradesieve-mcp-smoke-2026-08-11.md)
 - [Codex Agent MCP demonstration](evidence/codex-agent-mcp-demo-2026-08-11.md)
 

@@ -63,7 +63,7 @@ This endpoint is a bounded technical preview. It does not persist the request/re
 
 `docker compose up` starts PostgreSQL, runs the real Alembic migrations, loads the governed synthetic registration, creates and verifies two immutable source snapshots through retrieve/parse/validate/approve/activate, and uses authorized application services to activate one immutable synthetic rule bundle. It then starts the non-root read-only app and worker containers. The app, worker, and PostgreSQL services each have a healthcheck. No `runtime_coverage` source/rule marker is written or trusted.
 
-The application image uses the Docker Official Image for Python 3.13.14 through Google's Docker Hub pull-through cache and copies the separately pinned `uv` 0.12.1 binary. The acceptance script verifies both versions, UID `10001`, and read-only `/app` behavior inside the final image.
+The application image uses the Docker Official Image for Python 3.13.14 through Google's Docker Hub pull-through cache and copies the separately pinned `uv` 0.12.8 binary. The acceptance script verifies both versions, UID `10001`, and read-only `/app` behavior inside the final image.
 
 The reference database is the Docker Official Image for PostgreSQL 18.4, accessed through Google's Docker Hub pull-through cache and pinned to the same official multi-platform digest. The acceptance script verifies the server and `psql` minor versions. PostgreSQL 18 stores its versioned data below `/var/lib/postgresql`; the named volume mounts that parent path so data survives container recreation.
 

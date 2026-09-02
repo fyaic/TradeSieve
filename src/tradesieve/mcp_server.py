@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 import psycopg
 from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp_types import ToolAnnotations
 
 from tradesieve.adapters.postgres_official_sources import (
@@ -95,7 +96,10 @@ def build_server(
             RuntimeError,
             ValueError,
         ):
-            raise RuntimeError(UNAVAILABLE_MESSAGE) from None
+            # MCP SDK 2.1+ deliberately redacts unexpected exceptions. Use the
+            # SDK's anticipated tool-error type so callers receive our bounded,
+            # fail-closed instruction without exposing the underlying failure.
+            raise ToolError(UNAVAILABLE_MESSAGE) from None
 
     return server
 

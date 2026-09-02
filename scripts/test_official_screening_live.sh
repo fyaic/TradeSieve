@@ -86,13 +86,19 @@ run_bounded "$http_timeout_seconds" curl --fail-with-body --silent --show-error 
   -X POST \
   "http://127.0.0.1:${host_port}/demo/api/crm/records/crm-quote-260810-0047/screen-official" \
   --output "$evidence_dir/crm.json"
+run_bounded "$http_timeout_seconds" \
+  uv run --locked python scripts/mcp_stdio_probe.py \
+  --project-name "$compose_project" \
+  --request examples/requests/official-screening.json \
+  >"$evidence_dir/mcp.json"
 
 uv run python scripts/official_screening_live_assert.py \
   "$evidence_dir/refresh.json" \
   "$evidence_dir/replay.json" \
   "$evidence_dir/cli.json" \
   "$evidence_dir/rest.json" \
-  "$evidence_dir/crm.json"
+  "$evidence_dir/crm.json" \
+  "$evidence_dir/mcp.json"
 
 "${compose[@]}" down --volumes --remove-orphans
 assert_zero_residue
