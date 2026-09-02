@@ -5,7 +5,7 @@
 ## Prerequisites
 
 - Git;
-- `uv` 0.12.1;
+- `uv` 0.12.8;
 - Node.js/npm for the pinned Redocly contract lint command.
 
 The repository pins CPython 3.13.14 in `.python-version`. `uv` downloads that interpreter when it is not already available.

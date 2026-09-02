@@ -652,7 +652,7 @@ if [[ "$python_version" != "Python 3.13.14" ]]; then
 fi
 uv_version="$("${compose[@]}" run --rm --no-deps app uv --version)"
 read -r uv_name uv_semver _ <<<"$uv_version"
-if [[ "$uv_name" != "uv" || "$uv_semver" != "0.12.1" ]]; then
+if [[ "$uv_name" != "uv" || "$uv_semver" != "0.12.8" ]]; then
   echo "unexpected container uv version: $uv_version" >&2
   exit 1
 fi

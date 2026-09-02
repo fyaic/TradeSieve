@@ -28,6 +28,8 @@ def test_live_gate_is_bounded_isolated_authenticated_and_zero_residue() -> None:
     assert "Authorization: Bearer local_demo_only_official_screening_token" in text
     assert "/v1/official-screenings" in text
     assert "/screen-official" in text
+    assert "mcp_stdio_probe.py" in text
+    assert '"$evidence_dir/mcp.json"' in text
     assert "official_screening_live_assert.py" in text
     assert "mktemp -d" in text
     assert 'rm -r "$evidence_dir"' in text
@@ -44,6 +46,8 @@ def test_assertion_binds_all_interfaces_and_current_ofac_candidate() -> None:
     assert 'set(values) != {"SDN", "CONSOLIDATED"}' in text
     assert '"RUSSIA-EO14024"' in text
     assert "cli.model_dump() != rest.model_dump()" in text
+    assert 'mcp_payload.get("source_bundle_id") != refresh.bundle_id' in text
+    assert '"mcp_same_bundle": True' in text
     assert '"ofac_russia_candidate_held": True' in text
     assert "whole_name" not in text
     assert "identifier.number" not in text

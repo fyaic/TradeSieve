@@ -3,32 +3,36 @@ updates:
   - package-ecosystem: pip
     directory: /
     schedule:
-      interval: monthly
+      interval: quarterly
     groups:
       python-runtime:
         dependency-type: production
       python-development:
         dependency-type: development
     labels: ["dependencies", "python"]
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
 
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: monthly
+      interval: quarterly
     labels: ["dependencies", "documentation"]
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 1
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: monthly
+      interval: quarterly
     labels: ["dependencies", "ci"]
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 1
 
   - package-ecosystem: docker
     directory: /
     schedule:
-      interval: monthly
+      interval: quarterly
     labels: ["dependencies", "containers"]
-    open-pull-requests-limit: 3
+    # Base Python and uv image bumps must be coordinated with workflow, lock,
+    # documentation and acceptance pins; automated version PRs cannot do that.
+    # A zero limit disables Docker version-update PRs without suppressing
+    # Dependabot security-update PRs.
+    open-pull-requests-limit: 0
